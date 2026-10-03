@@ -17,6 +17,8 @@ enum Commands {
         #[arg(long, default_value_t = 0, allow_hyphen_values = true)]
         cents: i32,
         #[arg(long)]
+        to_note: Option<String>,
+        #[arg(long)]
         formant: bool,
     },
     Detect {
@@ -29,8 +31,12 @@ enum Commands {
         hz: f64,
     },
     Interval {
-        source: String,
-        target: String,
+        source: Option<String>,
+        target: Option<String>,
+        #[arg(long)]
+        source_hz: Option<f64>,
+        #[arg(long)]
+        target_note: Option<String>,
     },
     Add {
         source: String,
@@ -51,8 +57,24 @@ enum Commands {
     },
     #[command(subcommand)]
     Shelf(ShelfCmd),
+    #[command(subcommand)]
+    Variant(VariantCmd),
+    Favorites,
     Try {
         track_id: i64,
+    },
+}
+
+#[derive(Subcommand)]
+enum VariantCmd {
+    Add {
+        track_id: i64,
+        #[arg(long, allow_hyphen_values = true)]
+        cents: i32,
+        #[arg(long)]
+        path: String,
+        #[arg(long)]
+        formant: bool,
     },
 }
 
@@ -70,15 +92,15 @@ fn main() -> anyhow::Result<()> {
             let n = pitcher_core::notes::hz_to_note(*hz);
             println!("{} {:.2} Hz {:.1} cents off", n.name, hz, n.cents_off);
         }
-        Commands::Interval { source, target } => {
-            let c = pitcher_core::notes::cents_between_notes(source, target)?;
-            println!("{c:.0}");
+        Commands::Interval { .. } => {
+            anyhow::bail!("not implemented yet");
         }
         Commands::Pitch {
             input,
             output,
             cents,
             formant,
+            ..
         } => {
             let req = pitcher_core::engine::ShiftRequest {
                 input: input.into(),
@@ -163,7 +185,7 @@ fn main() -> anyhow::Result<()> {
                 c += *step;
             }
         }
-        Commands::Shelf(_) | Commands::Try { .. } => {
+        Commands::Shelf(_) | Commands::Variant(_) | Commands::Favorites | Commands::Try { .. } => {
             anyhow::bail!("not implemented yet");
         }
     }

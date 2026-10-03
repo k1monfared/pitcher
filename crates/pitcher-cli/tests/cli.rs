@@ -191,3 +191,202 @@ fn explore_generates_variants() {
     let s = String::from_utf8_lossy(&list.stdout);
     assert!(s.contains("3"), "expected 3 variants:\n{s}");
 }
+
+#[test]
+fn shelf_star_marks_favorite() {
+    if !have("ffmpeg") {
+        return;
+    }
+    let dir = tmp_dir("star");
+    let db = dir.join("shelf.sqlite");
+    let input = dir.join("in.wav");
+    make_tone(&input, 440.0, 1.0);
+
+    assert!(run(&[
+        "--db",
+        db.to_str().unwrap(),
+        "add",
+        input.to_str().unwrap(),
+        "--title",
+        "T"
+    ])
+    .status
+    .success());
+    let out = run(&[
+        "--db",
+        db.to_str().unwrap(),
+        "pitch",
+        input.to_str().unwrap(),
+        dir.join("o.wav").to_str().unwrap(),
+        "--cents",
+        "-100",
+    ]);
+    assert!(out.status.success());
+
+    let add = run(&[
+        "--db",
+        db.to_str().unwrap(),
+        "variant",
+        "add",
+        "1",
+        "--cents",
+        "-100",
+        "--path",
+        dir.join("o.wav").to_str().unwrap(),
+    ]);
+    assert!(
+        add.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&add.stderr)
+    );
+
+    let star = run(&["--db", db.to_str().unwrap(), "shelf", "star", "1"]);
+    assert!(
+        star.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&star.stderr)
+    );
+
+    let favs = run(&["--db", db.to_str().unwrap(), "favorites"]);
+    assert!(favs.status.success());
+    assert!(String::from_utf8_lossy(&favs.stdout).contains("1"));
+}
+
+#[test]
+fn shelf_prune_removes_variants() {
+    if !have("ffmpeg") {
+        return;
+    }
+    let dir = tmp_dir("prune");
+    let db = dir.join("shelf.sqlite");
+    let input = dir.join("in.wav");
+    make_tone(&input, 440.0, 1.0);
+
+    assert!(run(&[
+        "--db",
+        db.to_str().unwrap(),
+        "add",
+        input.to_str().unwrap(),
+        "--title",
+        "T"
+    ])
+    .status
+    .success());
+    let add = run(&[
+        "--db",
+        db.to_str().unwrap(),
+        "variant",
+        "add",
+        "1",
+        "--cents",
+        "-100",
+        "--path",
+        dir.join("o.wav").to_str().unwrap(),
+    ]);
+    assert!(add.status.success());
+    let prune = run(&["--db", db.to_str().unwrap(), "shelf", "prune", "1"]);
+    assert!(
+        prune.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&prune.stderr)
+    );
+    let list = run(&["--db", db.to_str().unwrap(), "list"]);
+    assert!(String::from_utf8_lossy(&list.stdout).contains("(0 variants)"));
+}
+
+#[test]
+fn shelf_export_copies_favorites() {
+    if !have("ffmpeg") {
+        return;
+    }
+    let dir = tmp_dir("export");
+    let db = dir.join("shelf.sqlite");
+    let input = dir.join("in.wav");
+    let variants = dir.join("var");
+    std::fs::create_dir_all(&variants).unwrap();
+    let vpath = variants.join("o.wav");
+    make_tone(&input, 440.0, 1.0);
+    make_tone(&vpath, 415.3, 1.0);
+
+    assert!(run(&[
+        "--db",
+        db.to_str().unwrap(),
+        "add",
+        input.to_str().unwrap(),
+        "--title",
+        "T"
+    ])
+    .status
+    .success());
+    let add = run(&[
+        "--db",
+        db.to_str().unwrap(),
+        "variant",
+        "add",
+        "1",
+        "--cents",
+        "-100",
+        "--path",
+        vpath.to_str().unwrap(),
+    ]);
+    assert!(add.status.success());
+    assert!(run(&["--db", db.to_str().unwrap(), "shelf", "star", "1"])
+        .status
+        .success());
+
+    let exp = run(&[
+        "--db",
+        db.to_str().unwrap(),
+        "shelf",
+        "export",
+        "1",
+        dir.join("dump").to_str().unwrap(),
+    ]);
+    assert!(
+        exp.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&exp.stderr)
+    );
+    let count = std::fs::read_dir(dir.join("dump")).unwrap().count();
+    assert!(count >= 1, "expected exported files, got {count}");
+}
+
+#[test]
+fn shift_to_target_note() {
+    if !have("ffmpeg") {
+        return;
+    }
+    let dir = tmp_dir("target");
+    let input = dir.join("in.wav");
+    let output = dir.join("out.wav");
+    make_tone(&input, 277.1826309768721, 1.0);
+
+    let out = run(&[
+        "pitch",
+        input.to_str().unwrap(),
+        output.to_str().unwrap(),
+        "--to-note",
+        "C4",
+        "--formant",
+    ]);
+    assert!(
+        out.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let s = String::from_utf8_lossy(&out.stdout);
+    assert!(s.contains("-100") || s.contains("C4"), "output: {s}");
+}
+
+#[test]
+fn manual_note_interval() {
+    let out = run(&["interval", "--source-hz", "277.18", "--target-note", "G5"]);
+    assert!(
+        out.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let s = String::from_utf8_lossy(&out.stdout);
+    let cents: f64 = s.split_whitespace().next().unwrap().parse().unwrap();
+    assert!((cents - 1800.0).abs() < 3.0, "got {cents}");
+}
