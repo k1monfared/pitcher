@@ -18,6 +18,7 @@ pub struct Track {
 pub struct Variant {
     pub id: i64,
     pub track_id: i64,
+    pub name: Option<String>,
     pub cents: i32,
     pub formant: bool,
     pub engine: String,

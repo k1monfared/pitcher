@@ -110,6 +110,71 @@ fn delete_track_with_files_missing_returns_false() {
 }
 
 #[test]
+fn rename_variant_sets_name() {
+    let shelf = Shelf::open(tmp_db("vrename")).unwrap();
+    let tid = shelf
+        .add_track("/music/a.wav", "file", None, "A", "", 12.0, 44100)
+        .unwrap();
+    let v = shelf
+        .add_variant(tid, -100, true, "finer", "quality", None, "/out/a.opus", Some("opus"))
+        .unwrap();
+    shelf.rename_variant(v, "my low version").unwrap();
+    let got = shelf.get_variant(v).unwrap().unwrap();
+    assert_eq!(got.name.as_deref(), Some("my low version"));
+}
+
+#[test]
+fn variants_default_to_no_name() {
+    let shelf = Shelf::open(tmp_db("vnoname")).unwrap();
+    let tid = shelf
+        .add_track("/music/a.wav", "file", None, "A", "", 12.0, 44100)
+        .unwrap();
+    let v = shelf
+        .add_variant(tid, -100, true, "finer", "quality", None, "/out/a.opus", Some("opus"))
+        .unwrap();
+    let got = shelf.get_variant(v).unwrap().unwrap();
+    assert_eq!(got.name, None);
+}
+
+#[test]
+fn old_db_without_name_column_migrates() {
+    use rusqlite::Connection;
+    let dir = std::env::temp_dir().join(format!("pitcher-mig-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let db = dir.join("old.sqlite");
+    let _ = std::fs::remove_file(&db);
+    let conn = Connection::open(&db).unwrap();
+    conn.execute_batch(
+        "CREATE TABLE tracks (id INTEGER PRIMARY KEY AUTOINCREMENT, source_path TEXT NOT NULL,
+            source_kind TEXT NOT NULL, source_url TEXT, title TEXT NOT NULL, artist TEXT,
+            duration_s REAL NOT NULL, sample_rate INTEGER,
+            created_at TEXT NOT NULL DEFAULT (datetime('now')));
+         CREATE TABLE variants (id INTEGER PRIMARY KEY AUTOINCREMENT,
+            track_id INTEGER NOT NULL REFERENCES tracks(id) ON DELETE CASCADE,
+            cents INTEGER NOT NULL, formant INTEGER NOT NULL, engine TEXT NOT NULL,
+            pitch_quality TEXT NOT NULL, section_start REAL, section_end REAL,
+            output_path TEXT NOT NULL, output_format TEXT, src_note TEXT, src_hz REAL,
+            target_note TEXT, target_hz REAL, favorite INTEGER NOT NULL DEFAULT 0,
+            created_at TEXT NOT NULL DEFAULT (datetime('now')));",
+    )
+    .unwrap();
+    drop(conn);
+
+    let shelf = Shelf::open(&db).unwrap();
+    let tid = shelf
+        .add_track("/music/a.wav", "file", None, "A", "", 12.0, 44100)
+        .unwrap();
+    let v = shelf
+        .add_variant(tid, -100, true, "finer", "quality", None, "/out/a.opus", Some("opus"))
+        .unwrap();
+    shelf.rename_variant(v, "migrated").unwrap();
+    assert_eq!(
+        shelf.get_variant(v).unwrap().unwrap().name.as_deref(),
+        Some("migrated")
+    );
+}
+
+#[test]
 fn add_variant_and_count() {
     let shelf = Shelf::open(tmp_db("var")).unwrap();
     let tid = shelf

@@ -17,3 +17,4 @@ thiserror.workspace = true
 rusqlite.workspace = true
 
 [dev-dependencies]
+rusqlite.workspace = true

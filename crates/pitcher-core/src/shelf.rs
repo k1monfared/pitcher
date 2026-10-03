@@ -32,6 +32,7 @@ impl Shelf {
              CREATE TABLE IF NOT EXISTS variants (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 track_id INTEGER NOT NULL REFERENCES tracks(id) ON DELETE CASCADE,
+                name TEXT,
                 cents INTEGER NOT NULL,
                 formant INTEGER NOT NULL,
                 engine TEXT NOT NULL,
@@ -48,7 +49,17 @@ impl Shelf {
                 created_at TEXT NOT NULL DEFAULT (datetime('now'))
              );",
         )?;
+        let has_name: bool = conn
+            .prepare("SELECT name FROM pragma_table_info('variants') WHERE name = 'name'")?
+            .exists([])?;
+        if !has_name {
+            conn.execute("ALTER TABLE variants ADD COLUMN name TEXT", [])?;
+        }
         Ok(Shelf { conn })
+    }
+
+    pub fn rename_variant(&self, _id: i64, _name: &str) -> anyhow::Result<()> {
+        unimplemented!()
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -164,7 +175,7 @@ impl Shelf {
 
     pub fn list_variants(&self, track_id: i64) -> anyhow::Result<Vec<Variant>> {
         let mut stmt = self.conn.prepare(
-            "SELECT id, track_id, cents, formant, engine, pitch_quality, section_start,
+            "SELECT id, track_id, name, cents, formant, engine, pitch_quality, section_start,
                     section_end, output_path, output_format, src_note, src_hz,
                     target_note, target_hz, favorite, created_at
              FROM variants WHERE track_id = ?1 ORDER BY cents, id",
@@ -175,7 +186,7 @@ impl Shelf {
 
     pub fn get_variant(&self, id: i64) -> anyhow::Result<Option<Variant>> {
         let mut stmt = self.conn.prepare(
-            "SELECT id, track_id, cents, formant, engine, pitch_quality, section_start,
+            "SELECT id, track_id, name, cents, formant, engine, pitch_quality, section_start,
                     section_end, output_path, output_format, src_note, src_hz,
                     target_note, target_hz, favorite, created_at
              FROM variants WHERE id = ?1",
@@ -185,7 +196,7 @@ impl Shelf {
 
     pub fn list_favorites(&self) -> anyhow::Result<Vec<Variant>> {
         let mut stmt = self.conn.prepare(
-            "SELECT id, track_id, cents, formant, engine, pitch_quality, section_start,
+            "SELECT id, track_id, name, cents, formant, engine, pitch_quality, section_start,
                     section_end, output_path, output_format, src_note, src_hz,
                     target_note, target_hz, favorite, created_at
              FROM variants WHERE favorite = 1 ORDER BY id",
@@ -279,19 +290,20 @@ fn map_variant(r: &rusqlite::Row) -> rusqlite::Result<Variant> {
     Ok(Variant {
         id: r.get(0)?,
         track_id: r.get(1)?,
-        cents: r.get(2)?,
-        formant: r.get::<_, i32>(3)? != 0,
-        engine: r.get(4)?,
-        pitch_quality: r.get(5)?,
-        section_start: r.get(6)?,
-        section_end: r.get(7)?,
-        output_path: r.get(8)?,
-        output_format: r.get(9)?,
-        src_note: r.get(10)?,
-        src_hz: r.get(11)?,
-        target_note: r.get(12)?,
-        target_hz: r.get(13)?,
-        favorite: r.get::<_, i32>(14)? != 0,
-        created_at: r.get(15)?,
+        name: r.get(2)?,
+        cents: r.get(3)?,
+        formant: r.get::<_, i32>(4)? != 0,
+        engine: r.get(5)?,
+        pitch_quality: r.get(6)?,
+        section_start: r.get(7)?,
+        section_end: r.get(8)?,
+        output_path: r.get(9)?,
+        output_format: r.get(10)?,
+        src_note: r.get(11)?,
+        src_hz: r.get(12)?,
+        target_note: r.get(13)?,
+        target_hz: r.get(14)?,
+        favorite: r.get::<_, i32>(15)? != 0,
+        created_at: r.get(16)?,
     })
 }
