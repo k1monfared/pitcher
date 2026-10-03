@@ -42,6 +42,8 @@ cargo build --release
 ./target/release/pitcher try 1
 ./target/release/pitcher shelf star 3
 ./target/release/pitcher shelf export 1 ./kept
+./target/release/pitcher rename 1 --title "New Title" --artist "Me"
+./target/release/pitcher delete 1            # asks first; --yes to skip
 ```
 
 ## Web UI
