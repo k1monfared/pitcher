@@ -106,6 +106,36 @@ describe("ApiClient", () => {
     expect(c.exportAllUrl(5)).toBe("/api/tracks/5/export");
   });
 
+  it("manages bookmarks", async () => {
+    const spy = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith("/bookmarks") && (!init || init.method === undefined || init.method === "GET")) {
+        return response([{ id: 1, t: 10 }]);
+      }
+      if (url.endsWith("/bookmarks") && init?.method === "POST") {
+        return response({ id: 2, t: 20 });
+      }
+      return response({ ok: true });
+    });
+    globalThis.fetch = spy as unknown as typeof fetch;
+    const c = new ApiClient();
+    expect(await c.listBookmarks(1)).toEqual([{ id: 1, t: 10 }]);
+    const created = await c.addBookmark(1, 20, "chorus");
+    expect(created).toEqual({ id: 2, t: 20 });
+    const postCall = spy.mock.calls[1];
+    expect(JSON.parse((postCall[1] as RequestInit).body as string)).toEqual({
+      t: 20,
+      name: "chorus",
+    });
+    await c.renameBookmark(2, "verse");
+    const patchCall = spy.mock.calls[2];
+    expect(String(patchCall[0])).toBe("/api/bookmarks/2");
+    expect((patchCall[1] as RequestInit).method).toBe("PATCH");
+    await c.deleteBookmark(2);
+    const delCall = spy.mock.calls[3];
+    expect((delCall[1] as RequestInit).method).toBe("DELETE");
+  });
+
   it("throws on error responses", async () => {
     globalThis.fetch = (async () => response("not found", false, 404)) as unknown as typeof fetch;
     const c = new ApiClient();

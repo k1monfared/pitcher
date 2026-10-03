@@ -2,10 +2,11 @@
   import { onMount } from "svelte";
   import PitchFader from "./lib/PitchFader.svelte";
   import Waveform from "./lib/Waveform.svelte";
+  import BookmarkStrip from "./lib/BookmarkStrip.svelte";
   import NoteTuner from "./lib/NoteTuner.svelte";
   import Transport from "./lib/Transport.svelte";
   import VariantShelf from "./lib/VariantShelf.svelte";
-  import { ApiClient, type Track, type Variant } from "./lib/api";
+  import { ApiClient, type Bookmark, type Track, type Variant } from "./lib/api";
   import { computePeaks } from "./lib/audio";
   import { isTextEntry, keyAction } from "./lib/view";
   import { PitchAudioEngine } from "./lib/engine";
@@ -21,6 +22,7 @@
   let tracks: Track[] = $state([]);
   let activeTrack: Track | null = $state(null);
   let variants: Variant[] = $state([]);
+  let bookmarks: Bookmark[] = $state([]);
   let activeVariant: Variant | null = $state(null);
   let cents = $state(0);
   let formant = $state(true);
@@ -97,6 +99,7 @@
     try {
       const detail = await api.getTrack(track.id);
       variants = detail.variants;
+      bookmarks = await api.listBookmarks(track.id);
     } catch (e) {
       status = `cannot open track: ${e}`;
       return;
@@ -293,6 +296,36 @@
     }
   }
 
+  async function addBookmark(name: string | null) {
+    if (!activeTrack) return;
+    try {
+      await api.addBookmark(activeTrack.id, time, name ?? undefined);
+      bookmarks = await api.listBookmarks(activeTrack.id);
+    } catch (e) {
+      status = `bookmark failed: ${e}`;
+    }
+  }
+
+  async function renameBookmark(id: number, name: string) {
+    if (!activeTrack) return;
+    try {
+      await api.renameBookmark(id, name);
+      bookmarks = await api.listBookmarks(activeTrack.id);
+    } catch (e) {
+      status = `rename failed: ${e}`;
+    }
+  }
+
+  async function deleteBookmark(id: number) {
+    if (!activeTrack) return;
+    try {
+      await api.deleteBookmark(id);
+      bookmarks = bookmarks.filter((b) => b.id !== id);
+    } catch (e) {
+      status = `delete failed: ${e}`;
+    }
+  }
+
   async function deleteVariant(v: Variant) {
     await api.deleteVariant(v.id);
     variants = variants.filter((x) => x.id !== v.id);
@@ -333,6 +366,7 @@
       if (activeTrack?.id === t.id) {
         activeTrack = null;
         variants = [];
+        bookmarks = [];
         activeVariant = null;
         peaks = [];
         engine.pause();
@@ -438,11 +472,23 @@
           duration={activeTrack.duration_s}
           {loop}
           playhead={time}
+          {bookmarks}
           onseek={(t) => {
             engine.seek(t);
             playhead = t;
           }}
           onloop={onLoop}
+        />
+        <BookmarkStrip
+          {bookmarks}
+          currentTime={time}
+          onadd={addBookmark}
+          onseek={(t) => {
+            engine.seek(t);
+            playhead = t;
+          }}
+          onrename={renameBookmark}
+          onremove={deleteBookmark}
         />
 
         <Transport

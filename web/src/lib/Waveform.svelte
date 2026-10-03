@@ -1,12 +1,14 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import { panBy, zoomAt, zoomCenter, type View } from "./view";
+  import { centerOn, followView, panBy, zoomAt, type View } from "./view";
+  import type { Bookmark } from "./api";
 
   let {
     peaks = [],
     duration = 0,
     loop = null,
     playhead = 0,
+    bookmarks = [],
     onseek,
     onloop,
   } = $props<{
@@ -14,6 +16,7 @@
     duration?: number;
     loop?: [number, number] | null;
     playhead?: number;
+    bookmarks?: Bookmark[];
     onseek?: (t: number) => void;
     onloop?: (loop: [number, number] | null) => void;
   }>();
@@ -22,6 +25,7 @@
   let width = 900;
   let height = 140;
   let view = $state<View | null>(null);
+  let follow = $state(true);
   let downX: number | null = null;
   let downTime: number | null = null;
   let downView: View | null = null;
@@ -84,6 +88,32 @@
       ctx.lineTo(px, height);
       ctx.stroke();
     }
+
+    ctx.font = "10px system-ui, sans-serif";
+    for (const b of bookmarks) {
+      if (b.t < span.start || b.t > span.end) continue;
+      const bx = timeToX(b.t);
+      ctx.strokeStyle = "#ffd166";
+      ctx.fillStyle = "#ffd166";
+      ctx.beginPath();
+      ctx.moveTo(bx, 0);
+      ctx.lineTo(bx, 12);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(bx, 2);
+      ctx.lineTo(bx - 4, 8);
+      ctx.lineTo(bx + 4, 8);
+      ctx.closePath();
+      ctx.fill();
+      const label = b.name?.trim() ? b.name : fmtClock(b.t);
+      ctx.fillText(label.slice(0, 24), bx + 5, 10);
+    }
+  }
+
+  function fmtClock(t: number): string {
+    const m = Math.floor(t / 60);
+    const s = Math.floor(t % 60);
+    return `${m}:${s.toString().padStart(2, "0")}`;
   }
 
   onMount(() => {
@@ -113,12 +143,17 @@
     playhead;
     duration;
     span;
+    if (follow && view) {
+      const next = followView(view, playhead, duration);
+      if (next !== view) view = next;
+    }
     draw();
   });
 
   $effect(() => {
     duration;
     view = null;
+    follow = true;
   });
 
   function localX(e: PointerEvent): number {
@@ -147,13 +182,27 @@
     } else if (gesture === "pan" && downView && duration > 0) {
       const secondsPerPixel = (downView.end - downView.start) / Math.max(1, width);
       view = panBy(downView, (downX - x) * secondsPerPixel, duration);
+      follow = false;
       draw();
     }
   }
 
+  function nearestMarker(x: number): number | null {
+    let best: number | null = null;
+    let bestDist = 9;
+    for (const b of bookmarks) {
+      const d = Math.abs(timeToX(b.t) - x);
+      if (d < bestDist) {
+        bestDist = d;
+        best = b.t;
+      }
+    }
+    return best;
+  }
+
   function onPointerUp(e: PointerEvent) {
     if (gesture === "maybe" && downX !== null) {
-      onseek?.(xToTime(downX));
+      onseek?.(nearestMarker(downX) ?? xToTime(downX));
     }
     gesture = null;
     downX = null;
@@ -166,18 +215,32 @@
     onloop?.(null);
   }
 
-  function zoomIn() {
-    view = zoomCenter(view, 0.5, duration);
+  function zoomOnPlayhead(factor: number) {
+    const centered = centerOn(view, playhead, duration) ?? {
+      start: 0,
+      end: duration,
+    };
+    view = zoomAt(centered, Math.max(0, Math.min(playhead, duration)), factor, duration);
     draw();
   }
 
+  function zoomIn() {
+    zoomOnPlayhead(0.5);
+  }
+
   function zoomOut() {
-    view = zoomCenter(view, 2, duration);
-    draw();
+    zoomOnPlayhead(2);
   }
 
   function zoomReset() {
     view = null;
+    follow = true;
+    draw();
+  }
+
+  function recenter() {
+    view = centerOn(view, playhead, duration);
+    follow = true;
     draw();
   }
 </script>
@@ -193,8 +256,13 @@
   <div class="hint">
     <span>click seek · drag pan · shift-drag loop · wheel zoom</span>
     <span class="zoom">
-      <button type="button" onclick={zoomIn} title="zoom in">+</button>
-      <button type="button" onclick={zoomOut} title="zoom out">-</button>
+      <button type="button" onclick={zoomIn} title="zoom in on playhead">+</button>
+      <button type="button" onclick={zoomOut} title="zoom out from playhead">-</button>
+      {#if view}
+        <button type="button" onclick={recenter} title="follow the playhead again">
+          {follow ? "following" : "recenter"}
+        </button>
+      {/if}
       <button type="button" onclick={zoomReset} title="show all">reset</button>
     </span>
     {#if loop}

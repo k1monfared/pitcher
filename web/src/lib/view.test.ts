@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
+  centerOn,
   clampView,
+  followView,
   isTextEntry,
   keyAction,
   MIN_VIEW_SPAN,
@@ -67,6 +69,39 @@ describe("panBy", () => {
   });
   it("returns null when already full", () => {
     expect(panBy(null, 5, 100)).toBeNull();
+  });
+});
+
+describe("centerOn", () => {
+  it("centers the span on t", () => {
+    expect(centerOn({ start: 0, end: 20 }, 50, 100)).toEqual({ start: 40, end: 60 });
+  });
+  it("clamps at edges", () => {
+    expect(centerOn({ start: 0, end: 20 }, 5, 100)).toEqual({ start: 0, end: 20 });
+    expect(centerOn({ start: 0, end: 20 }, 95, 100)).toEqual({ start: 80, end: 100 });
+  });
+  it("returns null when full", () => {
+    expect(centerOn(null, 50, 100)).toBeNull();
+  });
+});
+
+describe("followView", () => {
+  it("leaves the view alone when inside margins", () => {
+    const v = { start: 0, end: 100 };
+    expect(followView(v, 50, 200)).toBe(v);
+    expect(followView(v, 10, 200)).toBe(v);
+    expect(followView(v, 90, 200)).toBe(v);
+  });
+  it("shifts minimally to restore the margin", () => {
+    expect(followView({ start: 50, end: 150 }, 55, 200)).toEqual({ start: 45, end: 145 });
+    expect(followView({ start: 50, end: 150 }, 145, 200)).toEqual({ start: 55, end: 155 });
+  });
+  it("clamps at track edges", () => {
+    expect(followView({ start: 70, end: 100 }, 99, 100)).toEqual({ start: 70, end: 100 });
+    expect(followView({ start: 0, end: 30 }, 1, 100)).toEqual({ start: 0, end: 30 });
+  });
+  it("passes through null", () => {
+    expect(followView(null, 50, 100)).toBeNull();
   });
 });
 

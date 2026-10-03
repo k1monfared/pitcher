@@ -50,6 +50,34 @@ export function panBy(
   return clampView(cur.start + deltaSeconds, cur.end + deltaSeconds, duration);
 }
 
+export function centerOn(
+  view: View | null,
+  t: number,
+  duration: number,
+): View | null {
+  const cur = view ?? { start: 0, end: duration };
+  const span = cur.end - cur.start;
+  if (span >= duration || duration <= 0) return null;
+  const c = Math.max(0, Math.min(t, duration));
+  return clampView(c - span / 2, c + span / 2, duration);
+}
+
+export function followView(
+  view: View | null,
+  t: number,
+  duration: number,
+  margin = 0.1,
+): View | null {
+  if (!view || duration <= 0) return view;
+  const span = view.end - view.start;
+  if (span >= duration) return null;
+  const lo = view.start + margin * span;
+  const hi = view.end - margin * span;
+  if (t >= lo && t <= hi) return view;
+  const start = t < lo ? t - margin * span : t - (1 - margin) * span;
+  return clampView(start, start + span, duration);
+}
+
 export type KeyAction =
   | { type: "seek"; delta: number }
   | { type: "nudge"; delta: number };

@@ -31,6 +31,14 @@ export interface Variant {
   created_at: string;
 }
 
+export interface Bookmark {
+  id: number;
+  track_id: number;
+  t: number;
+  name: string | null;
+  created_at: string;
+}
+
 export interface NoteReading {
   name: string;
   midi: number;
@@ -180,5 +188,33 @@ export class ApiClient {
 
   async deleteTrack(id: number): Promise<unknown> {
     return json(await fetch(`${this.base}/api/tracks/${id}`, { method: "DELETE" }));
+  }
+
+  async listBookmarks(trackId: number): Promise<Bookmark[]> {
+    return json(await fetch(`${this.base}/api/tracks/${trackId}/bookmarks`));
+  }
+
+  async addBookmark(trackId: number, t: number, name?: string): Promise<Bookmark> {
+    return json(
+      await fetch(`${this.base}/api/tracks/${trackId}/bookmarks`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ t, name }),
+      }),
+    );
+  }
+
+  async renameBookmark(id: number, name: string): Promise<unknown> {
+    return json(
+      await fetch(`${this.base}/api/bookmarks/${id}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ name }),
+      }),
+    );
+  }
+
+  async deleteBookmark(id: number): Promise<unknown> {
+    return json(await fetch(`${this.base}/api/bookmarks/${id}`, { method: "DELETE" }));
   }
 }
