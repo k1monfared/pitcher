@@ -146,4 +146,22 @@ export class ApiClient {
   mediaUrl(variantId: number): string {
     return `${this.base}/api/media/${variantId}`;
   }
+
+  trackAudioUrl(trackId: number): string {
+    return `${this.base}/api/tracks/${trackId}/audio`;
+  }
+
+  async renameTrack(id: number, title?: string, artist?: string): Promise<{ track: Track }> {
+    return json(
+      await fetch(`${this.base}/api/tracks/${id}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ title, artist }),
+      }),
+    );
+  }
+
+  async deleteTrack(id: number): Promise<unknown> {
+    return json(await fetch(`${this.base}/api/tracks/${id}`, { method: "DELETE" }));
+  }
 }

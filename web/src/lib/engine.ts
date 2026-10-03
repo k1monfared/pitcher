@@ -8,7 +8,7 @@ export interface EngineCallbacks {
 export class PitchAudioEngine {
   private ctx: AudioContext | null = null;
   private originalBuffer: AudioBuffer | null = null;
-  private shifted: { buffer: AudioBuffer; source: AudioBufferSourceNode } | null = null;
+  private shiftedBuffer: AudioBuffer | null = null;
   private worklet: AudioWorkletNode | null = null;
   private source: AudioBufferSourceNode | null = null;
   private startedAt = 0;
@@ -44,9 +44,14 @@ export class PitchAudioEngine {
 
   async loadShifted(arrayBuffer: ArrayBuffer): Promise<void> {
     const ctx = this.ensureContext();
-    const buffer = await ctx.decodeAudioData(arrayBuffer.slice(0));
+    this.shiftedBuffer = await ctx.decodeAudioData(arrayBuffer.slice(0));
     this.stopSource();
-    this.shifted = { buffer, source: null as unknown as AudioBufferSourceNode };
+  }
+
+  clearShifted(): void {
+    this.stopSource();
+    this.shiftedBuffer = null;
+    if (this.mode === "variant") this.mode = "original";
   }
 
   get duration(): number {
@@ -55,6 +60,21 @@ export class PitchAudioEngine {
 
   get currentMode(): "original" | "variant" {
     return this.mode;
+  }
+
+  get hasOriginal(): boolean {
+    return this.originalBuffer !== null;
+  }
+
+  get hasShifted(): boolean {
+    return this.shiftedBuffer !== null;
+  }
+
+  activeBufferKind(): "original" | "variant" | null {
+    if (this.mode === "variant" && this.shiftedBuffer) return "variant";
+    if (this.originalBuffer) return "original";
+    if (this.shiftedBuffer) return "variant";
+    return null;
   }
 
   setLoop(loop: LoopRegion | null): void {
@@ -81,15 +101,21 @@ export class PitchAudioEngine {
 
   play(): void {
     if (this.playing) return;
-    const buffer = this.mode === "original" ? this.originalBuffer : this.shifted?.buffer;
+    const kind = this.activeBufferKind();
+    if (!kind) return;
+    const buffer = kind === "original" ? this.originalBuffer : this.shiftedBuffer;
     if (!buffer) return;
+    if (kind !== this.mode) {
+      this.mode = kind;
+      this.callbacks.onModeChange?.(kind);
+    }
     const ctx = this.ensureContext();
     ctx.resume();
     this.stopSource();
 
     const source = ctx.createBufferSource();
     source.buffer = buffer;
-    source.playbackRate.value = this.mode === "original" ? 1 : this.pitch;
+    source.playbackRate.value = kind === "original" ? 1 : this.pitch;
     if (this.loop) {
       source.loop = true;
       source.loopStart = this.loop.start;
@@ -122,11 +148,18 @@ export class PitchAudioEngine {
     return this.ctx.currentTime - this.startedAt;
   }
 
+  private activeDuration(): number {
+    const kind = this.activeBufferKind();
+    const buffer = kind === "variant" ? this.shiftedBuffer : this.originalBuffer;
+    return buffer?.duration ?? 0;
+  }
+
   private tick = () => {
     if (!this.playing) return;
     const t = this.currentTime();
     this.callbacks.onPosition?.(t);
-    if (!this.loop && this.originalBuffer && t >= this.originalBuffer.duration) {
+    const dur = this.activeDuration();
+    if (!this.loop && dur > 0 && t >= dur) {
       this.pause();
       return;
     }

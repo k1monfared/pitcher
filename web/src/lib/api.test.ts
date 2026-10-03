@@ -26,6 +26,40 @@ describe("ApiClient", () => {
     expect(c2.mediaUrl(3)).toBe("http://x:7373/api/media/3");
   });
 
+  it("builds a track audio url", () => {
+    const c = new ApiClient();
+    expect(c.trackAudioUrl(4)).toBe("/api/tracks/4/audio");
+  });
+
+  it("renames a track via PATCH", async () => {
+    const spy = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) =>
+      response({ track: { id: 1, title: "New" } }),
+    );
+    globalThis.fetch = spy as unknown as typeof fetch;
+    const c = new ApiClient();
+    const r = await c.renameTrack(1, "New", "Artist");
+    expect(r).toEqual({ track: { id: 1, title: "New" } });
+    const call = spy.mock.calls[0];
+    expect(String(call[0])).toBe("/api/tracks/1");
+    expect((call[1] as RequestInit).method).toBe("PATCH");
+    expect(JSON.parse((call[1] as RequestInit).body as string)).toEqual({
+      title: "New",
+      artist: "Artist",
+    });
+  });
+
+  it("deletes a track via DELETE", async () => {
+    const spy = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) =>
+      response({ deleted: 1 }),
+    );
+    globalThis.fetch = spy as unknown as typeof fetch;
+    const c = new ApiClient();
+    await c.deleteTrack(1);
+    const call = spy.mock.calls[0];
+    expect(String(call[0])).toBe("/api/tracks/1");
+    expect((call[1] as RequestInit).method).toBe("DELETE");
+  });
+
   it("fetches tracks", async () => {
     const tracks = [{ id: 1, title: "A" }];
     globalThis.fetch = mockFetch({ "/api/tracks": tracks });

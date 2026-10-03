@@ -2,6 +2,7 @@
   let {
     playing = false,
     mode = "variant" as "original" | "variant",
+    canToggle = true,
     time = 0,
     duration = 0,
     onplay,
@@ -11,6 +12,7 @@
   } = $props<{
     playing?: boolean;
     mode?: "original" | "variant";
+    canToggle?: boolean;
     time?: number;
     duration?: number;
     onplay?: () => void;
@@ -30,7 +32,7 @@
   <button type="button" onclick={playing ? onpause : onplay}>
     {playing ? "pause" : "play"}
   </button>
-  <button type="button" class="toggle" onclick={ontoggle}>
+  <button type="button" class="toggle" onclick={ontoggle} disabled={!canToggle}>
     {mode === "original" ? "hearing: original" : "hearing: shifted"}
   </button>
   <input

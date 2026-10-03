@@ -53,11 +53,33 @@
   }
 
   async function openTrack(track: Track) {
+    engine.pause();
+    playing = false;
     activeTrack = track;
-    const detail = await api.getTrack(track.id);
-    variants = detail.variants;
+    try {
+      const detail = await api.getTrack(track.id);
+      variants = detail.variants;
+    } catch (e) {
+      status = `cannot open track: ${e}`;
+      return;
+    }
     activeVariant = null;
+    engine.clearShifted();
     peaks = [];
+    time = 0;
+    playhead = 0;
+    try {
+      const buf = await (await fetch(api.trackAudioUrl(track.id))).arrayBuffer();
+      await engine.loadOriginal(buf);
+      const ctx = new AudioContext();
+      const audio = await ctx.decodeAudioData(buf.slice(0));
+      peaks = computePeaks(audio.getChannelData(0), 400);
+      await ctx.close();
+      engine.setMode("original");
+      mode = "original";
+    } catch (e) {
+      status = `cannot load audio: ${e}`;
+    }
   }
 
   async function doImportPath() {
@@ -134,8 +156,10 @@
       const audio = await ctx.decodeAudioData(buf.slice(0));
       peaks = computePeaks(audio.getChannelData(0), 400);
       await ctx.close();
-    } catch {
-      peaks = [];
+      engine.setMode("variant");
+      mode = "variant";
+    } catch (e) {
+      status = `cannot load variant: ${e}`;
     }
   }
 
@@ -171,7 +195,52 @@
   async function deleteVariant(v: Variant) {
     await api.deleteVariant(v.id);
     variants = variants.filter((x) => x.id !== v.id);
-    if (activeVariant?.id === v.id) activeVariant = null;
+    if (activeVariant?.id === v.id) {
+      activeVariant = null;
+      engine.clearShifted();
+      mode = "original";
+    }
+  }
+
+  let renamingId = $state<number | null>(null);
+  let renameTitle = $state("");
+  let renameArtist = $state("");
+
+  function startRename(t: Track) {
+    renamingId = t.id;
+    renameTitle = t.title;
+    renameArtist = t.artist ?? "";
+  }
+
+  async function commitRename() {
+    if (renamingId === null) return;
+    try {
+      const r = await api.renameTrack(renamingId, renameTitle, renameArtist);
+      tracks = tracks.map((t) => (t.id === renamingId ? r.track : t));
+      if (activeTrack?.id === renamingId) activeTrack = r.track;
+    } catch (e) {
+      status = `rename failed: ${e}`;
+    } finally {
+      renamingId = null;
+    }
+  }
+
+  async function deleteTrack(t: Track) {
+    if (!confirm(`Delete "${t.title}" and all its variants from disk?`)) return;
+    try {
+      await api.deleteTrack(t.id);
+      tracks = tracks.filter((x) => x.id !== t.id);
+      if (activeTrack?.id === t.id) {
+        activeTrack = null;
+        variants = [];
+        activeVariant = null;
+        peaks = [];
+        engine.pause();
+        playing = false;
+      }
+    } catch (e) {
+      status = `delete failed: ${e}`;
+    }
   }
 </script>
 
@@ -192,14 +261,35 @@
     <aside class="tracks">
       <h2>shelf</h2>
       {#each tracks as t (t.id)}
-        <button
-          type="button"
-          class:active={activeTrack?.id === t.id}
-          onclick={() => openTrack(t)}
-        >
-          <span class="title">{t.title}</span>
-          <span class="count">{t.variant_count}</span>
-        </button>
+        <div class="track-row" class:active={activeTrack?.id === t.id}>
+          {#if renamingId === t.id}
+            <input
+              class="rename"
+              bind:value={renameTitle}
+              onkeydown={(e) => {
+                if (e.key === "Enter") commitRename();
+                if (e.key === "Escape") renamingId = null;
+              }}
+            />
+            <input
+              class="rename"
+              bind:value={renameArtist}
+              placeholder="artist"
+              onkeydown={(e) => {
+                if (e.key === "Enter") commitRename();
+                if (e.key === "Escape") renamingId = null;
+              }}
+            />
+            <button type="button" class="mini" onclick={commitRename}>save</button>
+          {:else}
+            <button type="button" class="open" onclick={() => openTrack(t)}>
+              <span class="title">{t.title}</span>
+              <span class="count">{t.variant_count}</span>
+            </button>
+            <button type="button" class="mini" title="rename" onclick={() => startRename(t)}>rename</button>
+            <button type="button" class="mini danger" title="delete" onclick={() => deleteTrack(t)}>delete</button>
+          {/if}
+        </div>
       {/each}
       {#if tracks.length === 0}
         <p class="empty">import an audio file to begin</p>
@@ -242,6 +332,7 @@
         <Transport
           {playing}
           {mode}
+          canToggle={activeVariant !== null}
           time={time}
           duration={activeTrack.duration_s}
           onplay={() => {
@@ -364,21 +455,51 @@
     color: #888;
     letter-spacing: 0.05em;
   }
-  .tracks button {
+  .track-row {
+    display: flex;
+    gap: 0.25rem;
+    align-items: center;
+    border: 1px solid transparent;
+    border-radius: 0.3rem;
+    padding: 0.2rem;
+  }
+  .track-row.active {
+    background: #16161a;
+    border-color: #333;
+  }
+  .track-row button.open {
+    flex: 1;
     display: flex;
     justify-content: space-between;
     background: none;
-    border: 1px solid transparent;
+    border: none;
     border-radius: 0.3rem;
     color: #ccc;
     padding: 0.4rem 0.5rem;
     cursor: pointer;
     text-align: left;
   }
-  .tracks button.active {
-    background: #16161a;
-    border-color: #333;
-    color: #fff;
+  .track-row button.mini {
+    background: none;
+    border: 1px solid #333;
+    border-radius: 0.3rem;
+    color: #777;
+    font-size: 0.65rem;
+    padding: 0.2rem 0.35rem;
+    cursor: pointer;
+  }
+  .track-row button.mini.danger:hover {
+    color: #ff6b6b;
+    border-color: #ff6b6b;
+  }
+  .track-row input.rename {
+    background: #0e0e12;
+    border: 1px solid #333;
+    border-radius: 0.3rem;
+    color: #eee;
+    padding: 0.25rem 0.4rem;
+    width: 100%;
+    font-size: 0.8rem;
   }
   .count {
     color: #666;
