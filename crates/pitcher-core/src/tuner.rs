@@ -190,12 +190,7 @@ pub fn detect_at(
     }
 }
 
-pub fn detect_range(
-    path: &Path,
-    from: f64,
-    to: f64,
-    method: Method,
-) -> anyhow::Result<Vec<Frame>> {
+pub fn detect_range(path: &Path, from: f64, to: f64, method: Method) -> anyhow::Result<Vec<Frame>> {
     if from < 0.0 || to <= from {
         anyhow::bail!("invalid range {from}..{to}");
     }
