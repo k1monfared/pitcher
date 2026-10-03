@@ -27,7 +27,9 @@ fn rename_track_updates_title_and_artist() {
     let id = shelf
         .add_track("/music/a.wav", "file", None, "Old", "Nobody", 12.0, 44100)
         .unwrap();
-    shelf.rename_track(id, Some("New"), Some("Somebody")).unwrap();
+    shelf
+        .rename_track(id, Some("New"), Some("Somebody"))
+        .unwrap();
     let t = shelf.get_track(id).unwrap().unwrap();
     assert_eq!(t.title, "New");
     assert_eq!(t.artist.as_deref(), Some("Somebody"));

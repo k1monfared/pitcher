@@ -210,11 +210,22 @@ impl Shelf {
 
     pub fn rename_track(
         &self,
-        _id: i64,
-        _title: Option<&str>,
-        _artist: Option<&str>,
+        id: i64,
+        title: Option<&str>,
+        artist: Option<&str>,
     ) -> anyhow::Result<()> {
-        unimplemented!()
+        if let Some(t) = title {
+            self.conn
+                .execute("UPDATE tracks SET title = ?2 WHERE id = ?1", params![id, t])?;
+        }
+        if let Some(a) = artist {
+            let artist_opt = if a.trim().is_empty() { None } else { Some(a) };
+            self.conn.execute(
+                "UPDATE tracks SET artist = ?2 WHERE id = ?1",
+                params![id, artist_opt],
+            )?;
+        }
+        Ok(())
     }
 
     pub fn delete_track(&self, id: i64) -> anyhow::Result<()> {

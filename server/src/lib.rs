@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
-use axum::routing::{delete, get, post};
+use axum::routing::{delete, get, patch, post};
 use axum::{Json, Router};
 use serde::{Deserialize, Serialize};
 
@@ -113,6 +113,7 @@ pub fn build_api(state: AppState) -> Router {
         .route("/api/tracks/{id}/variants", get(list_variants))
         .route("/api/tracks/{id}/shift", post(shift_track))
         .route("/api/tracks/{id}", delete(delete_track))
+        .route("/api/tracks/{id}", patch(rename_track))
         .route("/api/import", post(import))
         .route("/api/detect", post(detect))
         .route("/api/note", get(note))
@@ -200,8 +201,40 @@ async fn delete_track(
     Path(id): Path<i64>,
 ) -> ApiResult<Json<serde_json::Value>> {
     let shelf = st.shelf()?;
+    let track = shelf
+        .get_track(id)?
+        .ok_or_else(|| anyhow::anyhow!("track {id} not found"))?;
+    let variants = shelf.list_variants(id)?;
     shelf.delete_track(id)?;
+
+    for v in variants {
+        let _ = std::fs::remove_file(&v.output_path);
+    }
+    let source = PathBuf::from(&track.source_path);
+    if source.starts_with(&st.data_dir) {
+        let _ = std::fs::remove_file(&source);
+    }
     Ok(Json(serde_json::json!({ "deleted": id })))
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RenameBody {
+    pub title: Option<String>,
+    pub artist: Option<String>,
+}
+
+async fn rename_track(
+    State(st): State<AppState>,
+    Path(id): Path<i64>,
+    Json(body): Json<RenameBody>,
+) -> ApiResult<Json<serde_json::Value>> {
+    let shelf = st.shelf()?;
+    if shelf.get_track(id)?.is_none() {
+        return Err(ApiError(anyhow::anyhow!("track {id} not found")));
+    }
+    shelf.rename_track(id, body.title.as_deref(), body.artist.as_deref())?;
+    let track = shelf.get_track(id)?.unwrap();
+    Ok(Json(serde_json::json!({ "track": track })))
 }
 
 async fn import(

@@ -309,6 +309,108 @@ async fn star_and_delete_variant() {
 }
 
 #[tokio::test]
+async fn rename_track_via_patch() {
+    if !have("ffmpeg") {
+        return;
+    }
+    let (st, dir) = state("patch");
+    let input = dir.join("in.wav");
+    make_tone(&input, 440.0, 1.0);
+    let app = build_router(st);
+
+    let imp = serde_json::json!({ "path": input.to_str().unwrap(), "title": "Old" });
+    app.clone()
+        .oneshot(
+            Request::post("/api/import")
+                .header("content-type", "application/json")
+                .body(Body::from(imp.to_string()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    let resp = app
+        .clone()
+        .oneshot(
+            Request::patch("/api/tracks/1")
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    serde_json::json!({ "title": "New", "artist": "Me" }).to_string(),
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let v = body_json(resp).await;
+    assert_eq!(v["track"]["title"], "New");
+    assert_eq!(v["track"]["artist"], "Me");
+}
+
+#[tokio::test]
+async fn delete_track_removes_db_rows_and_variant_files_but_keeps_local_source() {
+    if !have("ffmpeg") {
+        return;
+    }
+    let (st, _dir) = state("del");
+    let external =
+        std::env::temp_dir().join(format!("pitcher-server-del-ext-{}", std::process::id()));
+    std::fs::create_dir_all(&external).unwrap();
+    let input = external.join("in.wav");
+    make_tone(&input, 440.0, 1.0);
+    let app = build_router(st);
+
+    let imp = serde_json::json!({ "path": input.to_str().unwrap(), "title": "Tone" });
+    app.clone()
+        .oneshot(
+            Request::post("/api/import")
+                .header("content-type", "application/json")
+                .body(Body::from(imp.to_string()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    let payload = serde_json::json!({ "cents": -100, "format": "wav" });
+    let shift_resp = app
+        .clone()
+        .oneshot(
+            Request::post("/api/tracks/1/shift")
+                .header("content-type", "application/json")
+                .body(Body::from(payload.to_string()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(shift_resp.status(), StatusCode::OK);
+    let v = body_json(shift_resp).await;
+    let variant_path = v["output_path"].as_str().unwrap().to_string();
+    assert!(std::path::Path::new(&variant_path).exists());
+
+    let resp = app
+        .clone()
+        .oneshot(
+            Request::delete("/api/tracks/1")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+
+    assert!(
+        !std::path::Path::new(&variant_path).exists(),
+        "variant file should be removed"
+    );
+    assert!(input.exists(), "user's local source file must be kept");
+    let resp = app
+        .oneshot(Request::get("/api/tracks").body(Body::empty()).unwrap())
+        .await
+        .unwrap();
+    assert_eq!(body_json(resp).await.as_array().unwrap().len(), 0);
+}
+
+#[tokio::test]
 async fn missing_track_returns_404() {
     let (st, _d) = state("404");
     let app = build_router(st);
