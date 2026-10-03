@@ -62,20 +62,20 @@ export function centerOn(
   return clampView(c - span / 2, c + span / 2, duration);
 }
 
-export function followView(
+export function smoothFollow(
   view: View | null,
   t: number,
   duration: number,
-  margin = 0.1,
+  ahead = 0.3,
+  factor = 0.35,
 ): View | null {
   if (!view || duration <= 0) return view;
   const span = view.end - view.start;
   if (span >= duration) return null;
-  const lo = view.start + margin * span;
-  const hi = view.end - margin * span;
-  if (t >= lo && t <= hi) return view;
-  const start = t < lo ? t - margin * span : t - (1 - margin) * span;
-  return clampView(start, start + span, duration);
+  const want = Math.max(0, Math.min(t - (1 - ahead) * span, duration - span));
+  const next = view.start + (want - view.start) * factor;
+  if (Math.abs(next - view.start) < span * 0.001) return view;
+  return { start: next, end: next + span };
 }
 
 export type KeyAction =

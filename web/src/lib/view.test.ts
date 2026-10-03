@@ -2,11 +2,11 @@ import { describe, expect, it } from "vitest";
 import {
   centerOn,
   clampView,
-  followView,
   isTextEntry,
   keyAction,
   MIN_VIEW_SPAN,
   panBy,
+  smoothFollow,
   zoomAt,
   zoomCenter,
 } from "./view";
@@ -85,23 +85,24 @@ describe("centerOn", () => {
   });
 });
 
-describe("followView", () => {
-  it("leaves the view alone when inside margins", () => {
-    const v = { start: 0, end: 100 };
-    expect(followView(v, 50, 200)).toBe(v);
-    expect(followView(v, 10, 200)).toBe(v);
-    expect(followView(v, 90, 200)).toBe(v);
+describe("smoothFollow", () => {
+  it("glides toward 30% ahead of the playhead", () => {
+    const next = smoothFollow({ start: 0, end: 100 }, 90, 200)!;
+    expect(next.start).toBeCloseTo(7, 6);
+    expect(next.end - next.start).toBeCloseTo(100, 6);
   });
-  it("shifts minimally to restore the margin", () => {
-    expect(followView({ start: 50, end: 150 }, 55, 200)).toEqual({ start: 45, end: 145 });
-    expect(followView({ start: 50, end: 150 }, 145, 200)).toEqual({ start: 55, end: 155 });
+  it("settles by returning the same view at rest", () => {
+    const v = { start: 20, end: 120 };
+    expect(smoothFollow(v, 90, 200)).toBe(v);
   });
   it("clamps at track edges", () => {
-    expect(followView({ start: 70, end: 100 }, 99, 100)).toEqual({ start: 70, end: 100 });
-    expect(followView({ start: 0, end: 30 }, 1, 100)).toEqual({ start: 0, end: 30 });
+    expect(smoothFollow({ start: 50, end: 150 }, 5, 200)).toEqual({ start: 32.5, end: 132.5 });
+    const end = smoothFollow({ start: 50, end: 150 }, 199, 200)!;
+    expect(end.end).toBeLessThanOrEqual(200);
   });
-  it("passes through null", () => {
-    expect(followView(null, 50, 100)).toBeNull();
+  it("passes through null and full views", () => {
+    expect(smoothFollow(null, 50, 100)).toBeNull();
+    expect(smoothFollow({ start: 0, end: 100 }, 50, 100)).toBeNull();
   });
 });
 

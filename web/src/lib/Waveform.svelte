@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import { centerOn, followView, panBy, zoomAt, type View } from "./view";
+  import { centerOn, panBy, smoothFollow, zoomAt, type View } from "./view";
   import type { Bookmark } from "./api";
 
   let {
@@ -144,7 +144,7 @@
     duration;
     span;
     if (follow && view) {
-      const next = followView(view, playhead, duration);
+      const next = smoothFollow(view, playhead, duration);
       if (next !== view) view = next;
     }
     draw();
