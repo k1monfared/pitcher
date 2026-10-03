@@ -44,6 +44,37 @@
 
   let renamingId = $state<number | null>(null);
   let renameValue = $state("");
+  let busyKey = $state<string | null>(null);
+  let dlError = $state("");
+
+  function filenameFrom(resp: Response, fallback: string): string {
+    const disp = resp.headers.get("content-disposition") ?? "";
+    const m = disp.match(/filename="([^"]+)"/);
+    return m ? m[1] : fallback;
+  }
+
+  async function download(key: string, url: string, fallbackName: string) {
+    if (busyKey) return;
+    busyKey = key;
+    dlError = "";
+    try {
+      const resp = await fetch(url);
+      if (!resp.ok) throw new Error(`download failed (${resp.status})`);
+      const blob = await resp.blob();
+      const obj = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = obj;
+      a.download = filenameFrom(resp, fallbackName);
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.setTimeout(() => URL.revokeObjectURL(obj), 5000);
+    } catch (e) {
+      dlError = e instanceof Error ? e.message : String(e);
+    } finally {
+      busyKey = null;
+    }
+  }
 
   const below = $derived(variants.filter((v: Variant) => v.cents < 0));
   const atOrAbove = $derived(variants.filter((v: Variant) => v.cents >= 0));
@@ -102,7 +133,14 @@
             delete
           </button>
           {#if mediaUrlFor}
-            <a class="dl" href={mediaUrlFor(v.id)} download title="download this pitch">dl</a>
+            <button
+              type="button"
+              title="download this pitch"
+              disabled={busyKey !== null}
+              onclick={() => download(`v${v.id}`, mediaUrlFor(v.id), `pitch-${v.id}`)}
+            >
+              {busyKey === `v${v.id}` ? "..." : "dl"}
+            </button>
           {/if}
         </div>
       {#if renamingId === v.id}
@@ -137,7 +175,14 @@
       </button>
       <div class="actions">
         {#if originalAudioUrl}
-          <a class="dl" href={originalAudioUrl} download>download</a>
+          <button
+            type="button"
+            title="download the original"
+            disabled={busyKey !== null}
+            onclick={() => download("original", originalAudioUrl, "original")}
+          >
+            {busyKey === "original" ? "..." : "download"}
+          </button>
         {:else}
           <span class="note">no audio</span>
         {/if}
@@ -164,10 +209,19 @@
           <option value="wav">wav</option>
         </select>
       </label>
-      <a class="export" href={exportAllUrl} download title="download the original plus every kept pitch as one zip, in this format">
-        export all {variants.length + 1} pitches (.zip)
-      </a>
+      <button
+        type="button"
+        class="export"
+        disabled={busyKey !== null}
+        title="download the original plus every kept pitch as one zip, in this format"
+        onclick={() => download("all", exportAllUrl, "pitches.zip")}
+      >
+        {busyKey === "all" ? "packing..." : `export all ${variants.length + 1} pitches (.zip)`}
+      </button>
     </div>
+    {#if dlError}
+      <span class="summary error">{dlError}</span>
+    {/if}
   {/if}
 </div>
 
@@ -188,9 +242,16 @@
     color: #6aa9ff;
     font-size: 0.75rem;
     text-decoration: none;
+    background: none;
+    font-family: inherit;
     border: 1px solid #333;
     border-radius: 0.3rem;
     padding: 0.25rem 0.5rem;
+    cursor: pointer;
+  }
+  button.export:disabled {
+    opacity: 0.6;
+    cursor: wait;
   }
   .export-row {
     display: flex;
@@ -285,13 +346,9 @@
     padding: 0.3rem;
     cursor: pointer;
   }
-  .actions a.dl {
-    flex: 1;
-    color: #888;
-    font-size: 0.7rem;
-    padding: 0.3rem;
-    text-align: center;
-    text-decoration: none;
+  .actions button:disabled {
+    opacity: 0.6;
+    cursor: wait;
   }
   .rename-row {
     display: flex;
