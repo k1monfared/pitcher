@@ -73,6 +73,12 @@ enum Commands {
     Variant(VariantCmd),
     Try {
         track_id: i64,
+        #[arg(long, default_value = "data/out")]
+        outdir: String,
+        #[arg(long)]
+        no_play: bool,
+        #[arg(long)]
+        formant: bool,
     },
 }
 
@@ -259,11 +265,122 @@ fn main() -> anyhow::Result<()> {
             )?;
             println!("added variant {id}");
         }
-        Commands::Try { .. } => {
-            anyhow::bail!("interactive try is not implemented yet");
+        Commands::Try {
+            track_id,
+            outdir,
+            no_play,
+            formant,
+        } => run_try(&cli.db, *track_id, outdir, *no_play, *formant)?,
+    }
+    Ok(())
+}
+
+fn run_try(
+    db: &str,
+    track_id: i64,
+    outdir: &str,
+    no_play: bool,
+    formant: bool,
+) -> anyhow::Result<()> {
+    use std::io::{BufRead, Write};
+
+    let shelf = Shelf::open(db)?;
+    let track = shelf
+        .get_track(track_id)?
+        .ok_or_else(|| anyhow::anyhow!("no track {track_id}"))?;
+    std::fs::create_dir_all(outdir)?;
+
+    println!("track: {} ({:.1}s)", track.title, track.duration_s);
+    println!("enter cents (e.g. -100), 'k' to keep last, 'q' to quit");
+
+    let stdin = std::io::stdin();
+    let mut last: Option<i32> = None;
+
+    loop {
+        print!("> ");
+        std::io::stdout().flush()?;
+        let mut line = String::new();
+        if stdin.lock().read_line(&mut line)? == 0 {
+            break;
+        }
+        let cmd = line.trim();
+        if cmd.is_empty() {
+            continue;
+        }
+        if cmd == "q" {
+            break;
+        }
+        if cmd == "k" {
+            match last {
+                Some(cents) => {
+                    let stem = Path::new(&track.source_path)
+                        .file_stem()
+                        .and_then(|s| s.to_str())
+                        .unwrap_or("out");
+                    let out = Path::new(outdir).join(format!("{stem}_{cents:+}.wav"));
+                    let req = ShiftRequest {
+                        input: track.source_path.clone().into(),
+                        output: out.clone(),
+                        cents,
+                        formant,
+                        engine: Engine::Finer,
+                        pitch_quality: PitchQuality::Quality,
+                        section: None,
+                        output_format: Some("wav".into()),
+                    };
+                    pitcher_core::engine::shift(&req)?;
+                    let id = shelf.add_variant(
+                        track_id,
+                        cents,
+                        formant,
+                        "finer",
+                        "quality",
+                        None,
+                        out.to_str().unwrap(),
+                        Some("wav"),
+                    )?;
+                    println!("kept variant {id} at {cents:+} cents");
+                }
+                None => println!("nothing to keep yet"),
+            }
+            continue;
+        }
+
+        match cmd.parse::<i32>() {
+            Ok(cents) => {
+                last = Some(cents);
+                let stem = Path::new(&track.source_path)
+                    .file_stem()
+                    .and_then(|s| s.to_str())
+                    .unwrap_or("preview");
+                let preview = Path::new(outdir).join(format!(".preview_{stem}.wav"));
+                let req = ShiftRequest {
+                    input: track.source_path.clone().into(),
+                    output: preview.clone(),
+                    cents,
+                    formant,
+                    engine: Engine::Finer,
+                    pitch_quality: PitchQuality::Speed,
+                    section: None,
+                    output_format: Some("wav".into()),
+                };
+                pitcher_core::engine::shift(&req)?;
+                println!("preview {cents:+} cents -> {}", preview.display());
+                if !no_play {
+                    play_file(&preview);
+                }
+            }
+            Err(_) => println!("enter an integer number of cents, or k/q"),
         }
     }
     Ok(())
+}
+
+fn play_file(path: &Path) {
+    let _ = std::process::Command::new("ffplay")
+        .args(["-nodisp", "-autoexit", "-loglevel", "error"])
+        .arg(path)
+        .status();
 }
 
 fn run_shelf(db: &str, cmd: &ShelfCmd) -> anyhow::Result<()> {
