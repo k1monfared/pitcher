@@ -710,6 +710,68 @@ async fn export_names_files_song_then_pitch() {
 }
 
 #[tokio::test]
+async fn bookmarks_crud() {
+    if !have("ffmpeg") {
+        return;
+    }
+    let (st, dir) = state("marks");
+    import_tone(&build_router(st.clone()), &dir).await;
+    let app = build_router(st);
+
+    let add = |t: f64, name: Option<&str>| {
+        let payload = serde_json::json!({ "t": t, "name": name });
+        app.clone().oneshot(
+            Request::post("/api/tracks/1/bookmarks")
+                .header("content-type", "application/json")
+                .body(Body::from(payload.to_string()))
+                .unwrap(),
+        )
+    };
+    add(0.7, Some("chorus")).await.unwrap();
+    add(0.2, None).await.unwrap();
+
+    let resp = app
+        .clone()
+        .oneshot(
+            Request::get("/api/tracks/1/bookmarks")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let marks = body_json(resp).await;
+    assert_eq!(marks.as_array().unwrap().len(), 2);
+    assert_eq!(marks[0]["t"], 0.2);
+    assert_eq!(marks[1]["name"], "chorus");
+    let id: i64 = marks[0]["id"].as_i64().unwrap();
+
+    let resp = app
+        .clone()
+        .oneshot(
+            Request::patch(format!("/api/bookmarks/{id}"))
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    serde_json::json!({ "name": "intro" }).to_string(),
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+
+    let resp = app
+        .oneshot(
+            Request::delete(format!("/api/bookmarks/{id}"))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+}
+
+#[tokio::test]
 async fn export_missing_track_404() {
     let (st, _d) = state("export404");
     let app = build_router(st);

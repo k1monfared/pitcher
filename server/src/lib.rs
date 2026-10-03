@@ -124,6 +124,10 @@ pub fn build_api(state: AppState) -> Router {
         .route("/api/variants/{id}", patch(rename_variant))
         .route("/api/variants/{id}", delete(delete_variant))
         .route("/api/tracks/{id}/export", get(export_all))
+        .route("/api/tracks/{id}/bookmarks", get(list_bookmarks))
+        .route("/api/tracks/{id}/bookmarks", post(add_bookmark))
+        .route("/api/bookmarks/{id}", patch(rename_bookmark))
+        .route("/api/bookmarks/{id}", delete(delete_bookmark))
         .with_state(state)
 }
 
@@ -668,6 +672,64 @@ async fn export_all(
         bytes,
     )
         .into_response())
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BookmarkBody {
+    pub t: Option<f64>,
+    pub name: Option<String>,
+}
+
+async fn list_bookmarks(
+    State(st): State<AppState>,
+    Path(id): Path<i64>,
+) -> ApiResult<Json<serde_json::Value>> {
+    let shelf = st.shelf()?;
+    if shelf.get_track(id)?.is_none() {
+        return Err(ApiError(anyhow::anyhow!("track {id} not found")));
+    }
+    Ok(Json(serde_json::to_value(shelf.list_bookmarks(id)?)?))
+}
+
+async fn add_bookmark(
+    State(st): State<AppState>,
+    Path(id): Path<i64>,
+    Json(body): Json<BookmarkBody>,
+) -> ApiResult<Json<serde_json::Value>> {
+    let shelf = st.shelf()?;
+    let track = shelf
+        .get_track(id)?
+        .ok_or_else(|| anyhow::anyhow!("track {id} not found"))?;
+    let t = body.t.ok_or_else(|| anyhow::anyhow!("missing time t"))?;
+    if !(0.0..=track.duration_s).contains(&t) {
+        return Err(ApiError(anyhow::anyhow!(
+            "time {t} outside track duration {}",
+            track.duration_s
+        )));
+    }
+    let bid = shelf.add_bookmark(id, t, body.name.as_deref())?;
+    let marks = shelf.list_bookmarks(id)?;
+    let created = marks.into_iter().find(|m| m.id == bid).unwrap();
+    Ok(Json(serde_json::to_value(created)?))
+}
+
+async fn rename_bookmark(
+    State(st): State<AppState>,
+    Path(id): Path<i64>,
+    Json(body): Json<BookmarkBody>,
+) -> ApiResult<Json<serde_json::Value>> {
+    let shelf = st.shelf()?;
+    shelf.rename_bookmark(id, body.name.as_deref().unwrap_or(""))?;
+    Ok(Json(serde_json::json!({ "id": id })))
+}
+
+async fn delete_bookmark(
+    State(st): State<AppState>,
+    Path(id): Path<i64>,
+) -> ApiResult<Json<serde_json::Value>> {
+    let shelf = st.shelf()?;
+    shelf.delete_bookmark(id)?;
+    Ok(Json(serde_json::json!({ "deleted": id })))
 }
 
 async fn delete_variant(

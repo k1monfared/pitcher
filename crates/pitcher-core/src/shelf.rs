@@ -29,6 +29,13 @@ impl Shelf {
                 sample_rate INTEGER,
                 created_at TEXT NOT NULL DEFAULT (datetime('now'))
              );
+             CREATE TABLE IF NOT EXISTS bookmarks (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                track_id INTEGER NOT NULL REFERENCES tracks(id) ON DELETE CASCADE,
+                t REAL NOT NULL,
+                name TEXT,
+                created_at TEXT NOT NULL DEFAULT (datetime('now'))
+             );
              CREATE TABLE IF NOT EXISTS variants (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 track_id INTEGER NOT NULL REFERENCES tracks(id) ON DELETE CASCADE,
@@ -285,20 +292,52 @@ impl Shelf {
         Ok(())
     }
 
-    pub fn add_bookmark(&self, _track_id: i64, _t: f64, _name: Option<&str>) -> anyhow::Result<i64> {
-        unimplemented!()
+    pub fn add_bookmark(&self, track_id: i64, t: f64, name: Option<&str>) -> anyhow::Result<i64> {
+        let name_opt = match name.map(str::trim) {
+            Some(n) if !n.is_empty() => Some(n),
+            _ => None,
+        };
+        self.conn.execute(
+            "INSERT INTO bookmarks (track_id, t, name) VALUES (?1, ?2, ?3)",
+            params![track_id, t, name_opt],
+        )?;
+        Ok(self.conn.last_insert_rowid())
     }
 
-    pub fn list_bookmarks(&self, _track_id: i64) -> anyhow::Result<Vec<crate::model::Bookmark>> {
-        unimplemented!()
+    pub fn list_bookmarks(&self, track_id: i64) -> anyhow::Result<Vec<crate::model::Bookmark>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT id, track_id, t, name, created_at FROM bookmarks
+             WHERE track_id = ?1 ORDER BY t, id",
+        )?;
+        let rows = stmt.query_map([track_id], |r| {
+            Ok(crate::model::Bookmark {
+                id: r.get(0)?,
+                track_id: r.get(1)?,
+                t: r.get(2)?,
+                name: r.get(3)?,
+                created_at: r.get(4)?,
+            })
+        })?;
+        Ok(rows.collect::<Result<Vec<_>, _>>()?)
     }
 
-    pub fn rename_bookmark(&self, _id: i64, _name: &str) -> anyhow::Result<()> {
-        unimplemented!()
+    pub fn rename_bookmark(&self, id: i64, name: &str) -> anyhow::Result<()> {
+        let name_opt = if name.trim().is_empty() {
+            None
+        } else {
+            Some(name.trim())
+        };
+        self.conn.execute(
+            "UPDATE bookmarks SET name = ?2 WHERE id = ?1",
+            params![id, name_opt],
+        )?;
+        Ok(())
     }
 
-    pub fn delete_bookmark(&self, _id: i64) -> anyhow::Result<()> {
-        unimplemented!()
+    pub fn delete_bookmark(&self, id: i64) -> anyhow::Result<()> {
+        self.conn
+            .execute("DELETE FROM bookmarks WHERE id = ?1", [id])?;
+        Ok(())
     }
 
     pub fn delete_track_with_files(
