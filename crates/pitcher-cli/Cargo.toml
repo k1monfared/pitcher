@@ -12,3 +12,4 @@ path = "src/main.rs"
 [dependencies]
 pitcher-core.workspace = true
 anyhow.workspace = true
+clap = { version = "4.6.7", features = ["derive"] }
