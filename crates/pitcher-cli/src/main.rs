@@ -113,6 +113,11 @@ enum VariantCmd {
         #[arg(long)]
         formant: bool,
     },
+    Rename {
+        variant_id: i64,
+        #[arg(long)]
+        name: String,
+    },
 }
 
 fn resolve_cents(
@@ -276,6 +281,18 @@ fn main() -> anyhow::Result<()> {
                 *track_id, *cents, *formant, "finer", "quality", None, path, None,
             )?;
             println!("added variant {id}");
+        }
+        Commands::Variant(VariantCmd::Rename { variant_id, name }) => {
+            let shelf = Shelf::open(&cli.db)?;
+            if shelf.get_variant(*variant_id)?.is_none() {
+                anyhow::bail!("no variant {variant_id}");
+            }
+            shelf.rename_variant(*variant_id, name)?;
+            let v = shelf.get_variant(*variant_id)?.unwrap();
+            println!(
+                "renamed variant {variant_id} to \"{}\"",
+                v.name.as_deref().unwrap_or("")
+            );
         }
         Commands::Try {
             track_id,
@@ -459,14 +476,8 @@ fn run_shelf(db: &str, cmd: &ShelfCmd) -> anyhow::Result<()> {
         }
         ShelfCmd::Export { track_id, dir } => {
             let variants = shelf.list_variants(*track_id)?;
-            let favorites: Vec<_> = variants.iter().filter(|v| v.favorite).collect();
-            let to_export: Vec<_> = if favorites.is_empty() {
-                variants.iter().collect()
-            } else {
-                favorites
-            };
             std::fs::create_dir_all(dir)?;
-            for v in to_export {
+            for v in &variants {
                 let name = Path::new(&v.output_path)
                     .file_name()
                     .and_then(|s| s.to_str())
