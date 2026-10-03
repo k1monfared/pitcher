@@ -10,6 +10,8 @@ import {
   noteToMidi,
   ratioFromCents,
   semitonesToCents,
+  targetHzForNote,
+  targetNoteForHz,
 } from "./notes";
 
 describe("ratioFromCents", () => {
@@ -85,6 +87,31 @@ describe("noteToHz", () => {
   it("matches midiToHz", () => {
     expect(noteToHz("A4")).toBeCloseTo(440, 6);
     expect(noteToHz("C#4")).toBeCloseTo(midiToHz(61), 6);
+  });
+});
+
+describe("targetHzForNote", () => {
+  it("rounds to 1 decimal", () => {
+    expect(targetHzForNote("C4")).toBe(261.6);
+    expect(targetHzForNote("A4")).toBe(440);
+  });
+  it("returns null for blank or bad names", () => {
+    expect(targetHzForNote("")).toBeNull();
+    expect(targetHzForNote("  ")).toBeNull();
+    expect(targetHzForNote("H4")).toBeNull();
+  });
+});
+
+describe("targetNoteForHz", () => {
+  it("names the nearest note", () => {
+    expect(targetNoteForHz(277.2)).toBe("C#4");
+    expect(targetNoteForHz(440)).toBe("A4");
+  });
+  it("clears for missing or non-positive input", () => {
+    expect(targetNoteForHz(null)).toBe("");
+    expect(targetNoteForHz(undefined)).toBe("");
+    expect(targetNoteForHz(0)).toBe("");
+    expect(targetNoteForHz(-5)).toBe("");
   });
 });
 

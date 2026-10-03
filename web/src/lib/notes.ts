@@ -62,6 +62,21 @@ export function noteToHz(name: string): number | null {
   return midi === null ? null : midiToHz(midi);
 }
 
+export function round1Hz(hz: number): number {
+  return Math.round(hz * 10) / 10;
+}
+
+export function targetHzForNote(name: string): number | null {
+  if (!name.trim()) return null;
+  const hz = noteToHz(name);
+  return hz === null ? null : round1Hz(hz);
+}
+
+export function targetNoteForHz(hz: number | null | undefined): string {
+  if (hz === null || hz === undefined || !(hz > 0)) return "";
+  return hzToNote(hz).name;
+}
+
 export function centsBetweenHz(source: number, target: number): number {
   return 1200 * Math.log2(target / source);
 }

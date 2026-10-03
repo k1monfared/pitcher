@@ -17,16 +17,8 @@
   let dragging = $state(false);
   let startY = 0;
   let startCents = 0;
-  let stepSemitones = $state("1");
 
   const knobY = $derived(centsToY(cents, range, height));
-
-  function nudgeSemitones(direction: 1 | -1) {
-    const st = parseFloat(stepSemitones);
-    if (!Number.isFinite(st) || st === 0) return;
-    cents = clampCents(Math.round(cents + direction * st * 100), range);
-    onchange?.(cents);
-  }
 
   function setFromY(y: number) {
     const raw = clampCents(yToCents(y, range, height), range);
@@ -88,22 +80,6 @@
   <div class="readout">
     <span class="cents">{formatCents(cents)}</span>
     <span class="unit">cents</span>
-  </div>
-  <div class="stepper">
-    <input
-      type="number"
-      step="0.25"
-      min="0"
-      bind:value={stepSemitones}
-      title="semitones per step"
-      aria-label="semitones per step"
-    />
-    <button type="button" title="move down by this many semitones" onclick={() => nudgeSemitones(-1)}>
-      down
-    </button>
-    <button type="button" title="move up by this many semitones" onclick={() => nudgeSemitones(1)}>
-      up
-    </button>
   </div>
 </div>
 
@@ -172,28 +148,5 @@
   .unit {
     font-size: 0.75rem;
     color: #888;
-  }
-  .stepper {
-    display: flex;
-    gap: 0.25rem;
-    align-items: center;
-  }
-  .stepper input {
-    background: #0e0e12;
-    border: 1px solid #333;
-    border-radius: 0.3rem;
-    color: #eee;
-    padding: 0.2rem 0.3rem;
-    width: 3.5rem;
-    font-size: 0.75rem;
-  }
-  .stepper button {
-    background: #1b1b1f;
-    color: #aaa;
-    border: 1px solid #333;
-    border-radius: 0.3rem;
-    padding: 0.2rem 0.45rem;
-    font-size: 0.75rem;
-    cursor: pointer;
   }
 </style>

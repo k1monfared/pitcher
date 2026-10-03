@@ -523,6 +523,7 @@
               bind:manualHz
               bind:targetNote
               bind:manualTargetHz
+              faderCents={cents}
               statusText={detectStatus}
               ondetect={detectAtPlayhead}
               onapply={applyIntervalToFader}

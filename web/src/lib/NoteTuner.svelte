@@ -1,9 +1,12 @@
 <script lang="ts">
-  import { hzToNote, midiToHz, noteToHz, noteToMidi } from "../lib/notes";
-
-  function round1(hz: number): number {
-    return Math.round(hz * 10) / 10;
-  }
+  import {
+    hzToNote,
+    midiToHz,
+    noteToMidi,
+    round1Hz,
+    targetHzForNote,
+    targetNoteForHz,
+  } from "../lib/notes";
 
   let {
     detectedHz = null,
@@ -11,6 +14,7 @@
     targetNote = $bindable<string>(""),
     manualTargetHz = $bindable<number | null>(null),
     statusText = "",
+    faderCents = 0,
     ondetect,
     onapply,
   } = $props<{
@@ -19,6 +23,7 @@
     targetNote?: string;
     manualTargetHz?: number | null;
     statusText?: string;
+    faderCents?: number;
     ondetect?: () => void;
     onapply?: (cents: number) => void;
   }>();
@@ -31,22 +36,33 @@
     manualHz && manualHz > 0 ? manualHz : detectedHz ?? null,
   );
 
-  const targetHz = $derived.by(() => {
-    if (manualTargetHz && manualTargetHz > 0) return manualTargetHz;
-    if (!targetNote.trim()) return null;
-    return noteToHz(targetNote);
-  });
-
-  const targetReading = $derived(targetHz ? hzToNote(targetHz) : null);
+  const targetHz = $derived(
+    manualTargetHz && manualTargetHz > 0 ? manualTargetHz : null,
+  );
 
   const interval = $derived(
     sourceHz && targetHz ? 1200 * Math.log2(targetHz / sourceHz) : null,
   );
 
+  const alreadyThere = $derived(
+    interval === null || Math.abs(interval - faderCents) < 0.5,
+  );
+
   function applyManualNote() {
     const midi = noteToMidi(manualNote);
     if (midi === null) return;
-    manualHz = round1(midiToHz(midi));
+    manualHz = round1Hz(midiToHz(midi));
+  }
+
+  function onTargetNoteInput(value: string) {
+    targetNote = value;
+    manualTargetHz = targetHzForNote(value);
+  }
+
+  function onTargetHzInput(value: number | null) {
+    const hz = value === null || Number.isNaN(value) ? null : value;
+    manualTargetHz = hz;
+    targetNote = targetNoteForHz(hz);
   }
 </script>
 
@@ -83,7 +99,11 @@
   <div class="row">
     <label>
       target note
-      <input bind:value={targetNote} placeholder="C4" />
+      <input
+        value={targetNote}
+        placeholder="C4"
+        oninput={(e) => onTargetNoteInput((e.currentTarget as HTMLInputElement).value)}
+      />
     </label>
     <label>
       target Hz
@@ -91,16 +111,14 @@
         type="number"
         step="0.1"
         min="0"
-        bind:value={manualTargetHz}
+        value={manualTargetHz ?? ""}
         placeholder="261.6"
+        oninput={(e) => {
+          const raw = (e.currentTarget as HTMLInputElement).value;
+          onTargetHzInput(raw === "" ? null : (e.currentTarget as HTMLInputElement).valueAsNumber);
+        }}
       />
     </label>
-    {#if targetHz}
-      <span class="detected">
-        {targetReading?.name ?? ""}
-        <small>{targetHz.toFixed(1)} Hz</small>
-      </span>
-    {/if}
   </div>
 
   <div class="row">
@@ -108,10 +126,11 @@
       <span class="interval">{interval >= 0 ? "+" : ""}{interval.toFixed(0)} cents</span>
       <button
         type="button"
-        title="move the pitch fader to this difference"
+        title={alreadyThere ? "the fader is already here" : "move the pitch fader to this difference"}
+        disabled={alreadyThere}
         onclick={() => onapply?.(interval)}
       >
-        move fader here
+        {alreadyThere ? "fader is here" : "move fader here"}
       </button>
     {/if}
   </div>
