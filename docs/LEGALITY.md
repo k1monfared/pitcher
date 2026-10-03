@@ -22,6 +22,12 @@ actual audio from a different provider, usually YouTube. This is against Spotify
 and likely copyright law. Pitcher follows the same model if a Spotify URL is given: it
 resolves metadata only. The audio still has to come from a source you are allowed to use.
 
+## Bundled libraries
+
+The web UI ships `rubberband.wasm`, a WebAssembly build of the Rubber Band Library
+(GPL, via the `rubberband-wasm` npm package). This matches the repo license
+(GPL-3.0-or-later). No proprietary or closed-source audio code is used anywhere.
+
 ## No warranty
 
 Users are responsible for their own actions and any legal consequences. Only process audio

@@ -11,9 +11,13 @@
   import { centsBetweenHz, midiToHz, noteToMidi } from "./lib/notes";
 
   const api = new ApiClient();
+  let livePitch = $state(false);
   const engine = new PitchAudioEngine({
     onPosition: (t) => {
       time = t;
+    },
+    onLiveChange: (live) => {
+      livePitch = live;
     },
   });
 
@@ -33,6 +37,7 @@
   let time = $state(0);
   let playing = $state(false);
   let mode = $state<"original" | "variant">("variant");
+  let tempo = $state(1);
   let peaks: number[] = $state([]);
   let pathInput = $state("");
   let urlInput = $state("");
@@ -41,7 +46,6 @@
 
   onMount(async () => {
     await refreshTracks();
-    await engine.initWorklet("/rubberband-processor.js");
   });
 
   async function refreshTracks() {
@@ -181,6 +185,25 @@
     engine.setPitchRatio(Math.pow(2, value / 1200));
   }
 
+  function onTempoChange(value: number) {
+    tempo = value;
+    engine.setTempo(value);
+  }
+
+  const renderSummary = $derived.by(() => {
+    const parts: string[] = [];
+    const sign = cents >= 0 ? "+" : "";
+    parts.push(`shift ${sign}${Math.round(cents)}c`);
+    parts.push(formant ? "formants kept" : "formants shifted");
+    if (loop) {
+      parts.push(`${loop[0].toFixed(2)}-${loop[1].toFixed(2)}s section`);
+    } else {
+      parts.push("full track");
+    }
+    parts.push(outputFormat);
+    return parts.join(" · ");
+  });
+
   function onLoop(l: [number, number] | null) {
     loop = l;
     if (l) engine.setLoop({ start: l[0], end: l[1] });
@@ -247,6 +270,15 @@
 <div class="app">
   <header>
     <h1>pitcher</h1>
+    <span
+      class="engine-badge"
+      class:live={livePitch}
+      title={livePitch
+        ? "live preview uses the Rubber Band pitch engine: tempo stays fixed while you move the fader"
+        : "live pitch engine unavailable: preview falls back to tape-style speed change"}
+    >
+      {livePitch ? "live pitch: rubberband" : "live pitch: basic"}
+    </span>
     <div class="import">
       <input bind:value={pathInput} placeholder="/path/to/audio.wav" />
       <button type="button" onclick={doImportPath} disabled={busy}>import file</button>
@@ -333,6 +365,8 @@
           {playing}
           {mode}
           canToggle={activeVariant !== null}
+          {tempo}
+          tempoEnabled={livePitch}
           time={time}
           duration={activeTrack.duration_s}
           onplay={() => {
@@ -351,6 +385,7 @@
             engine.seek(t);
             playhead = t;
           }}
+          ontempo={onTempoChange}
         />
 
         <div class="stage">
@@ -369,6 +404,7 @@
             <VariantShelf
               {variants}
               activeId={activeVariant?.id ?? null}
+              renderSummary={renderSummary}
               onselect={selectVariant}
               onstar={starVariant}
               ondelete={deleteVariant}
@@ -408,6 +444,17 @@
     font-size: 1.3rem;
     margin: 0;
     letter-spacing: 0.02em;
+  }
+  .engine-badge {
+    font-size: 0.7rem;
+    color: #888;
+    border: 1px solid #333;
+    border-radius: 1rem;
+    padding: 0.15rem 0.6rem;
+  }
+  .engine-badge.live {
+    color: #7ddf9a;
+    border-color: #2c5f3f;
   }
   .import {
     display: flex;

@@ -1,15 +1,26 @@
 import type { LoopRegion } from "./audio";
+import rbWorkletUrl from "../worklets/rb-live.ts?worker&url";
+
+export type PitchEngineKind = "rubberband" | "fallback";
 
 export interface EngineCallbacks {
   onPosition?: (t: number) => void;
   onModeChange?: (mode: "original" | "variant") => void;
+  onLiveChange?: (live: boolean) => void;
 }
+
+const TAIL_SECONDS = 0.3;
+const READY_TIMEOUT_MS = 8000;
 
 export class PitchAudioEngine {
   private ctx: AudioContext | null = null;
   private originalBuffer: AudioBuffer | null = null;
   private shiftedBuffer: AudioBuffer | null = null;
   private worklet: AudioWorkletNode | null = null;
+  private workletModuleAdded = false;
+  private liveChannels = 0;
+  private liveReady = false;
+  private wasmModule: WebAssembly.Module | null = null;
   private source: AudioBufferSourceNode | null = null;
   private startedAt = 0;
   private offset = 0;
@@ -19,18 +30,18 @@ export class PitchAudioEngine {
   private rafId = 0;
   private pitch = 1;
   private tempo = 1;
-  private useWorklet = false;
 
   constructor(private callbacks: EngineCallbacks = {}) {}
 
-  async initWorklet(processorUrl: string): Promise<boolean> {
-    try {
-      const ctx = this.ensureContext();
-      await ctx.audioWorklet.addModule(processorUrl);
-      return true;
-    } catch {
-      return false;
-    }
+  get pitchEngine(): PitchEngineKind {
+    return this.livePath() ? "rubberband" : "fallback";
+  }
+
+  private livePath(): boolean {
+    if (!this.worklet || !this.liveReady) return false;
+    const kind = this.activeBufferKind();
+    const buffer = kind === "variant" ? this.shiftedBuffer : this.originalBuffer;
+    return !!buffer && buffer.numberOfChannels === this.liveChannels;
   }
 
   private ensureContext(): AudioContext {
@@ -38,15 +49,110 @@ export class PitchAudioEngine {
     return this.ctx;
   }
 
+  private async compileWasm(): Promise<WebAssembly.Module | null> {
+    if (this.wasmModule) return this.wasmModule;
+    try {
+      const resp = await fetch("/rubberband.wasm");
+      const bytes = await resp.arrayBuffer();
+      this.wasmModule = await WebAssembly.compile(bytes);
+      return this.wasmModule;
+    } catch {
+      return null;
+    }
+  }
+
+  private waitReady(node: AudioWorkletNode): Promise<boolean> {
+    return new Promise((resolve) => {
+      const timer = window.setTimeout(() => resolve(false), READY_TIMEOUT_MS);
+      const handler = (event: MessageEvent) => {
+        const msg = event.data as { type?: string };
+        if (msg.type === "ready") {
+          window.clearTimeout(timer);
+          node.port.removeEventListener("message", handler);
+          resolve(true);
+        } else if (msg.type === "error") {
+          window.clearTimeout(timer);
+          node.port.removeEventListener("message", handler);
+          resolve(false);
+        }
+      };
+      node.port.addEventListener("message", handler);
+      node.port.start();
+    });
+  }
+
+  private async activateLive(channels: number): Promise<boolean> {
+    if (this.worklet && this.liveReady && this.liveChannels === channels) {
+      return true;
+    }
+    this.teardownLive();
+    try {
+      const ctx = this.ensureContext();
+      const module = await this.compileWasm();
+      if (!module) return false;
+      if (!this.workletModuleAdded) {
+        await ctx.audioWorklet.addModule(rbWorkletUrl);
+        this.workletModuleAdded = true;
+      }
+      const node = new AudioWorkletNode(ctx, "rb-live", {
+        numberOfInputs: 1,
+        numberOfOutputs: 1,
+        outputChannelCount: [channels],
+      });
+      const readyPromise = this.waitReady(node);
+      node.port.postMessage({
+        type: "init",
+        module,
+        sampleRate: ctx.sampleRate,
+        channels,
+      });
+      node.port.postMessage({ type: "pitch", value: this.pitch });
+      node.port.postMessage({ type: "tempo", value: this.tempo });
+      if (!(await readyPromise)) {
+        node.disconnect();
+        return false;
+      }
+      node.connect(ctx.destination);
+      this.worklet = node;
+      this.liveChannels = channels;
+      this.liveReady = true;
+      return true;
+    } catch {
+      this.teardownLive();
+      return false;
+    }
+  }
+
+  private teardownLive(): void {
+    if (this.worklet) {
+      try {
+        this.worklet.disconnect();
+      } catch {
+        /* already gone */
+      }
+      this.worklet = null;
+    }
+    this.liveReady = false;
+    this.liveChannels = 0;
+  }
+
+  private notifyLive(): void {
+    this.callbacks.onLiveChange?.(this.pitchEngine === "rubberband");
+  }
+
   async loadOriginal(arrayBuffer: ArrayBuffer): Promise<void> {
     const ctx = this.ensureContext();
     this.originalBuffer = await ctx.decodeAudioData(arrayBuffer.slice(0));
+    await this.activateLive(this.originalBuffer.numberOfChannels).catch(() => false);
+    this.notifyLive();
   }
 
   async loadShifted(arrayBuffer: ArrayBuffer): Promise<void> {
     const ctx = this.ensureContext();
     this.shiftedBuffer = await ctx.decodeAudioData(arrayBuffer.slice(0));
     this.stopSource();
+    await this.activateLive(this.shiftedBuffer.numberOfChannels).catch(() => false);
+    this.notifyLive();
   }
 
   clearShifted(): void {
@@ -71,6 +177,10 @@ export class PitchAudioEngine {
     return this.shiftedBuffer !== null;
   }
 
+  get currentTempo(): number {
+    return this.tempo;
+  }
+
   activeBufferKind(): "original" | "variant" | null {
     if (this.mode === "variant" && this.shiftedBuffer) return "variant";
     if (this.originalBuffer) return "original";
@@ -80,26 +190,21 @@ export class PitchAudioEngine {
 
   setLoop(loop: LoopRegion | null): void {
     this.loop = loop;
-    this.worklet?.port.postMessage({ type: "loop", loop });
     this.restart();
   }
 
   setPitchRatio(ratio: number): void {
     this.pitch = ratio;
-    if (this.worklet) {
+    if (this.worklet && this.liveReady) {
       this.worklet.port.postMessage({ type: "pitch", value: ratio });
     } else {
       this.restart();
     }
   }
 
-  get currentTempo(): number {
-    return this.tempo;
-  }
-
   setTempo(tempo: number): void {
     this.tempo = tempo;
-    if (this.worklet) {
+    if (this.worklet && this.liveReady) {
       this.worklet.port.postMessage({ type: "tempo", value: tempo });
     } else {
       this.restart();
@@ -124,21 +229,24 @@ export class PitchAudioEngine {
       this.callbacks.onModeChange?.(kind);
     }
     const ctx = this.ensureContext();
-    ctx.resume();
+    void ctx.resume();
     this.stopSource();
 
+    const live = this.livePath();
     const source = ctx.createBufferSource();
     source.buffer = buffer;
-    source.playbackRate.value = kind === "original" ? 1 : this.pitch;
-    if (this.loop) {
-      source.loop = true;
-      source.loopStart = this.loop.start;
-      source.loopEnd = this.loop.end;
+    if (live && this.worklet) {
+      this.worklet.port.postMessage({ type: "reset" });
+      this.worklet.port.postMessage({ type: "pitch", value: this.pitch });
+      this.worklet.port.postMessage({ type: "tempo", value: this.tempo });
+      source.connect(this.worklet);
+    } else {
+      source.playbackRate.value = kind === "original" ? 1 : this.pitch * this.tempo;
+      source.connect(ctx.destination);
     }
-    source.connect(ctx.destination);
-    const when = this.loop ? this.offset : Math.min(this.offset, buffer.duration);
-    source.start(0, when);
-    this.startedAt = ctx.currentTime - when;
+    const startAt = Math.min(this.offset, buffer.duration);
+    source.start(0, startAt);
+    this.startedAt = ctx.currentTime - startAt;
     this.source = source;
     this.playing = true;
     this.tick();
@@ -153,8 +261,13 @@ export class PitchAudioEngine {
   }
 
   seek(t: number): void {
-    this.offset = Math.max(0, t);
-    if (this.playing) this.play();
+    const dur = this.activeDuration();
+    this.offset = dur > 0 ? Math.max(0, Math.min(t, dur)) : Math.max(0, t);
+    if (this.playing) this.restart();
+    if (this.worklet && this.liveReady) {
+      this.worklet.port.postMessage({ type: "reset" });
+    }
+    this.callbacks.onPosition?.(this.offset);
   }
 
   currentTime(): number {
@@ -170,10 +283,17 @@ export class PitchAudioEngine {
 
   private tick = () => {
     if (!this.playing) return;
-    const t = this.currentTime();
+    let t = this.currentTime();
+    if (this.loop && t >= this.loop.end) {
+      this.seek(this.loop.start);
+      t = this.loop.start;
+      this.callbacks.onPosition?.(t);
+      this.rafId = requestAnimationFrame(this.tick);
+      return;
+    }
     this.callbacks.onPosition?.(t);
     const dur = this.activeDuration();
-    if (!this.loop && dur > 0 && t >= dur) {
+    if (!this.loop && dur > 0 && t >= dur + TAIL_SECONDS) {
       this.pause();
       return;
     }
@@ -202,6 +322,6 @@ export class PitchAudioEngine {
   }
 
   get isWorkletActive(): boolean {
-    return this.useWorklet;
+    return this.liveReady;
   }
 }

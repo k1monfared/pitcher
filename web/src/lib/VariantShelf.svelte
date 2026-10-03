@@ -5,6 +5,7 @@
   let {
     variants = [],
     activeId = null,
+    renderSummary = "",
     onselect,
     onstar,
     ondelete,
@@ -12,6 +13,7 @@
   } = $props<{
     variants?: Variant[];
     activeId?: number | null;
+    renderSummary?: string;
     onselect?: (v: Variant) => void;
     onstar?: (v: Variant, favorite: boolean) => void;
     ondelete?: (v: Variant) => void;
@@ -22,7 +24,12 @@
 <div class="shelf">
   <div class="head">
     <span>variants ({variants.length})</span>
-    <button type="button" onclick={onrender}>render current</button>
+  </div>
+  <div class="keep">
+    <button type="button" onclick={onrender}>keep this pitch as variant</button>
+    {#if renderSummary}
+      <span class="summary" title="exactly what the server will render and store">{renderSummary}</span>
+    {/if}
   </div>
   <div class="grid">
     {#each variants as v (v.id)}
@@ -70,13 +77,24 @@
     font-size: 0.85rem;
     color: #aaa;
   }
-  .head button {
+  .keep {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    align-items: flex-start;
+  }
+  .keep button {
     background: #1b1b1f;
     color: #6aa9ff;
     border: 1px solid #333;
     border-radius: 0.3rem;
-    padding: 0.25rem 0.5rem;
+    padding: 0.35rem 0.7rem;
     cursor: pointer;
+  }
+  .summary {
+    font-size: 0.72rem;
+    color: #888;
+    font-variant-numeric: tabular-nums;
   }
   .grid {
     display: grid;
