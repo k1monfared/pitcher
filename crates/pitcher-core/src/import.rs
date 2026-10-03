@@ -69,7 +69,9 @@ pub fn yt_dlp_args() -> Vec<String> {
         "--no-playlist".into(),
         "-x".into(),
         "--audio-format".into(),
-        "wav".into(),
+        "flac".into(),
+        "--postprocessor-args".into(),
+        "ExtractAudio:-compression_level 8".into(),
         "--print".into(),
         "after_move:filepath".into(),
     ];
@@ -117,7 +119,33 @@ pub fn download(url: &str, out_dir: &Path) -> anyhow::Result<PathBuf> {
                 String::from_utf8_lossy(&output.stderr).trim()
             )
         })?;
-    Ok(PathBuf::from(path))
+
+    let downloaded = PathBuf::from(path);
+    Ok(transcode_archive(&downloaded, out_dir))
+}
+
+pub fn transcode_archive(downloaded: &Path, out_dir: &Path) -> PathBuf {
+    let target = crate::archive::default_archive_format();
+
+    if target == crate::archive::ExportFormat::Flac
+        && downloaded
+            .extension()
+            .and_then(|e| e.to_str())
+            .map(|e| e.eq_ignore_ascii_case("flac"))
+            .unwrap_or(false)
+    {
+        return downloaded.to_path_buf();
+    }
+
+    match crate::archive::compress_to(downloaded, out_dir, target, crate::archive::Quality::High) {
+        Ok((compressed, _)) => {
+            if compressed != downloaded {
+                let _ = std::fs::remove_file(downloaded);
+            }
+            compressed
+        }
+        Err(_) => downloaded.to_path_buf(),
+    }
 }
 
 pub fn yt_dlp_version() -> Option<String> {

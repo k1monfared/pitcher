@@ -302,7 +302,11 @@ async fn shift_track(
         .ok_or_else(|| anyhow::anyhow!("track {id} not found"))?;
 
     let cents = resolve_shift(&track.source_path, &body)?;
-    let format = body.format.clone().unwrap_or_else(|| "wav".to_string());
+    let format = body.format.clone().unwrap_or_else(|| {
+        pitcher_core::archive::default_export_format()
+            .extension()
+            .to_string()
+    });
     let stem = std::path::Path::new(&track.source_path)
         .file_stem()
         .and_then(|s| s.to_str())

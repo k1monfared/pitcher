@@ -1,4 +1,6 @@
-use pitcher_core::import::{detect_kind, is_url, js_runtime_args, yt_dlp_args, yt_dlp_command};
+use pitcher_core::import::{
+    detect_kind, is_url, js_runtime_args, transcode_archive, yt_dlp_args, yt_dlp_command,
+};
 
 #[test]
 fn url_detection() {
@@ -33,11 +35,14 @@ fn yt_dlp_command_prefers_env_then_path() {
 }
 
 #[test]
-fn yt_dlp_args_request_best_audio_and_wav() {
+fn yt_dlp_args_extract_lossless_intermediate() {
     let args = yt_dlp_args();
     let joined = args.join(" ");
     assert!(joined.contains("bestaudio"), "args: {joined}");
-    assert!(joined.contains("--audio-format wav"), "args: {joined}");
+    assert!(
+        joined.contains("--audio-format flac"),
+        "yt-dlp should extract a lossless intermediate; transcode happens after, args: {joined}"
+    );
     assert!(joined.contains("--no-playlist"), "args: {joined}");
     assert!(joined.contains("after_move:filepath"), "args: {joined}");
 }
@@ -62,6 +67,48 @@ fn js_runtime_args_are_pairs() {
     assert_eq!(args2, vec!["--js-runtimes", "deno"]);
     let args3 = js_runtime_args(None, None);
     assert!(args3.is_empty());
+}
+
+#[test]
+fn transcode_archive_produces_opus_from_flac_intermediate() {
+    if !have("ffmpeg") {
+        return;
+    }
+    let dir = tmp_dir("transcode");
+    let flac = dir.join("source.flac");
+    let status = std::process::Command::new("ffmpeg")
+        .args(["-hide_banner", "-loglevel", "error", "-y"])
+        .args(["-f", "lavfi", "-i"])
+        .arg("anoisesrc=duration=3:sample_rate=44100:amplitude=0.4")
+        .args(["-c:a", "flac"])
+        .arg(&flac)
+        .status()
+        .unwrap();
+    assert!(status.success());
+
+    std::env::remove_var("PITCHER_ARCHIVE_FORMAT");
+    let out = transcode_archive(&flac, &dir);
+    assert_eq!(out.extension().unwrap(), "opus", "got {}", out.display());
+    assert!(out.exists());
+    assert!(
+        !flac.exists(),
+        "lossless intermediate should be removed after transcode"
+    );
+}
+
+fn have(cmd: &str) -> bool {
+    std::process::Command::new("sh")
+        .arg("-c")
+        .arg(format!("command -v {cmd}"))
+        .status()
+        .map(|s| s.success())
+        .unwrap_or(false)
+}
+
+fn tmp_dir(tag: &str) -> std::path::PathBuf {
+    let dir = std::env::temp_dir().join(format!("pitcher-import-{tag}-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    dir
 }
 
 fn which_node() -> Option<()> {

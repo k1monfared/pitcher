@@ -24,7 +24,7 @@
   let cents = $state(0);
   let snap = $state(0);
   let formant = $state(true);
-  let outputFormat = $state("wav");
+  let outputFormat = $state("opus");
   let targetNote = $state("");
   let manualHz = $state<number | null>(null);
   let detectedHz = $state<number | null>(null);
@@ -213,11 +213,12 @@
           <label class="format">
             format
             <select bind:value={outputFormat}>
-              <option value="wav">wav</option>
-              <option value="mp3">mp3</option>
+              <option value="opus">opus</option>
               <option value="flac">flac</option>
+              <option value="mp3">mp3</option>
               <option value="ogg">ogg</option>
               <option value="m4a">m4a</option>
+              <option value="wav">wav</option>
             </select>
           </label>
           <label class="formant">

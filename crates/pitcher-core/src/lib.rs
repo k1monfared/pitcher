@@ -1,3 +1,4 @@
+pub mod archive;
 pub mod engine;
 pub mod import;
 pub mod model;

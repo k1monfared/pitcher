@@ -226,7 +226,7 @@ fn main() -> anyhow::Result<()> {
                 .unwrap_or("out");
             let mut c = *offset;
             while c <= *offset + *span {
-                let out = Path::new(outdir).join(format!("{stem}_{c:+}.wav"));
+                let out = Path::new(outdir).join(format!("{stem}_{c:+}.opus"));
                 let req = ShiftRequest {
                     input: track.source_path.clone().into(),
                     output: out.clone(),
@@ -235,7 +235,7 @@ fn main() -> anyhow::Result<()> {
                     engine: Engine::Finer,
                     pitch_quality: PitchQuality::Quality,
                     section: None,
-                    output_format: Some("wav".into()),
+                    output_format: Some("opus".into()),
                 };
                 pitcher_core::engine::shift(&req)?;
                 shelf.add_variant(
@@ -246,7 +246,7 @@ fn main() -> anyhow::Result<()> {
                     "quality",
                     None,
                     out.to_str().unwrap(),
-                    Some("wav"),
+                    Some("opus"),
                 )?;
                 c += *step;
             }
@@ -317,7 +317,7 @@ fn run_try(
                         .file_stem()
                         .and_then(|s| s.to_str())
                         .unwrap_or("out");
-                    let out = Path::new(outdir).join(format!("{stem}_{cents:+}.wav"));
+                    let out = Path::new(outdir).join(format!("{stem}_{cents:+}.opus"));
                     let req = ShiftRequest {
                         input: track.source_path.clone().into(),
                         output: out.clone(),
@@ -326,7 +326,7 @@ fn run_try(
                         engine: Engine::Finer,
                         pitch_quality: PitchQuality::Quality,
                         section: None,
-                        output_format: Some("wav".into()),
+                        output_format: Some("opus".into()),
                     };
                     pitcher_core::engine::shift(&req)?;
                     let id = shelf.add_variant(
@@ -337,7 +337,7 @@ fn run_try(
                         "quality",
                         None,
                         out.to_str().unwrap(),
-                        Some("wav"),
+                        Some("opus"),
                     )?;
                     println!("kept variant {id} at {cents:+} cents");
                 }
