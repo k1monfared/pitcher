@@ -18,6 +18,7 @@ export class PitchAudioEngine {
   private loop: LoopRegion | null = null;
   private rafId = 0;
   private pitch = 1;
+  private tempo = 1;
   private useWorklet = false;
 
   constructor(private callbacks: EngineCallbacks = {}) {}
@@ -87,6 +88,19 @@ export class PitchAudioEngine {
     this.pitch = ratio;
     if (this.worklet) {
       this.worklet.port.postMessage({ type: "pitch", value: ratio });
+    } else {
+      this.restart();
+    }
+  }
+
+  get currentTempo(): number {
+    return this.tempo;
+  }
+
+  setTempo(tempo: number): void {
+    this.tempo = tempo;
+    if (this.worklet) {
+      this.worklet.port.postMessage({ type: "tempo", value: tempo });
     } else {
       this.restart();
     }

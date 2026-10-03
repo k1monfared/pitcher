@@ -2,8 +2,11 @@ import { describe, expect, it } from "vitest";
 import {
   abToggle,
   computePeaks,
+  formatTempo,
   nextFrameTime,
   normalizeLoop,
+  SPEED_OPTIONS,
+  tempoToTimeRatio,
 } from "./audio";
 
 describe("normalizeLoop", () => {
@@ -31,6 +34,29 @@ describe("abToggle", () => {
   it("toggles", () => {
     expect(abToggle("original")).toBe("variant");
     expect(abToggle("variant")).toBe("original");
+  });
+});
+
+describe("SPEED_OPTIONS", () => {
+  it("contains the requested rates in order", () => {
+    expect(SPEED_OPTIONS).toEqual([
+      0.5, 0.6, 0.7, 0.8, 0.9, 1, 1.1, 1.2, 1.3, 1.4, 1.5, 1.75, 2,
+    ]);
+  });
+});
+
+describe("tempoToTimeRatio", () => {
+  it("inverts tempo", () => {
+    expect(tempoToTimeRatio(2)).toBeCloseTo(0.5, 9);
+    expect(tempoToTimeRatio(0.5)).toBeCloseTo(2, 9);
+    expect(tempoToTimeRatio(1)).toBeCloseTo(1, 9);
+  });
+});
+
+describe("formatTempo", () => {
+  it("formats with x suffix", () => {
+    expect(formatTempo(1)).toBe("1x");
+    expect(formatTempo(1.75)).toBe("1.75x");
   });
 });
 

@@ -42,6 +42,15 @@ describe("hasOriginal/hasShifted", () => {
   });
 });
 
+describe("tempo", () => {
+  it("defaults to 1 and stores set values", () => {
+    const e = engineWith({});
+    expect(e.currentTempo).toBe(1);
+    e.setTempo(1.5);
+    expect(e.currentTempo).toBe(1.5);
+  });
+});
+
 describe("clearShifted", () => {
   it("drops the variant and returns to original mode", () => {
     const e = engineWith({ original: fakeBuffer, shifted: fakeBuffer }, "variant");

@@ -34,6 +34,18 @@ export function abToggle(current: "original" | "variant"): "original" | "variant
   return current === "original" ? "variant" : "original";
 }
 
+export const SPEED_OPTIONS = [
+  0.5, 0.6, 0.7, 0.8, 0.9, 1, 1.1, 1.2, 1.3, 1.4, 1.5, 1.75, 2,
+];
+
+export function tempoToTimeRatio(tempo: number): number {
+  return 1 / tempo;
+}
+
+export function formatTempo(tempo: number): string {
+  return `${tempo}x`;
+}
+
 export function computePeaks(samples: Float32Array, buckets: number): number[] {
   if (buckets <= 0) return [];
   const size = Math.max(1, Math.floor(samples.length / buckets));
