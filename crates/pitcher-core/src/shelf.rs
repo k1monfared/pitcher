@@ -233,6 +233,14 @@ impl Shelf {
             .execute("DELETE FROM tracks WHERE id = ?1", [id])?;
         Ok(())
     }
+
+    pub fn delete_track_with_files(
+        &self,
+        _id: i64,
+        _data_dir: &std::path::Path,
+    ) -> anyhow::Result<bool> {
+        unimplemented!()
+    }
 }
 
 pub fn default_db_path() -> PathBuf {

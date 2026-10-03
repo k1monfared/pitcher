@@ -48,6 +48,59 @@ fn rename_track_partial_keeps_other_field() {
 }
 
 #[test]
+fn delete_track_with_files_removes_managed_files() {
+    let base = std::env::temp_dir().join(format!("pitcher-purge-{}", std::process::id()));
+    let data = base.join("data");
+    std::fs::create_dir_all(&data).unwrap();
+    let shelf = Shelf::open(data.join("shelf.sqlite")).unwrap();
+
+    let src = data.join("imports").join("a.opus");
+    std::fs::create_dir_all(src.parent().unwrap()).unwrap();
+    std::fs::write(&src, b"audio").unwrap();
+    let tid = shelf
+        .add_track(src.to_str().unwrap(), "url", None, "A", "", 10.0, 48000)
+        .unwrap();
+    let vpath = data.join("out").join("a_-100.opus");
+    std::fs::create_dir_all(vpath.parent().unwrap()).unwrap();
+    std::fs::write(&vpath, b"variant").unwrap();
+    shelf
+        .add_variant(tid, -100, true, "finer", "quality", None, vpath.to_str().unwrap(), Some("opus"))
+        .unwrap();
+
+    assert!(shelf.delete_track_with_files(tid, &data).unwrap());
+    assert!(!src.exists(), "managed source should be removed");
+    assert!(!vpath.exists(), "variant file should be removed");
+    assert!(shelf.list_tracks().unwrap().is_empty());
+}
+
+#[test]
+fn delete_track_with_files_keeps_external_source() {
+    let base = std::env::temp_dir().join(format!("pitcher-purge-ext-{}", std::process::id()));
+    let data = base.join("data");
+    let external = base.join("music");
+    std::fs::create_dir_all(&data).unwrap();
+    std::fs::create_dir_all(&external).unwrap();
+    let shelf = Shelf::open(data.join("shelf.sqlite")).unwrap();
+
+    let src = external.join("a.wav");
+    std::fs::write(&src, b"audio").unwrap();
+    let tid = shelf
+        .add_track(src.to_str().unwrap(), "file", None, "A", "", 10.0, 44100)
+        .unwrap();
+
+    assert!(shelf.delete_track_with_files(tid, &data).unwrap());
+    assert!(src.exists(), "user local file must be kept");
+    assert!(shelf.list_tracks().unwrap().is_empty());
+}
+
+#[test]
+fn delete_track_with_files_missing_returns_false() {
+    let shelf = Shelf::open(tmp_db("purgemiss")).unwrap();
+    let data = std::env::temp_dir().join(format!("pitcher-purgemiss-{}", std::process::id()));
+    assert!(!shelf.delete_track_with_files(999, &data).unwrap());
+}
+
+#[test]
 fn add_variant_and_count() {
     let shelf = Shelf::open(tmp_db("var")).unwrap();
     let tid = shelf
