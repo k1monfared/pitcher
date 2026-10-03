@@ -1,6 +1,4 @@
-use pitcher_core::import::{
-    detect_kind, is_url, js_runtime_args, yt_dlp_args, yt_dlp_command,
-};
+use pitcher_core::import::{detect_kind, is_url, js_runtime_args, yt_dlp_args, yt_dlp_command};
 
 #[test]
 fn url_detection() {
