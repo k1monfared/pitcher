@@ -283,8 +283,38 @@ fn main() -> anyhow::Result<()> {
             no_play,
             formant,
         } => run_try(&cli.db, *track_id, outdir, *no_play, *formant)?,
-        Commands::Rename { .. } | Commands::Delete { .. } => {
-            anyhow::bail!("not implemented yet");
+        Commands::Rename {
+            track_id,
+            title,
+            artist,
+        } => {
+            let shelf = Shelf::open(&cli.db)?;
+            if shelf.get_track(*track_id)?.is_none() {
+                anyhow::bail!("no track {track_id}");
+            }
+            shelf.rename_track(*track_id, title.as_deref(), artist.as_deref())?;
+            let t = shelf.get_track(*track_id)?.unwrap();
+            println!(
+                "renamed track {track_id} to \"{}\"{}",
+                t.title,
+                t.artist.map(|a| format!(" by {a}")).unwrap_or_default()
+            );
+        }
+        Commands::Delete { track_id, yes } => {
+            let shelf = Shelf::open(&cli.db)?;
+            if shelf.get_track(*track_id)?.is_none() {
+                anyhow::bail!("no track {track_id}");
+            }
+            if !yes && !confirm(&format!("delete track {track_id} and its files? [y/N] "))? {
+                println!("aborted");
+                return Ok(());
+            }
+            let data_dir = std::path::Path::new(&cli.db)
+                .parent()
+                .map(|p| p.to_path_buf())
+                .unwrap_or_else(|| std::path::PathBuf::from("data"));
+            shelf.delete_track_with_files(*track_id, &data_dir)?;
+            println!("deleted track {track_id}");
         }
     }
     Ok(())
@@ -396,6 +426,18 @@ fn play_file(path: &Path) {
         .args(["-nodisp", "-autoexit", "-loglevel", "error"])
         .arg(path)
         .status();
+}
+
+fn confirm(prompt: &str) -> anyhow::Result<bool> {
+    use std::io::Write;
+    print!("{prompt}");
+    std::io::stdout().flush()?;
+    let mut line = String::new();
+    std::io::stdin().read_line(&mut line)?;
+    Ok(matches!(
+        line.trim().to_ascii_lowercase().as_str(),
+        "y" | "yes"
+    ))
 }
 
 fn run_shelf(db: &str, cmd: &ShelfCmd) -> anyhow::Result<()> {

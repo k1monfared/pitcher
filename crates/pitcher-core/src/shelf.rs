@@ -236,10 +236,23 @@ impl Shelf {
 
     pub fn delete_track_with_files(
         &self,
-        _id: i64,
-        _data_dir: &std::path::Path,
+        id: i64,
+        data_dir: &std::path::Path,
     ) -> anyhow::Result<bool> {
-        unimplemented!()
+        let Some(track) = self.get_track(id)? else {
+            return Ok(false);
+        };
+        let variants = self.list_variants(id)?;
+        self.delete_track(id)?;
+
+        for v in variants {
+            let _ = std::fs::remove_file(&v.output_path);
+        }
+        let source = std::path::PathBuf::from(&track.source_path);
+        if source.starts_with(data_dir) {
+            let _ = std::fs::remove_file(&source);
+        }
+        Ok(true)
     }
 }
 

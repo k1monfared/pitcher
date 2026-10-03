@@ -201,18 +201,8 @@ async fn delete_track(
     Path(id): Path<i64>,
 ) -> ApiResult<Json<serde_json::Value>> {
     let shelf = st.shelf()?;
-    let track = shelf
-        .get_track(id)?
-        .ok_or_else(|| anyhow::anyhow!("track {id} not found"))?;
-    let variants = shelf.list_variants(id)?;
-    shelf.delete_track(id)?;
-
-    for v in variants {
-        let _ = std::fs::remove_file(&v.output_path);
-    }
-    let source = PathBuf::from(&track.source_path);
-    if source.starts_with(&st.data_dir) {
-        let _ = std::fs::remove_file(&source);
+    if !shelf.delete_track_with_files(id, &st.data_dir)? {
+        return Err(ApiError(anyhow::anyhow!("track {id} not found")));
     }
     Ok(Json(serde_json::json!({ "deleted": id })))
 }

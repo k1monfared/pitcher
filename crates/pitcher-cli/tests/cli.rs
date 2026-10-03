@@ -481,12 +481,30 @@ fn rename_track_updates_title() {
     let db = dir.join("shelf.sqlite");
     let input = dir.join("in.wav");
     make_tone(&input, 440.0, 1.0);
-    assert!(run(&["--db", db.to_str().unwrap(), "add", input.to_str().unwrap(), "--title", "Old"])
-        .status
-        .success());
+    assert!(run(&[
+        "--db",
+        db.to_str().unwrap(),
+        "add",
+        input.to_str().unwrap(),
+        "--title",
+        "Old"
+    ])
+    .status
+    .success());
 
-    let out = run(&["--db", db.to_str().unwrap(), "rename", "1", "--title", "New"]);
-    assert!(out.status.success(), "stderr: {}", String::from_utf8_lossy(&out.stderr));
+    let out = run(&[
+        "--db",
+        db.to_str().unwrap(),
+        "rename",
+        "1",
+        "--title",
+        "New",
+    ]);
+    assert!(
+        out.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
 
     let list = run(&["--db", db.to_str().unwrap(), "list"]);
     let s = String::from_utf8_lossy(&list.stdout);
@@ -501,11 +519,19 @@ fn delete_track_removes_variants_and_keeps_external_source() {
     }
     let dir = tmp_dir("delcli");
     let db = dir.join("shelf.sqlite");
-    let input = dir.join("in.wav");
+    let external = tmp_dir("delcli-ext");
+    let input = external.join("in.wav");
     make_tone(&input, 440.0, 1.0);
-    assert!(run(&["--db", db.to_str().unwrap(), "add", input.to_str().unwrap(), "--title", "T"])
-        .status
-        .success());
+    assert!(run(&[
+        "--db",
+        db.to_str().unwrap(),
+        "add",
+        input.to_str().unwrap(),
+        "--title",
+        "T"
+    ])
+    .status
+    .success());
 
     let outdir = dir.join("out");
     let script = "-100\nk\nq\n";
@@ -532,7 +558,11 @@ fn delete_track_removes_variants_and_keeps_external_source() {
     assert!(variant_path.exists());
 
     let del = run(&["--db", db.to_str().unwrap(), "delete", "1", "--yes"]);
-    assert!(del.status.success(), "stderr: {}", String::from_utf8_lossy(&del.stderr));
+    assert!(
+        del.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&del.stderr)
+    );
     assert!(!variant_path.exists(), "variant file should be removed");
     assert!(input.exists(), "external source must be kept");
 

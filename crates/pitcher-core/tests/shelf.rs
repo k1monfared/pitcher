@@ -64,7 +64,16 @@ fn delete_track_with_files_removes_managed_files() {
     std::fs::create_dir_all(vpath.parent().unwrap()).unwrap();
     std::fs::write(&vpath, b"variant").unwrap();
     shelf
-        .add_variant(tid, -100, true, "finer", "quality", None, vpath.to_str().unwrap(), Some("opus"))
+        .add_variant(
+            tid,
+            -100,
+            true,
+            "finer",
+            "quality",
+            None,
+            vpath.to_str().unwrap(),
+            Some("opus"),
+        )
         .unwrap();
 
     assert!(shelf.delete_track_with_files(tid, &data).unwrap());
