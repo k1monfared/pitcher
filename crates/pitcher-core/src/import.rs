@@ -20,6 +20,18 @@ pub fn detect_kind(source: &str) -> &'static str {
     }
 }
 
+pub fn yt_dlp_command() -> Command {
+    unimplemented!()
+}
+
+pub fn yt_dlp_args() -> Vec<String> {
+    unimplemented!()
+}
+
+pub fn js_runtime_args(_node: Option<&str>, _deno: Option<&str>) -> Vec<String> {
+    unimplemented!()
+}
+
 pub fn download(url: &str, out_dir: &Path) -> anyhow::Result<PathBuf> {
     std::fs::create_dir_all(out_dir)?;
     let template = out_dir.join("%(title)s.%(ext)s");
