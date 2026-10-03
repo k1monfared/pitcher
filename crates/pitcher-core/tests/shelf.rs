@@ -266,6 +266,42 @@ fn download_filename_combines_song_and_pitch() {
 }
 
 #[test]
+fn bookmarks_crud_sorted_by_time() {
+    let shelf = Shelf::open(tmp_db("marks")).unwrap();
+    let tid = shelf
+        .add_track("/music/a.wav", "file", None, "A", "", 60.0, 44100)
+        .unwrap();
+    let b2 = shelf.add_bookmark(tid, 30.0, Some("chorus")).unwrap();
+    let b1 = shelf.add_bookmark(tid, 10.0, None).unwrap();
+    let marks = shelf.list_bookmarks(tid).unwrap();
+    assert_eq!(marks.len(), 2);
+    assert_eq!(marks[0].id, b1);
+    assert_eq!(marks[0].t, 10.0);
+    assert_eq!(marks[0].name, None);
+    assert_eq!(marks[1].id, b2);
+    assert_eq!(marks[1].name.as_deref(), Some("chorus"));
+
+    shelf.rename_bookmark(b1, "intro").unwrap();
+    assert_eq!(
+        shelf.list_bookmarks(tid).unwrap()[0].name.as_deref(),
+        Some("intro")
+    );
+    shelf.delete_bookmark(b2).unwrap();
+    assert_eq!(shelf.list_bookmarks(tid).unwrap().len(), 1);
+}
+
+#[test]
+fn bookmarks_die_with_track() {
+    let shelf = Shelf::open(tmp_db("markscascade")).unwrap();
+    let tid = shelf
+        .add_track("/music/a.wav", "file", None, "A", "", 60.0, 44100)
+        .unwrap();
+    shelf.add_bookmark(tid, 5.0, None).unwrap();
+    shelf.delete_track(tid).unwrap();
+    assert!(shelf.list_bookmarks(tid).unwrap().is_empty());
+}
+
+#[test]
 fn variants_list_sorted_by_shift_amount() {
     let shelf = Shelf::open(tmp_db("sorted")).unwrap();
     let tid = shelf

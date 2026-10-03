@@ -68,6 +68,15 @@ pub fn download_filename(
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Bookmark {
+    pub id: i64,
+    pub track_id: i64,
+    pub t: f64,
+    pub name: Option<String>,
+    pub created_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct VariantSpec {
     pub cents: i32,
     pub formant: bool,

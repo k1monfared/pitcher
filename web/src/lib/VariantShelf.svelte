@@ -15,7 +15,6 @@
     rendering = false,
     onselect,
     onselectOriginal,
-    onstar,
     ondelete,
     onrename,
     onrender,
@@ -32,7 +31,6 @@
     rendering?: boolean;
     onselect?: (v: Variant) => void;
     onselectOriginal?: () => void;
-    onstar?: (v: Variant, favorite: boolean) => void;
     ondelete?: (v: Variant) => void;
     onrename?: (v: Variant, name: string) => void;
     onrender?: () => void;
@@ -96,14 +94,6 @@
         {/if}
       </button>
       <div class="actions">
-        <button
-          type="button"
-          class:starred={v.favorite}
-          title="mark as keeper"
-          onclick={() => onstar?.(v, !v.favorite)}
-        >
-          {v.favorite ? "kept" : "keep"}
-        </button>
         <button type="button" title="rename" onclick={() => startRename(v)}>
           name
         </button>
@@ -250,9 +240,6 @@
     font-size: 0.7rem;
     padding: 0.3rem;
     cursor: pointer;
-  }
-  .actions button.starred {
-    color: #ffd166;
   }
   .actions a.dl {
     flex: 1;

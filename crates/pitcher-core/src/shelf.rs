@@ -285,6 +285,22 @@ impl Shelf {
         Ok(())
     }
 
+    pub fn add_bookmark(&self, _track_id: i64, _t: f64, _name: Option<&str>) -> anyhow::Result<i64> {
+        unimplemented!()
+    }
+
+    pub fn list_bookmarks(&self, _track_id: i64) -> anyhow::Result<Vec<crate::model::Bookmark>> {
+        unimplemented!()
+    }
+
+    pub fn rename_bookmark(&self, _id: i64, _name: &str) -> anyhow::Result<()> {
+        unimplemented!()
+    }
+
+    pub fn delete_bookmark(&self, _id: i64) -> anyhow::Result<()> {
+        unimplemented!()
+    }
+
     pub fn delete_track_with_files(
         &self,
         id: i64,

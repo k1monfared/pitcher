@@ -47,8 +47,23 @@
 
   onMount(() => {
     void refreshTracks();
+    const togglePlay = () => {
+      if (playing) {
+        engine.pause();
+        playing = false;
+      } else if (engine.hasOriginal || engine.hasShifted) {
+        engine.play();
+        playing = true;
+      }
+    };
+
     const onKey = (e: KeyboardEvent) => {
       if (!activeTrack || isTextEntry(e.target)) return;
+      if (e.key === " ") {
+        e.preventDefault();
+        togglePlay();
+        return;
+      }
       const action = keyAction(e.key, e.shiftKey, e.ctrlKey || e.metaKey);
       if (!action) return;
       e.preventDefault();
@@ -269,11 +284,6 @@
     else engine.setLoop(null);
   }
 
-  async function starVariant(v: Variant, favorite: boolean) {
-    await api.star(v.id, favorite);
-    variants = variants.map((x) => (x.id === v.id ? { ...x, favorite } : x));
-  }
-
   async function renameVariant(v: Variant, name: string) {
     try {
       const updated = await api.renameVariant(v.id, name);
@@ -480,7 +490,6 @@
               rendering={rendering}
               onselect={selectVariant}
               onselectOriginal={selectOriginal}
-              onstar={starVariant}
               ondelete={deleteVariant}
               onrename={renameVariant}
               onrender={renderCurrent}
