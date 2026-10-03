@@ -15,7 +15,8 @@ decisions. Summary of the chosen stack:
 - **Core + CLI:** Rust. Single static binary, reusable from Android later.
 - **Shelf storage:** SQLite via `rusqlite`.
 - **Web server:** Rust `axum`. **Web UI:** Svelte 5 + Vite + TypeScript.
-- **Live audition:** `rubberband-wasm` AudioWorklet in the browser.
+- **Live audition:** `soundtouchjs` in the browser (pitch + tempo preview).
+  Kept files are always rendered server-side with Rubber Band.
 - **Importer:** `yt-dlp` for YouTube/SoundCloud. See [docs/LEGALITY.md](docs/LEGALITY.md).
 - torchcrepe, Basic Pitch, and Android are deferred past v1.
 

@@ -4,7 +4,6 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "postinstall": "cp node_modules/rubberband-wasm/dist/rubberband.wasm public/rubberband.wasm",
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
@@ -22,6 +21,6 @@
     "vitest": "^2.1.0"
   },
   "dependencies": {
-    "rubberband-wasm": "^3.3.0"
+    "soundtouchjs": "^0.3.0"
   }
 }

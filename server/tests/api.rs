@@ -505,6 +505,101 @@ async fn export_all_returns_zip_of_every_variant() {
 }
 
 #[tokio::test]
+async fn media_format_param_transcodes() {
+    if !have("ffmpeg") {
+        return;
+    }
+    let (st, dir) = state("mediafmt");
+    import_tone(&build_router(st.clone()), &dir).await;
+    let app = build_router(st);
+
+    let payload = serde_json::json!({ "cents": -100, "format": "wav" });
+    app.clone()
+        .oneshot(
+            Request::post("/api/tracks/1/shift")
+                .header("content-type", "application/json")
+                .body(Body::from(payload.to_string()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    let resp = app
+        .clone()
+        .oneshot(
+            Request::get("/api/media/1?format=mp3")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    assert_eq!(resp.headers().get("content-type").unwrap(), "audio/mpeg");
+    let bytes = resp.into_body().collect().await.unwrap().to_bytes();
+    assert!(!bytes.is_empty());
+
+    let resp2 = app
+        .oneshot(
+            Request::get("/api/media/1?format=mp3")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp2.status(), StatusCode::OK);
+}
+
+#[tokio::test]
+async fn media_bad_format_400() {
+    let (st, _d) = state("mediafmtbad");
+    let app = build_router(st);
+    let resp = app
+        .oneshot(
+            Request::get("/api/media/1?format=bogus")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+}
+
+#[tokio::test]
+async fn export_format_param_transcodes_entries() {
+    if !have("ffmpeg") {
+        return;
+    }
+    let (st, dir) = state("exportfmt");
+    import_tone(&build_router(st.clone()), &dir).await;
+    let app = build_router(st);
+
+    let payload = serde_json::json!({ "cents": -100, "format": "wav" });
+    app.clone()
+        .oneshot(
+            Request::post("/api/tracks/1/shift")
+                .header("content-type", "application/json")
+                .body(Body::from(payload.to_string()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    let resp = app
+        .oneshot(
+            Request::get("/api/tracks/1/export?format=mp3")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let bytes = resp.into_body().collect().await.unwrap().to_bytes();
+    let mut archive = zip::ZipArchive::new(std::io::Cursor::new(bytes.to_vec())).unwrap();
+    assert_eq!(archive.len(), 1);
+    assert!(archive.by_index(0).unwrap().name().ends_with(".mp3"));
+}
+
+#[tokio::test]
 async fn export_missing_track_404() {
     let (st, _d) = state("export404");
     let app = build_router(st);

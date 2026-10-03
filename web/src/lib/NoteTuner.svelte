@@ -5,12 +5,16 @@
     detectedHz = null,
     manualHz = $bindable<number | null>(null),
     targetNote = $bindable<string>(""),
+    statusText = "",
     ondetect,
+    onapply,
   } = $props<{
     detectedHz?: number | null;
     manualHz?: number | null;
     targetNote?: string;
+    statusText?: string;
     ondetect?: () => void;
+    onapply?: (cents: number) => void;
   }>();
 
   let manualNote = $state("");
@@ -50,6 +54,8 @@
         <small>{reading.centsOff >= 0 ? "+" : ""}{reading.centsOff.toFixed(1)}c</small>
         <small>{detectedHz?.toFixed(1)} Hz</small>
       </span>
+    {:else if statusText}
+      <span class="status">{statusText}</span>
     {/if}
   </div>
 

@@ -402,14 +402,113 @@ fn resolve_shift(source_path: &str, body: &ShiftBody) -> anyhow::Result<i32> {
     Ok(body.cents)
 }
 
-async fn media(State(st): State<AppState>, Path(variant_id): Path<i64>) -> ApiResult<Response> {
+#[derive(Debug, Deserialize)]
+pub struct FormatQuery {
+    pub format: Option<String>,
+}
+
+fn target_format(
+    requested: Option<&str>,
+    stored_ext: &str,
+) -> anyhow::Result<pitcher_core::archive::ExportFormat> {
+    match requested {
+        None => pitcher_core::archive::ExportFormat::parse(stored_ext)
+            .ok_or_else(|| anyhow::anyhow!("unknown stored format: {stored_ext}")),
+        Some(f) => pitcher_core::archive::ExportFormat::parse(f)
+            .ok_or_else(|| anyhow::anyhow!("unknown format: {f}")),
+    }
+}
+
+fn stored_ext(path: &str) -> String {
+    std::path::Path::new(path)
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("wav")
+        .to_string()
+}
+
+fn converted_path(
+    out_dir: &std::path::Path,
+    variant_id: i64,
+    format: pitcher_core::archive::ExportFormat,
+) -> PathBuf {
+    out_dir
+        .join(".converted")
+        .join(format!("{variant_id}.{}", format.extension()))
+}
+
+fn serve_variant_file(
+    out_dir: &std::path::Path,
+    variant: &pitcher_core::model::Variant,
+    requested: Option<&str>,
+) -> anyhow::Result<(Vec<u8>, &'static str, String)> {
+    let ext = stored_ext(&variant.output_path);
+    let target = target_format(requested, &ext)?;
+    if target.extension() == ext {
+        let bytes = std::fs::read(&variant.output_path)?;
+        return Ok((
+            bytes,
+            mime_for(Some(target.extension())),
+            filename_for(variant, &ext),
+        ));
+    }
+    let cached = converted_path(out_dir, variant.id, target);
+    if !cached.is_file() {
+        if let Some(parent) = cached.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
+        let (tmp, _) = pitcher_core::archive::compress_to(
+            std::path::Path::new(&variant.output_path),
+            &cached.parent().unwrap().to_path_buf(),
+            target,
+            pitcher_core::archive::Quality::High,
+        )?;
+        if tmp != cached {
+            std::fs::rename(&tmp, &cached)?;
+        }
+    }
+    let bytes = std::fs::read(&cached)?;
+    Ok((
+        bytes,
+        mime_for(Some(target.extension())),
+        filename_for(variant, target.extension()),
+    ))
+}
+
+fn filename_for(variant: &pitcher_core::model::Variant, ext: &str) -> String {
+    let stem = variant.name.as_deref().unwrap_or("").trim();
+    if stem.is_empty() {
+        format!("pitch {:+}.{}", variant.cents, ext)
+    } else {
+        format!("{}.{ext}", safe_filename(stem))
+    }
+}
+
+async fn media(
+    State(st): State<AppState>,
+    Path(variant_id): Path<i64>,
+    Query(q): Query<FormatQuery>,
+) -> ApiResult<Response> {
+    if let Some(f) = q.format.as_deref() {
+        pitcher_core::archive::ExportFormat::parse(f)
+            .ok_or_else(|| anyhow::anyhow!("unknown format: {f}"))?;
+    }
     let shelf = st.shelf()?;
     let variant = shelf
         .get_variant(variant_id)?
         .ok_or_else(|| anyhow::anyhow!("variant {variant_id} not found"))?;
-    let bytes = std::fs::read(&variant.output_path)?;
-    let mime = mime_for(variant.output_format.as_deref());
-    Ok(([(axum::http::header::CONTENT_TYPE, mime)], bytes).into_response())
+    let (bytes, mime, filename) = serve_variant_file(&st.out_dir, &variant, q.format.as_deref())?;
+    Ok((
+        [
+            (axum::http::header::CONTENT_TYPE, mime),
+            (
+                axum::http::header::CONTENT_DISPOSITION,
+                &format!("attachment; filename=\"{filename}\"")[..],
+            ),
+        ],
+        bytes,
+    )
+        .into_response())
 }
 
 fn mime_for(format: Option<&str>) -> &'static str {
@@ -512,7 +611,11 @@ fn safe_filename(s: &str) -> String {
     }
 }
 
-async fn export_all(State(st): State<AppState>, Path(id): Path<i64>) -> ApiResult<Response> {
+async fn export_all(
+    State(st): State<AppState>,
+    Path(id): Path<i64>,
+    Query(q): Query<FormatQuery>,
+) -> ApiResult<Response> {
     let shelf = st.shelf()?;
     let track = shelf
         .get_track(id)?
@@ -530,19 +633,9 @@ async fn export_all(State(st): State<AppState>, Path(id): Path<i64>) -> ApiResul
         let mut zip = zip::ZipWriter::new(&mut buf);
         let options = zip::write::SimpleFileOptions::default();
         for v in &variants {
-            let bytes = std::fs::read(&v.output_path)
-                .map_err(|_| anyhow::anyhow!("variant {} file not found on disk", v.id))?;
-            let ext = std::path::Path::new(&v.output_path)
-                .extension()
-                .and_then(|e| e.to_str())
-                .unwrap_or("wav");
-            let stem = v.name.as_deref().unwrap_or("").trim();
-            let entry = if stem.is_empty() {
-                format!("{:+}c.{}", v.cents, ext)
-            } else {
-                format!("{}.{ext}", safe_filename(stem))
-            };
-            zip.start_file(entry, options)?;
+            let (bytes, _, filename) = serve_variant_file(&st.out_dir, v, q.format.as_deref())
+                .map_err(|e| anyhow::anyhow!("variant {}: {e}", v.id))?;
+            zip.start_file(filename, options)?;
             zip.write_all(&bytes)?;
         }
         zip.finish()?;

@@ -7,17 +7,14 @@
   import VariantShelf from "./lib/VariantShelf.svelte";
   import { ApiClient, type Track, type Variant } from "./lib/api";
   import { computePeaks } from "./lib/audio";
+  import { isTextEntry, keyAction } from "./lib/view";
   import { PitchAudioEngine } from "./lib/engine";
   import { centsBetweenHz, midiToHz, noteToMidi } from "./lib/notes";
 
   const api = new ApiClient();
-  let livePitch = $state(false);
   const engine = new PitchAudioEngine({
     onPosition: (t) => {
       time = t;
-    },
-    onLiveChange: (live) => {
-      livePitch = live;
     },
   });
 
@@ -26,12 +23,12 @@
   let variants: Variant[] = $state([]);
   let activeVariant: Variant | null = $state(null);
   let cents = $state(0);
-  let snap = $state(0);
   let formant = $state(true);
   let outputFormat = $state("opus");
   let targetNote = $state("");
   let manualHz = $state<number | null>(null);
   let detectedHz = $state<number | null>(null);
+  let detectStatus = $state("");
   let loop = $state<[number, number] | null>(null);
   let playhead = $state(0);
   let time = $state(0);
@@ -43,8 +40,26 @@
   let busy = $state(false);
   let status = $state("");
 
-  onMount(async () => {
-    await refreshTracks();
+  onMount(() => {
+    void refreshTracks();
+    const onKey = (e: KeyboardEvent) => {
+      if (!activeTrack || isTextEntry(e.target)) return;
+      const action = keyAction(e.key, e.shiftKey, e.ctrlKey || e.metaKey);
+      if (!action) return;
+      e.preventDefault();
+      if (action.type === "seek") {
+        const dur = activeTrack.duration_s;
+        const t = Math.max(0, Math.min(dur, time + action.delta));
+        engine.seek(t);
+        playhead = t;
+      } else {
+        const next = Math.max(-1200, Math.min(1200, Math.round(cents + action.delta)));
+        cents = next;
+        engine.setPitchCents(next);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
   });
 
   async function refreshTracks() {
@@ -69,8 +84,7 @@
     activeVariant = null;
     engine.clearShifted();
     cents = 0;
-    engine.setBaseCents(0);
-    engine.setPitchRatio(1);
+    engine.setPitchCents(0);
     peaks = [];
     time = 0;
     playhead = 0;
@@ -79,7 +93,7 @@
       await engine.loadOriginal(buf);
       const ctx = new AudioContext();
       const audio = await ctx.decodeAudioData(buf.slice(0));
-      peaks = computePeaks(audio.getChannelData(0), 400);
+      peaks = computePeaks(audio.getChannelData(0), 2000);
       await ctx.close();
       engine.select("original");
     } catch (e) {
@@ -153,8 +167,7 @@
   async function selectOriginal() {
     activeVariant = null;
     cents = 0;
-    engine.setBaseCents(0);
-    engine.setPitchRatio(1);
+    engine.setPitchCents(0);
     engine.select("original");
     await showOriginalPeaks();
   }
@@ -165,7 +178,7 @@
       const buf = await (await fetch(api.trackAudioUrl(activeTrack.id))).arrayBuffer();
       const ctx = new AudioContext();
       const audio = await ctx.decodeAudioData(buf);
-      peaks = computePeaks(audio.getChannelData(0), 400);
+      peaks = computePeaks(audio.getChannelData(0), 2000);
       await ctx.close();
     } catch {
       peaks = [];
@@ -181,34 +194,49 @@
       await engine.loadShifted(buf);
       const ctx = new AudioContext();
       const audio = await ctx.decodeAudioData(buf.slice(0));
-      peaks = computePeaks(audio.getChannelData(0), 400);
+      peaks = computePeaks(audio.getChannelData(0), 2000);
       await ctx.close();
-      // The file already carries the variant's shift, so the live engine
-      // compensates: fader stays absolute from the original.
-      engine.setBaseCents(v.cents);
-      engine.setPitchRatio(Math.pow(2, v.cents / 1200));
-      engine.select("variant");
+      engine.setPitchCents(v.cents);
+      engine.select("variant", v.cents);
     } catch (e) {
       status = `cannot load variant: ${e}`;
     }
   }
 
+  function fmtClock(t: number): string {
+    const m = Math.floor(t / 60);
+    const s = Math.floor(t % 60);
+    return `${m}:${s.toString().padStart(2, "0")}`;
+  }
+
   async function detectAtPlayhead() {
     if (!activeTrack) return;
+    const at = time;
     try {
-      const r = await api.detect(activeTrack.id, playhead);
-      detectedHz = r.hz > 0 ? r.hz : null;
-      if (!targetNote && r.note) {
-        targetNote = "";
+      const r = await api.detect(activeTrack.id, at);
+      if (r.hz > 0 && r.note) {
+        detectedHz = r.hz;
+        detectStatus = "";
+      } else {
+        detectedHz = null;
+        detectStatus = `no clear pitch at ${fmtClock(at)}`;
       }
     } catch (e) {
-      status = `detect failed: ${e}`;
+      detectedHz = null;
+      detectStatus = `detect failed: ${e}`;
     }
+  }
+
+  async function applyIntervalToFader(c: number) {
+    await selectOriginal();
+    const rounded = Math.max(-1200, Math.min(1200, Math.round(c)));
+    cents = rounded;
+    engine.setPitchCents(rounded);
   }
 
   function onFaderChange(value: number) {
     cents = value;
-    engine.setPitchRatio(Math.pow(2, value / 1200));
+    engine.setPitchCents(value);
   }
 
   function onTempoChange(value: number) {
@@ -305,13 +333,10 @@
   <header>
     <h1>pitcher</h1>
     <span
-      class="engine-badge"
-      class:live={livePitch}
-      title={livePitch
-        ? "live preview uses the Rubber Band pitch engine: tempo stays fixed while you move the fader"
-        : "live pitch engine unavailable: preview falls back to tape-style speed change"}
+      class="engine-badge live"
+      title="live preview uses the SoundTouch engine: fader moves pitch at fixed tempo, speed moves tempo at fixed pitch. Files you keep are rendered with Rubber Band"
     >
-      {livePitch ? "live pitch: rubberband" : "live pitch: basic"}
+      live preview: soundtouch · files: rubberband
     </span>
     <div class="import">
       <input bind:value={pathInput} placeholder="/path/to/audio.wav" />
@@ -398,7 +423,7 @@
         <Transport
           {playing}
           {tempo}
-          tempoEnabled={livePitch}
+          tempoEnabled={true}
           time={time}
           duration={activeTrack.duration_s}
           onplay={() => {
@@ -417,17 +442,15 @@
         />
 
         <div class="stage">
-          <PitchFader
-            bind:cents
-            bind:snap
-            onchange={onFaderChange}
-          />
+          <PitchFader bind:cents onchange={onFaderChange} />
           <div class="right">
             <NoteTuner
               detectedHz={detectedHz}
               bind:manualHz
               bind:targetNote
+              statusText={detectStatus}
               ondetect={detectAtPlayhead}
+              onapply={applyIntervalToFader}
             />
             <VariantShelf
               {variants}

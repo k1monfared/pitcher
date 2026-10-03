@@ -18,16 +18,12 @@ describe("selection", () => {
     expect(e.activeBufferKind()).toBe("original");
   });
 
-  it("select switches to the variant buffer", () => {
+  it("select switches buffers", () => {
     const e = engineWith({ original: fakeBuffer, shifted: fakeBuffer });
-    e.select("variant");
+    e.select("variant", -600);
     expect(e.selection).toBe("variant");
     expect(e.activeBufferKind()).toBe("variant");
-  });
-
-  it("falls back to original when no variant is loaded", () => {
-    const e = engineWith({ original: fakeBuffer });
-    e.select("variant");
+    e.select("original");
     expect(e.activeBufferKind()).toBe("original");
   });
 
@@ -40,11 +36,47 @@ describe("selection", () => {
     const e = engineWith({});
     expect(e.activeBufferKind()).toBeNull();
   });
+});
 
-  it("select is a no-op for the current selection", () => {
-    const e = engineWith({ original: fakeBuffer });
-    e.select("original");
-    expect(e.selection).toBe("original");
+describe("direct file playback", () => {
+  it("plays the variant file untouched when fader matches", () => {
+    const e = engineWith({ original: fakeBuffer, shifted: fakeBuffer });
+    e.select("variant", -600);
+    e.setPitchCents(-600);
+    expect(e.useDirectFile()).toBe(true);
+  });
+
+  it("uses live preview when the fader moves off the variant", () => {
+    const e = engineWith({ original: fakeBuffer, shifted: fakeBuffer });
+    e.select("variant", -600);
+    e.setPitchCents(-550);
+    expect(e.useDirectFile()).toBe(false);
+  });
+
+  it("uses live preview when tempo is not 1", () => {
+    const e = engineWith({ original: fakeBuffer, shifted: fakeBuffer });
+    e.select("variant", -600);
+    e.setPitchCents(-600);
+    e.setTempo(1.5);
+    expect(e.useDirectFile()).toBe(false);
+  });
+
+  it("never uses direct file for original selection", () => {
+    const e = engineWith({ original: fakeBuffer, shifted: fakeBuffer });
+    e.setPitchCents(0);
+    expect(e.useDirectFile()).toBe(false);
+  });
+});
+
+describe("pitch and tempo state", () => {
+  it("stores fader cents and tempo", () => {
+    const e = engineWith({});
+    expect(e.currentCents).toBe(0);
+    expect(e.currentTempo).toBe(1);
+    e.setPitchCents(-100);
+    e.setTempo(1.5);
+    expect(e.currentCents).toBe(-100);
+    expect(e.currentTempo).toBe(1.5);
   });
 });
 
@@ -56,53 +88,10 @@ describe("hasOriginal/hasShifted", () => {
   });
 });
 
-describe("absolute fader with base compensation", () => {
-  it("defaults to base 0, ratio passes through", () => {
-    const e = engineWith({});
-    expect(e.effectivePitchRatio(1)).toBeCloseTo(1, 9);
-  });
-
-  it("variant at base plays unmodified when fader matches", () => {
-    const e = engineWith({ shifted: fakeBuffer });
-    e.setBaseCents(-600);
-    e.setPitchRatio(Math.pow(2, -600 / 1200));
-    expect(e.effectivePitchRatio(e.currentPitchRatio)).toBeCloseTo(1, 9);
-  });
-
-  it("moving the fader above base shifts up from the variant", () => {
-    const e = engineWith({ shifted: fakeBuffer });
-    e.setBaseCents(-600);
-    e.setPitchRatio(Math.pow(2, -500 / 1200));
-    expect(e.effectivePitchRatio(e.currentPitchRatio)).toBeCloseTo(
-      Math.pow(2, 100 / 1200),
-      9,
-    );
-  });
-
-  it("total from original always equals the fader", () => {
-    const e = engineWith({ original: fakeBuffer, shifted: fakeBuffer });
-    for (const [base, fader] of [[-600, -600], [-600, -500], [0, 300], [200, -100]] as const) {
-      e.setBaseCents(base);
-      const ratio = Math.pow(2, fader / 1200);
-      const total = Math.pow(2, base / 1200) * e.effectivePitchRatio(ratio);
-      expect(total).toBeCloseTo(ratio, 9);
-    }
-  });
-});
-
-describe("tempo", () => {
-  it("defaults to 1 and stores set values", () => {
-    const e = engineWith({});
-    expect(e.currentTempo).toBe(1);
-    e.setTempo(1.5);
-    expect(e.currentTempo).toBe(1.5);
-  });
-});
-
 describe("clearShifted", () => {
   it("drops the variant and returns to original selection", () => {
     const e = engineWith({ original: fakeBuffer, shifted: fakeBuffer });
-    e.select("variant");
+    e.select("variant", -100);
     e.clearShifted();
     expect(e.hasShifted).toBe(false);
     expect(e.selection).toBe("original");

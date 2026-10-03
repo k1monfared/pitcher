@@ -24,9 +24,10 @@ resolves metadata only. The audio still has to come from a source you are allowe
 
 ## Bundled libraries
 
-The web UI ships `rubberband.wasm`, a WebAssembly build of the Rubber Band Library
-(GPL, via the `rubberband-wasm` npm package). This matches the repo license
-(GPL-3.0-or-later). No proprietary or closed-source audio code is used anywhere.
+The web UI uses `soundtouchjs` (LGPL-2.1, compatible with this repo's GPL-3.0-or-later)
+for live pitch and tempo preview in the browser. Files you keep are always rendered
+server-side with the Rubber Band Library (GPL). No proprietary or closed-source audio
+code is used anywhere.
 
 ## No warranty
 
