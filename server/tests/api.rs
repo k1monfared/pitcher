@@ -318,3 +318,93 @@ async fn missing_track_returns_404() {
         .unwrap();
     assert_eq!(resp.status(), StatusCode::NOT_FOUND);
 }
+
+#[tokio::test]
+async fn track_audio_serves_original_file() {
+    if !have("ffmpeg") {
+        return;
+    }
+    let (st, dir) = state("audio");
+    let input = dir.join("in.wav");
+    make_tone(&input, 440.0, 1.0);
+    let app = build_router(st);
+
+    let imp = serde_json::json!({ "path": input.to_str().unwrap(), "title": "Tone" });
+    app.clone()
+        .oneshot(
+            Request::post("/api/import")
+                .header("content-type", "application/json")
+                .body(Body::from(imp.to_string()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    let resp = app
+        .oneshot(
+            Request::get("/api/tracks/1/audio")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let ctype = resp
+        .headers()
+        .get("content-type")
+        .unwrap()
+        .to_str()
+        .unwrap()
+        .to_string();
+    assert!(ctype.starts_with("audio/"), "content-type: {ctype}");
+    let bytes = resp.into_body().collect().await.unwrap().to_bytes();
+    assert!(!bytes.is_empty(), "expected audio bytes");
+}
+
+#[tokio::test]
+async fn track_audio_404_for_missing_track() {
+    let (st, _d) = state("audio404");
+    let app = build_router(st);
+    let resp = app
+        .oneshot(
+            Request::get("/api/tracks/999/audio")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
+async fn track_audio_404_when_file_gone() {
+    if !have("ffmpeg") {
+        return;
+    }
+    let (st, dir) = state("audiogone");
+    let input = dir.join("in.wav");
+    make_tone(&input, 440.0, 1.0);
+    let app = build_router(st);
+
+    let imp = serde_json::json!({ "path": input.to_str().unwrap(), "title": "Tone" });
+    app.clone()
+        .oneshot(
+            Request::post("/api/import")
+                .header("content-type", "application/json")
+                .body(Body::from(imp.to_string()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    std::fs::remove_file(&input).unwrap();
+    let resp = app
+        .oneshot(
+            Request::get("/api/tracks/1/audio")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+}

@@ -118,6 +118,7 @@ pub fn build_api(state: AppState) -> Router {
         .route("/api/note", get(note))
         .route("/api/interval", get(interval))
         .route("/api/media/{variant_id}", get(media))
+        .route("/api/tracks/{id}/audio", get(track_audio))
         .route("/api/variants/{id}/star", post(star))
         .route("/api/variants/{id}", delete(delete_variant))
         .with_state(state)
@@ -388,6 +389,37 @@ fn mime_for(format: Option<&str>) -> &'static str {
         Some("m4a") | Some("aac") => "audio/mp4",
         _ => "audio/wav",
     }
+}
+
+fn mime_for_path(path: &str) -> &'static str {
+    let ext = std::path::Path::new(path)
+        .extension()
+        .and_then(|e| e.to_str())
+        .map(|e| e.to_ascii_lowercase())
+        .unwrap_or_default();
+    match ext.as_str() {
+        "mp3" => "audio/mpeg",
+        "flac" => "audio/flac",
+        "ogg" | "opus" => "audio/ogg",
+        "m4a" | "aac" => "audio/mp4",
+        "wav" => "audio/wav",
+        _ => "application/octet-stream",
+    }
+}
+
+async fn track_audio(State(st): State<AppState>, Path(id): Path<i64>) -> ApiResult<Response> {
+    let shelf = st.shelf()?;
+    let track = shelf
+        .get_track(id)?
+        .ok_or_else(|| anyhow::anyhow!("track {id} not found"))?;
+    let bytes = std::fs::read(&track.source_path).map_err(|_| {
+        anyhow::anyhow!(
+            "track {id} audio file not found on disk: {}",
+            track.source_path
+        )
+    })?;
+    let mime = mime_for_path(&track.source_path);
+    Ok(([(axum::http::header::CONTENT_TYPE, mime)], bytes).into_response())
 }
 
 async fn star(
