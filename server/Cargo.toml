@@ -5,6 +5,10 @@ edition.workspace = true
 license.workspace = true
 authors.workspace = true
 
+[lib]
+name = "pitcher_server"
+path = "src/lib.rs"
+
 [[bin]]
 name = "pitcher-server"
 path = "src/main.rs"
@@ -12,3 +16,12 @@ path = "src/main.rs"
 [dependencies]
 pitcher-core.workspace = true
 anyhow.workspace = true
+axum = "0.8.9"
+tokio = { version = "1.53.2", features = ["full"] }
+tower-http = { version = "0.7.1", features = ["fs", "cors"] }
+serde.workspace = true
+serde_json.workspace = true
+
+[dev-dependencies]
+http-body-util = "0.1.5"
+tower = { version = "0.5.3", features = ["util"] }
