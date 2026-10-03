@@ -11,6 +11,8 @@
     exportAllUrl = null,
     mediaUrlFor = null,
     renderSummary = "",
+    renderMsg = "",
+    rendering = false,
     onselect,
     onselectOriginal,
     onstar,
@@ -26,6 +28,8 @@
     exportAllUrl?: string | null;
     mediaUrlFor?: ((id: number) => string) | null;
     renderSummary?: string;
+    renderMsg?: string;
+    rendering?: boolean;
     onselect?: (v: Variant) => void;
     onselectOriginal?: () => void;
     onstar?: (v: Variant, favorite: boolean) => void;
@@ -62,14 +66,20 @@
 <div class="shelf">
   <div class="head">
     <span>pitches ({variants.length + 1})</span>
-    {#if exportAllUrl && variants.length > 0}
-      <a class="export" href={exportAllUrl} download>export all (.zip)</a>
-    {/if}
   </div>
   <div class="keep">
-    <button type="button" onclick={onrender}>keep this pitch as variant</button>
-    {#if renderSummary}
+    <button type="button" onclick={onrender} disabled={rendering}>
+      {rendering ? "rendering..." : "keep this pitch as variant"}
+    </button>
+    {#if renderMsg}
+      <span class="summary" class:error={renderMsg.includes("failed")}>{renderMsg}</span>
+    {:else if renderSummary}
       <span class="summary" title="exactly what the server will render and store">{renderSummary}</span>
+    {/if}
+    {#if exportAllUrl && variants.length > 0}
+      <a class="export" href={exportAllUrl} download title="download every kept pitch as one zip, in the format above">
+        export all {variants.length} pitches (.zip)
+      </a>
     {/if}
   </div>
   {#snippet variantCard(v: Variant)}
@@ -185,6 +195,9 @@
     font-size: 0.72rem;
     color: #888;
     font-variant-numeric: tabular-nums;
+  }
+  .summary.error {
+    color: #ff9b9b;
   }
   .grid {
     display: grid;

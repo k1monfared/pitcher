@@ -82,6 +82,13 @@
     </label>
     {#if interval !== null}
       <span class="interval">{interval >= 0 ? "+" : ""}{interval.toFixed(0)} cents</span>
+      <button
+        type="button"
+        title="move the pitch fader to this difference"
+        onclick={() => onapply?.(interval)}
+      >
+        move fader here
+      </button>
     {/if}
   </div>
 

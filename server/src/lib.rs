@@ -459,7 +459,7 @@ fn serve_variant_file(
         }
         let (tmp, _) = pitcher_core::archive::compress_to(
             std::path::Path::new(&variant.output_path),
-            &cached.parent().unwrap().to_path_buf(),
+            cached.parent().unwrap(),
             target,
             pitcher_core::archive::Quality::High,
         )?;
@@ -549,7 +549,21 @@ async fn track_audio(State(st): State<AppState>, Path(id): Path<i64>) -> ApiResu
         )
     })?;
     let mime = mime_for_path(&track.source_path);
-    Ok(([(axum::http::header::CONTENT_TYPE, mime)], bytes).into_response())
+    let filename = std::path::Path::new(&track.source_path)
+        .file_name()
+        .and_then(|s| s.to_str())
+        .unwrap_or("audio");
+    Ok((
+        [
+            (axum::http::header::CONTENT_TYPE, mime),
+            (
+                axum::http::header::CONTENT_DISPOSITION,
+                &format!("attachment; filename=\"{filename}\"")[..],
+            ),
+        ],
+        bytes,
+    )
+        .into_response())
 }
 
 async fn star(

@@ -37,7 +37,12 @@
   let peaks: number[] = $state([]);
   let pathInput = $state("");
   let urlInput = $state("");
-  let busy = $state(false);
+  let importingFile = $state(false);
+  let importingUrl = $state(false);
+  let rendering = $state(false);
+  let importFileMsg = $state("");
+  let importUrlMsg = $state("");
+  let renderMsg = $state("");
   let status = $state("");
 
   onMount(() => {
@@ -102,41 +107,41 @@
   }
 
   async function doImportPath() {
-    if (!pathInput) return;
-    busy = true;
-    status = "importing...";
+    if (!pathInput || importingFile) return;
+    importingFile = true;
+    importFileMsg = "importing...";
     try {
       const r = await api.importPath(pathInput);
       await refreshTracks();
       await openTrack(r.track);
-      status = "";
+      importFileMsg = "";
     } catch (e) {
-      status = `import failed: ${e}`;
+      importFileMsg = `import failed: ${e}`;
     } finally {
-      busy = false;
+      importingFile = false;
     }
   }
 
   async function doImportUrl() {
-    if (!urlInput) return;
-    busy = true;
-    status = "downloading...";
+    if (!urlInput || importingUrl) return;
+    importingUrl = true;
+    importUrlMsg = "downloading...";
     try {
       const r = await api.importUrl(urlInput);
       await refreshTracks();
       await openTrack(r.track);
-      status = "";
+      importUrlMsg = "";
     } catch (e) {
-      status = `download failed: ${e}`;
+      importUrlMsg = `download failed: ${e}`;
     } finally {
-      busy = false;
+      importingUrl = false;
     }
   }
 
   async function renderCurrent() {
-    if (!activeTrack) return;
-    busy = true;
-    status = "rendering...";
+    if (!activeTrack || rendering) return;
+    rendering = true;
+    renderMsg = "rendering...";
     try {
       const body: Record<string, unknown> = {
         cents,
@@ -156,11 +161,11 @@
       variants = detail.variants;
       activeVariant = v;
       await selectVariant(v);
-      status = "";
+      renderMsg = "";
     } catch (e) {
-      status = `render failed: ${e}`;
+      renderMsg = `render failed: ${e}`;
     } finally {
-      busy = false;
+      rendering = false;
     }
   }
 
@@ -339,10 +344,20 @@
       live preview: soundtouch · files: rubberband
     </span>
     <div class="import">
-      <input bind:value={pathInput} placeholder="/path/to/audio.wav" />
-      <button type="button" onclick={doImportPath} disabled={busy}>import file</button>
-      <input bind:value={urlInput} placeholder="https://youtube.com/..." />
-      <button type="button" onclick={doImportUrl} disabled={busy}>import url</button>
+      <span class="import-group">
+        <input bind:value={pathInput} placeholder="/path/to/audio.wav" />
+        <button type="button" onclick={doImportPath} disabled={importingFile}>
+          {importingFile ? "importing..." : "import file"}
+        </button>
+        {#if importFileMsg}<span class="action-msg">{importFileMsg}</span>{/if}
+      </span>
+      <span class="import-group">
+        <input bind:value={urlInput} placeholder="https://youtube.com/..." />
+        <button type="button" onclick={doImportUrl} disabled={importingUrl}>
+          {importingUrl ? "downloading..." : "import url"}
+        </button>
+        {#if importUrlMsg}<span class="action-msg">{importUrlMsg}</span>{/if}
+      </span>
     </div>
   </header>
 
@@ -458,9 +473,11 @@
               originalActive={activeVariant === null}
               originalTitle={activeTrack.title}
               originalAudioUrl={api.trackAudioUrl(activeTrack.id)}
-              exportAllUrl={variants.length > 0 ? api.exportAllUrl(activeTrack.id) : null}
-              mediaUrlFor={(id) => api.mediaUrl(id)}
+              exportAllUrl={variants.length > 0 ? api.exportAllUrl(activeTrack.id, outputFormat) : null}
+              mediaUrlFor={(id) => api.mediaUrl(id, outputFormat)}
               renderSummary={renderSummary}
+              renderMsg={renderMsg}
+              rendering={rendering}
               onselect={selectVariant}
               onselectOriginal={selectOriginal}
               onstar={starVariant}
@@ -516,8 +533,19 @@
   }
   .import {
     display: flex;
-    gap: 0.5rem;
+    gap: 1rem;
     flex-wrap: wrap;
+  }
+  .import-group {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  .action-msg {
+    font-size: 0.75rem;
+    color: #ffd166;
+    max-width: 22rem;
   }
   .import input {
     background: #16161a;

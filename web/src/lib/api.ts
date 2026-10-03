@@ -154,12 +154,14 @@ export class ApiClient {
     );
   }
 
-  exportAllUrl(trackId: number): string {
-    return `${this.base}/api/tracks/${trackId}/export`;
+  exportAllUrl(trackId: number, format?: string): string {
+    const q = format ? `?format=${encodeURIComponent(format)}` : "";
+    return `${this.base}/api/tracks/${trackId}/export${q}`;
   }
 
-  mediaUrl(variantId: number): string {
-    return `${this.base}/api/media/${variantId}`;
+  mediaUrl(variantId: number, format?: string): string {
+    const q = format ? `?format=${encodeURIComponent(format)}` : "";
+    return `${this.base}/api/media/${variantId}${q}`;
   }
 
   trackAudioUrl(trackId: number): string {

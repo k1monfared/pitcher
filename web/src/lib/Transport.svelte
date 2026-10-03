@@ -43,7 +43,7 @@
 </script>
 
 <div class="transport">
-  <button type="button" onclick={playing ? onpause : onplay}>
+  <button type="button" class="play" onclick={playing ? onpause : onplay}>
     {playing ? "pause" : "play"}
   </button>
   <label
@@ -102,6 +102,9 @@
   button:disabled {
     opacity: 0.4;
     cursor: default;
+  }
+  button.play {
+    min-width: 4.2rem;
   }
   .speed {
     display: flex;

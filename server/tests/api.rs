@@ -663,6 +663,14 @@ async fn track_audio_serves_original_file() {
         .unwrap()
         .to_string();
     assert!(ctype.starts_with("audio/"), "content-type: {ctype}");
+    let disp = resp
+        .headers()
+        .get("content-disposition")
+        .unwrap()
+        .to_str()
+        .unwrap()
+        .to_string();
+    assert!(disp.contains("in.wav"), "disposition: {disp}");
     let bytes = resp.into_body().collect().await.unwrap().to_bytes();
     assert!(!bytes.is_empty(), "expected audio bytes");
 }

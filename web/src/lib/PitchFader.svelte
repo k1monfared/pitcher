@@ -1,17 +1,15 @@
 <script lang="ts">
-  import { centsToY, clampCents, snapCents, yToCents, SNAP_MODES } from "../lib/fader";
+  import { centsToY, clampCents, yToCents } from "../lib/fader";
   import { formatCents } from "../lib/notes";
 
   let {
     cents = $bindable(0),
     range = 1200,
-    snap = $bindable(0),
     height = 360,
     onchange,
   } = $props<{
     cents?: number;
     range?: number;
-    snap?: number;
     height?: number;
     onchange?: (cents: number) => void;
   }>();
@@ -24,7 +22,7 @@
 
   function setFromY(y: number) {
     const raw = clampCents(yToCents(y, range, height), range);
-    cents = snapCents(raw, snap);
+    cents = Math.round(raw);
     onchange?.(cents);
   }
 
@@ -40,24 +38,13 @@
     const deltaY = e.clientY - startY;
     const semitones = -deltaY / (height / (2 * range / 100));
     const raw = clampCents(startCents + semitones * 100, range);
-    cents = snapCents(raw, snap);
+    cents = Math.round(raw);
     onchange?.(cents);
   }
 
   function onPointerUp(e: PointerEvent) {
     dragging = false;
     (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
-  }
-
-  function onKey(e: KeyboardEvent) {
-    const step = e.shiftKey ? 1 : e.altKey ? 10 : 100;
-    if (e.key === "ArrowUp") cents = clampCents(cents + step, range);
-    else if (e.key === "ArrowDown") cents = clampCents(cents - step, range);
-    else if (e.key === "Home") cents = 0;
-    else return;
-    if (snap > 0) cents = snapCents(cents, snap);
-    onchange?.(cents);
-    e.preventDefault();
   }
 
   function onTrackPointerDown(e: PointerEvent) {
@@ -85,7 +72,6 @@
     onpointerdown={onTrackPointerDown}
     onpointermove={onPointerMove}
     onpointerup={onPointerUp}
-    onkeydown={onKey}
   >
     <div class="centerline"></div>
     <div class="knob" style="top: {knobY}px"></div>
@@ -94,17 +80,6 @@
   <div class="readout">
     <span class="cents">{formatCents(cents)}</span>
     <span class="unit">cents</span>
-  </div>
-  <div class="snaps">
-    {#each SNAP_MODES as mode}
-      <button
-        class:active={snap === mode.cents}
-        onclick={() => (snap = mode.cents)}
-        type="button"
-      >
-        {mode.label}
-      </button>
-    {/each}
   </div>
 </div>
 
@@ -173,22 +148,5 @@
   .unit {
     font-size: 0.75rem;
     color: #888;
-  }
-  .snaps {
-    display: flex;
-    gap: 0.25rem;
-  }
-  .snaps button {
-    background: #1b1b1f;
-    color: #aaa;
-    border: 1px solid #333;
-    border-radius: 0.3rem;
-    padding: 0.15rem 0.4rem;
-    font-size: 0.7rem;
-    cursor: pointer;
-  }
-  .snaps button.active {
-    border-color: #6aa9ff;
-    color: #6aa9ff;
   }
 </style>
