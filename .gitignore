@@ -1,0 +1,12 @@
+/target
+/data
+/node_modules
+web/node_modules
+web/dist
+*.wav
+*.mp3
+*.flac
+*.ogg
+*.m4a
+*.opus
+!web/public/**/*.wasm
