@@ -195,13 +195,33 @@ impl Shelf {
 
     pub fn find_variant(
         &self,
-        _track_id: i64,
-        _cents: i32,
-        _formant: bool,
-        _section: Option<(f64, f64)>,
-        _format: Option<&str>,
+        track_id: i64,
+        cents: i32,
+        formant: bool,
+        section: Option<(f64, f64)>,
+        format: Option<&str>,
     ) -> anyhow::Result<Option<Variant>> {
-        unimplemented!()
+        let (start, end) = match section {
+            Some((s, e)) => (Some(s), Some(e)),
+            None => (None, None),
+        };
+        let mut stmt = self.conn.prepare(
+            "SELECT id, track_id, name, cents, formant, engine, pitch_quality, section_start,
+                    section_end, output_path, output_format, src_note, src_hz,
+                    target_note, target_hz, favorite, created_at
+             FROM variants
+             WHERE track_id = ?1 AND cents = ?2 AND formant = ?3
+               AND IFNULL(section_start, -1) = IFNULL(?4, -1)
+               AND IFNULL(section_end, -1) = IFNULL(?5, -1)
+               AND IFNULL(output_format, '') = IFNULL(?6, '')
+             ORDER BY id LIMIT 1",
+        )?;
+        Ok(stmt
+            .query_row(
+                params![track_id, cents, formant as i32, start, end, format],
+                map_variant,
+            )
+            .optional()?)
     }
 
     pub fn get_variant(&self, id: i64) -> anyhow::Result<Option<Variant>> {

@@ -426,6 +426,59 @@ async fn import_tone(app: &axum::Router, dir: &std::path::Path) {
 }
 
 #[tokio::test]
+async fn repeat_shift_returns_existing_variant() {
+    if !have("ffmpeg") {
+        return;
+    }
+    let (st, dir) = state("dupe");
+    import_tone(&build_router(st.clone()), &dir).await;
+    let app = build_router(st);
+
+    let payload = serde_json::json!({ "cents": -600, "formant": true, "format": "wav" });
+    let first = async {
+        let resp = app
+            .clone()
+            .oneshot(
+                Request::post("/api/tracks/1/shift")
+                    .header("content-type", "application/json")
+                    .body(Body::from(payload.to_string()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+        body_json(resp).await
+    }
+    .await;
+    let second = async {
+        let resp = app
+            .clone()
+            .oneshot(
+                Request::post("/api/tracks/1/shift")
+                    .header("content-type", "application/json")
+                    .body(Body::from(payload.to_string()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+        body_json(resp).await
+    }
+    .await;
+    assert_eq!(
+        first["id"], second["id"],
+        "same pitch must not render twice"
+    );
+
+    let resp = app
+        .oneshot(Request::get("/api/tracks/1").body(Body::empty()).unwrap())
+        .await
+        .unwrap();
+    let detail = body_json(resp).await;
+    assert_eq!(detail["variants"].as_array().unwrap().len(), 1);
+}
+
+#[tokio::test]
 async fn rename_variant_via_patch() {
     if !have("ffmpeg") {
         return;
@@ -501,7 +554,11 @@ async fn export_all_returns_zip_of_every_variant() {
     let bytes = resp.into_body().collect().await.unwrap().to_bytes();
     assert!(bytes.starts_with(b"PK"), "expected a zip archive");
     let archive = zip::ZipArchive::new(std::io::Cursor::new(bytes.to_vec())).unwrap();
-    assert_eq!(archive.len(), 2, "expected every variant in the zip");
+    assert_eq!(
+        archive.len(),
+        3,
+        "expected original plus every variant in the zip"
+    );
 }
 
 #[tokio::test]
@@ -595,8 +652,61 @@ async fn export_format_param_transcodes_entries() {
     assert_eq!(resp.status(), StatusCode::OK);
     let bytes = resp.into_body().collect().await.unwrap().to_bytes();
     let mut archive = zip::ZipArchive::new(std::io::Cursor::new(bytes.to_vec())).unwrap();
-    assert_eq!(archive.len(), 1);
-    assert!(archive.by_index(0).unwrap().name().ends_with(".mp3"));
+    assert_eq!(archive.len(), 2, "expected original plus variant");
+    let names: Vec<String> = (0..archive.len())
+        .map(|i| archive.by_index(i).unwrap().name().to_string())
+        .collect();
+    assert!(
+        names.iter().any(|n| n.ends_with(".mp3")),
+        "variant entry: {names:?}"
+    );
+}
+
+#[tokio::test]
+async fn export_names_files_song_then_pitch() {
+    if !have("ffmpeg") {
+        return;
+    }
+    let (st, dir) = state("exportnames");
+    import_tone(&build_router(st.clone()), &dir).await;
+    let app = build_router(st);
+
+    let payload = serde_json::json!({ "cents": -600, "format": "wav" });
+    app.clone()
+        .oneshot(
+            Request::post("/api/tracks/1/shift")
+                .header("content-type", "application/json")
+                .body(Body::from(payload.to_string()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    app.clone()
+        .oneshot(
+            Request::patch("/api/variants/1")
+                .header("content-type", "application/json")
+                .body(Body::from(serde_json::json!({ "name": "low" }).to_string()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    let resp = app
+        .oneshot(
+            Request::get("/api/tracks/1/export")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let bytes = resp.into_body().collect().await.unwrap().to_bytes();
+    let mut archive = zip::ZipArchive::new(std::io::Cursor::new(bytes.to_vec())).unwrap();
+    let mut names: Vec<String> = (0..archive.len())
+        .map(|i| archive.by_index(i).unwrap().name().to_string())
+        .collect();
+    names.sort();
+    assert_eq!(names, vec!["Tone - low.wav", "Tone.wav"]);
 }
 
 #[tokio::test]

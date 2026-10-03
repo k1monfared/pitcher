@@ -35,6 +35,38 @@ pub struct Variant {
     pub created_at: String,
 }
 
+pub fn sanitize_filename(s: &str) -> String {
+    let cleaned: String = s
+        .chars()
+        .map(|c| {
+            if c == '/' || c == '\\' || c == '\0' {
+                '_'
+            } else {
+                c
+            }
+        })
+        .collect();
+    let trimmed = cleaned.trim();
+    if trimmed.is_empty() {
+        "untitled".to_string()
+    } else {
+        trimmed.to_string()
+    }
+}
+
+pub fn download_filename(
+    track_title: &str,
+    variant_name: Option<&str>,
+    cents: i32,
+    ext: &str,
+) -> String {
+    let pitch = match variant_name.map(str::trim) {
+        Some(n) if !n.is_empty() => sanitize_filename(n),
+        _ => format!("pitch {cents:+}"),
+    };
+    format!("{} - {}.{}", sanitize_filename(track_title), pitch, ext)
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct VariantSpec {
     pub cents: i32,

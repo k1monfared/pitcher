@@ -245,6 +245,27 @@ fn find_variant_matches_render_settings() {
 }
 
 #[test]
+fn download_filename_combines_song_and_pitch() {
+    use pitcher_core::model::download_filename;
+    assert_eq!(
+        download_filename("nava sol darya", Some("low"), -600, "opus"),
+        "nava sol darya - low.opus"
+    );
+    assert_eq!(
+        download_filename("nava sol darya", None, -600, "opus"),
+        "nava sol darya - pitch -600.opus"
+    );
+    assert_eq!(
+        download_filename("nava sol darya", Some("  "), 200, "mp3"),
+        "nava sol darya - pitch +200.mp3"
+    );
+    assert_eq!(
+        download_filename("a/b\\c", Some("x/y"), 0, "wav"),
+        "a_b_c - x_y.wav"
+    );
+}
+
+#[test]
 fn variants_list_sorted_by_shift_amount() {
     let shelf = Shelf::open(tmp_db("sorted")).unwrap();
     let tid = shelf

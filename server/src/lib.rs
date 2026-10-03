@@ -339,6 +339,11 @@ async fn shift_track(
             .extension()
             .to_string()
     });
+    if let Some(existing) =
+        shelf.find_variant(id, cents, body.formant, body.section, Some(&format))?
+    {
+        return Ok(Json(serde_json::to_value(existing)?));
+    }
     let stem = std::path::Path::new(&track.source_path)
         .file_stem()
         .and_then(|s| s.to_str())
@@ -439,18 +444,21 @@ fn converted_path(
 
 fn serve_variant_file(
     out_dir: &std::path::Path,
+    track_title: &str,
     variant: &pitcher_core::model::Variant,
     requested: Option<&str>,
 ) -> anyhow::Result<(Vec<u8>, &'static str, String)> {
     let ext = stored_ext(&variant.output_path);
     let target = target_format(requested, &ext)?;
+    let filename = pitcher_core::model::download_filename(
+        track_title,
+        variant.name.as_deref(),
+        variant.cents,
+        target.extension(),
+    );
     if target.extension() == ext {
         let bytes = std::fs::read(&variant.output_path)?;
-        return Ok((
-            bytes,
-            mime_for(Some(target.extension())),
-            filename_for(variant, &ext),
-        ));
+        return Ok((bytes, mime_for(Some(target.extension())), filename));
     }
     let cached = converted_path(out_dir, variant.id, target);
     if !cached.is_file() {
@@ -468,20 +476,7 @@ fn serve_variant_file(
         }
     }
     let bytes = std::fs::read(&cached)?;
-    Ok((
-        bytes,
-        mime_for(Some(target.extension())),
-        filename_for(variant, target.extension()),
-    ))
-}
-
-fn filename_for(variant: &pitcher_core::model::Variant, ext: &str) -> String {
-    let stem = variant.name.as_deref().unwrap_or("").trim();
-    if stem.is_empty() {
-        format!("pitch {:+}.{}", variant.cents, ext)
-    } else {
-        format!("{}.{ext}", safe_filename(stem))
-    }
+    Ok((bytes, mime_for(Some(target.extension())), filename))
 }
 
 async fn media(
@@ -497,7 +492,12 @@ async fn media(
     let variant = shelf
         .get_variant(variant_id)?
         .ok_or_else(|| anyhow::anyhow!("variant {variant_id} not found"))?;
-    let (bytes, mime, filename) = serve_variant_file(&st.out_dir, &variant, q.format.as_deref())?;
+    let track_title = shelf
+        .get_track(variant.track_id)?
+        .map(|t| t.title)
+        .unwrap_or_else(|| "track".to_string());
+    let (bytes, mime, filename) =
+        serve_variant_file(&st.out_dir, &track_title, &variant, q.format.as_deref())?;
     Ok((
         [
             (axum::http::header::CONTENT_TYPE, mime),
@@ -635,20 +635,21 @@ async fn export_all(
         .get_track(id)?
         .ok_or_else(|| anyhow::anyhow!("track {id} not found"))?;
     let variants = shelf.list_variants(id)?;
-    if variants.is_empty() {
-        return Err(ApiError(anyhow::anyhow!(
-            "track {id} has no variants to export"
-        )));
-    }
 
     use std::io::Write;
     let mut buf = std::io::Cursor::new(Vec::new());
     {
         let mut zip = zip::ZipWriter::new(&mut buf);
         let options = zip::write::SimpleFileOptions::default();
+        if let Ok(bytes) = std::fs::read(&track.source_path) {
+            let ext = stored_ext(&track.source_path);
+            zip.start_file(format!("{}.{ext}", safe_filename(&track.title)), options)?;
+            zip.write_all(&bytes)?;
+        }
         for v in &variants {
-            let (bytes, _, filename) = serve_variant_file(&st.out_dir, v, q.format.as_deref())
-                .map_err(|e| anyhow::anyhow!("variant {}: {e}", v.id))?;
+            let (bytes, _, filename) =
+                serve_variant_file(&st.out_dir, &track.title, v, q.format.as_deref())
+                    .map_err(|e| anyhow::anyhow!("variant {}: {e}", v.id))?;
             zip.start_file(filename, options)?;
             zip.write_all(&bytes)?;
         }
