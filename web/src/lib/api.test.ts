@@ -1,16 +1,21 @@
 import { describe, expect, it, vi } from "vitest";
 import { ApiClient } from "./api";
 
-function mockFetch(payloads: Record<string, unknown>) {
-  return vi.fn(async (url: string) => {
-    const body = payloads[url] ?? {};
-    return {
-      ok: true,
-      status: 200,
-      json: async () => body,
-      text: async () => JSON.stringify(body),
-    } as unknown as Response;
+function response(body: unknown, ok = true, status = 200): Response {
+  return {
+    ok,
+    status,
+    json: async () => body,
+    text: async () => (typeof body === "string" ? body : JSON.stringify(body)),
+  } as unknown as Response;
+}
+
+function mockFetch(payloads: Record<string, unknown>): typeof fetch {
+  const fn = vi.fn(async (input: RequestInfo | URL, _init?: RequestInit) => {
+    const url = String(input);
+    return response(payloads[url] ?? {});
   });
+  return fn as unknown as typeof fetch;
 }
 
 describe("ApiClient", () => {
@@ -29,33 +34,27 @@ describe("ApiClient", () => {
   });
 
   it("posts a shift body", async () => {
-    const spy = mockFetch({ "/api/tracks/1/shift": { id: 9, cents: -100 } });
-    globalThis.fetch = spy;
+    const spy = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) =>
+      response({ id: 9, cents: -100 }),
+    );
+    globalThis.fetch = spy as unknown as typeof fetch;
     const c = new ApiClient();
     const v = await c.shift(1, { cents: -100, formant: true });
     expect(v).toEqual({ id: 9, cents: -100 });
     const call = spy.mock.calls[0];
-    expect(call[0]).toBe("/api/tracks/1/shift");
-    expect(JSON.parse((call[1] as RequestInit).body as string)).toEqual({
-      cents: -100,
-      formant: true,
-    });
+    expect(String(call[0])).toBe("/api/tracks/1/shift");
+    expect(JSON.parse(call[1]!.body as string)).toEqual({ cents: -100, formant: true });
   });
 
   it("encodes interval query", async () => {
-    const spy = mockFetch({ "/api/interval?source=C%234&target=C4": { cents: -100 } });
-    globalThis.fetch = spy;
+    globalThis.fetch = mockFetch({ "/api/interval?source=C%234&target=C4": { cents: -100 } });
     const c = new ApiClient();
     const r = await c.interval("C#4", "C4");
     expect(r.cents).toBe(-100);
   });
 
   it("throws on error responses", async () => {
-    globalThis.fetch = vi.fn(async () => ({
-      ok: false,
-      status: 404,
-      text: async () => "not found",
-    })) as unknown as typeof fetch;
+    globalThis.fetch = (async () => response("not found", false, 404)) as unknown as typeof fetch;
     const c = new ApiClient();
     await expect(c.listTracks()).rejects.toThrow("404");
   });

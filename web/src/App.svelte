@@ -1,0 +1,428 @@
+<script lang="ts">
+  import { onMount } from "svelte";
+  import PitchFader from "./lib/PitchFader.svelte";
+  import Waveform from "./lib/Waveform.svelte";
+  import NoteTuner from "./lib/NoteTuner.svelte";
+  import Transport from "./lib/Transport.svelte";
+  import VariantShelf from "./lib/VariantShelf.svelte";
+  import { ApiClient, type Track, type Variant } from "./lib/api";
+  import { computePeaks } from "./lib/audio";
+  import { PitchAudioEngine } from "./lib/engine";
+  import { centsBetweenHz, midiToHz, noteToMidi } from "./lib/notes";
+
+  const api = new ApiClient();
+  const engine = new PitchAudioEngine({
+    onPosition: (t) => {
+      time = t;
+    },
+  });
+
+  let tracks: Track[] = $state([]);
+  let activeTrack: Track | null = $state(null);
+  let variants: Variant[] = $state([]);
+  let activeVariant: Variant | null = $state(null);
+  let cents = $state(0);
+  let snap = $state(0);
+  let formant = $state(true);
+  let outputFormat = $state("wav");
+  let targetNote = $state("");
+  let manualHz = $state<number | null>(null);
+  let detectedHz = $state<number | null>(null);
+  let loop = $state<[number, number] | null>(null);
+  let playhead = $state(0);
+  let time = $state(0);
+  let playing = $state(false);
+  let mode = $state<"original" | "variant">("variant");
+  let peaks: number[] = $state([]);
+  let pathInput = $state("");
+  let urlInput = $state("");
+  let busy = $state(false);
+  let status = $state("");
+
+  onMount(async () => {
+    await refreshTracks();
+    await engine.initWorklet("/rubberband-processor.js");
+  });
+
+  async function refreshTracks() {
+    try {
+      tracks = await api.listTracks();
+    } catch (e) {
+      status = `cannot reach server: ${e}`;
+    }
+  }
+
+  async function openTrack(track: Track) {
+    activeTrack = track;
+    const detail = await api.getTrack(track.id);
+    variants = detail.variants;
+    activeVariant = null;
+    peaks = [];
+  }
+
+  async function doImportPath() {
+    if (!pathInput) return;
+    busy = true;
+    status = "importing...";
+    try {
+      const r = await api.importPath(pathInput);
+      await refreshTracks();
+      await openTrack(r.track);
+      status = "";
+    } catch (e) {
+      status = `import failed: ${e}`;
+    } finally {
+      busy = false;
+    }
+  }
+
+  async function doImportUrl() {
+    if (!urlInput) return;
+    busy = true;
+    status = "downloading...";
+    try {
+      const r = await api.importUrl(urlInput);
+      await refreshTracks();
+      await openTrack(r.track);
+      status = "";
+    } catch (e) {
+      status = `download failed: ${e}`;
+    } finally {
+      busy = false;
+    }
+  }
+
+  async function renderCurrent() {
+    if (!activeTrack) return;
+    busy = true;
+    status = "rendering...";
+    try {
+      const body: Record<string, unknown> = {
+        cents,
+        formant,
+        format: outputFormat,
+      };
+      if (manualHz && targetNote) {
+        body.from_hz = manualHz;
+        body.target_note = targetNote;
+      } else if (targetNote && detectedHz) {
+        body.from_hz = detectedHz;
+        body.target_note = targetNote;
+      }
+      if (loop) body.section = loop;
+      const v = await api.shift(activeTrack.id, body);
+      const detail = await api.getTrack(activeTrack.id);
+      variants = detail.variants;
+      activeVariant = v;
+      await selectVariant(v);
+      status = "";
+    } catch (e) {
+      status = `render failed: ${e}`;
+    } finally {
+      busy = false;
+    }
+  }
+
+  async function selectVariant(v: Variant) {
+    activeVariant = v;
+    cents = v.cents;
+    formant = v.formant;
+    try {
+      const buf = await (await fetch(api.mediaUrl(v.id))).arrayBuffer();
+      await engine.loadShifted(buf);
+      const ctx = new AudioContext();
+      const audio = await ctx.decodeAudioData(buf.slice(0));
+      peaks = computePeaks(audio.getChannelData(0), 400);
+      await ctx.close();
+    } catch {
+      peaks = [];
+    }
+  }
+
+  async function detectAtPlayhead() {
+    if (!activeTrack) return;
+    try {
+      const r = await api.detect(activeTrack.id, playhead);
+      detectedHz = r.hz > 0 ? r.hz : null;
+      if (!targetNote && r.note) {
+        targetNote = "";
+      }
+    } catch (e) {
+      status = `detect failed: ${e}`;
+    }
+  }
+
+  function onFaderChange(value: number) {
+    cents = value;
+    engine.setPitchRatio(Math.pow(2, value / 1200));
+  }
+
+  function onLoop(l: [number, number] | null) {
+    loop = l;
+    if (l) engine.setLoop({ start: l[0], end: l[1] });
+    else engine.setLoop(null);
+  }
+
+  async function starVariant(v: Variant, favorite: boolean) {
+    await api.star(v.id, favorite);
+    variants = variants.map((x) => (x.id === v.id ? { ...x, favorite } : x));
+  }
+
+  async function deleteVariant(v: Variant) {
+    await api.deleteVariant(v.id);
+    variants = variants.filter((x) => x.id !== v.id);
+    if (activeVariant?.id === v.id) activeVariant = null;
+  }
+</script>
+
+<div class="app">
+  <header>
+    <h1>pitcher</h1>
+    <div class="import">
+      <input bind:value={pathInput} placeholder="/path/to/audio.wav" />
+      <button type="button" onclick={doImportPath} disabled={busy}>import file</button>
+      <input bind:value={urlInput} placeholder="https://youtube.com/..." />
+      <button type="button" onclick={doImportUrl} disabled={busy}>import url</button>
+    </div>
+  </header>
+
+  {#if status}<p class="status">{status}</p>{/if}
+
+  <div class="layout">
+    <aside class="tracks">
+      <h2>shelf</h2>
+      {#each tracks as t (t.id)}
+        <button
+          type="button"
+          class:active={activeTrack?.id === t.id}
+          onclick={() => openTrack(t)}
+        >
+          <span class="title">{t.title}</span>
+          <span class="count">{t.variant_count}</span>
+        </button>
+      {/each}
+      {#if tracks.length === 0}
+        <p class="empty">import an audio file to begin</p>
+      {/if}
+    </aside>
+
+    <main>
+      {#if activeTrack}
+        <div class="title-row">
+          <h2>{activeTrack.title}</h2>
+          <label class="format">
+            format
+            <select bind:value={outputFormat}>
+              <option value="wav">wav</option>
+              <option value="mp3">mp3</option>
+              <option value="flac">flac</option>
+              <option value="ogg">ogg</option>
+              <option value="m4a">m4a</option>
+            </select>
+          </label>
+          <label class="formant">
+            <input type="checkbox" bind:checked={formant} />
+            preserve formants
+          </label>
+        </div>
+
+        <Waveform
+          {peaks}
+          duration={activeTrack.duration_s}
+          {loop}
+          playhead={time}
+          onseek={(t) => {
+            engine.seek(t);
+            playhead = t;
+          }}
+          onloop={onLoop}
+        />
+
+        <Transport
+          {playing}
+          {mode}
+          time={time}
+          duration={activeTrack.duration_s}
+          onplay={() => {
+            engine.play();
+            playing = true;
+          }}
+          onpause={() => {
+            engine.pause();
+            playing = false;
+          }}
+          ontoggle={() => {
+            engine.setMode(mode === "original" ? "variant" : "original");
+            mode = mode === "original" ? "variant" : "original";
+          }}
+          onseek={(t) => {
+            engine.seek(t);
+            playhead = t;
+          }}
+        />
+
+        <div class="stage">
+          <PitchFader
+            bind:cents
+            bind:snap
+            onchange={onFaderChange}
+          />
+          <div class="right">
+            <NoteTuner
+              detectedHz={detectedHz}
+              bind:manualHz
+              bind:targetNote
+              ondetect={detectAtPlayhead}
+            />
+            <VariantShelf
+              {variants}
+              activeId={activeVariant?.id ?? null}
+              onselect={selectVariant}
+              onstar={starVariant}
+              ondelete={deleteVariant}
+              onrender={renderCurrent}
+            />
+          </div>
+        </div>
+      {:else}
+        <p class="empty">no track selected</p>
+      {/if}
+    </main>
+  </div>
+</div>
+
+<style>
+  :global(body) {
+    margin: 0;
+    background: #0e0e12;
+    color: #e8e8ee;
+    font-family: system-ui, -apple-system, sans-serif;
+  }
+  .app {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 1.5rem;
+  }
+  header {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    border-bottom: 1px solid #26262c;
+    padding-bottom: 1rem;
+  }
+  h1 {
+    font-size: 1.3rem;
+    margin: 0;
+    letter-spacing: 0.02em;
+  }
+  .import {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+  .import input {
+    background: #16161a;
+    border: 1px solid #333;
+    border-radius: 0.3rem;
+    color: #eee;
+    padding: 0.3rem 0.5rem;
+    width: 11rem;
+  }
+  .import button {
+    background: #1b1b1f;
+    color: #6aa9ff;
+    border: 1px solid #333;
+    border-radius: 0.3rem;
+    padding: 0.3rem 0.6rem;
+    cursor: pointer;
+  }
+  button:disabled {
+    opacity: 0.5;
+    cursor: default;
+  }
+  .status {
+    color: #ffd166;
+    font-size: 0.85rem;
+  }
+  .layout {
+    display: grid;
+    grid-template-columns: 15rem 1fr;
+    gap: 1.5rem;
+    margin-top: 1.5rem;
+  }
+  .tracks {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+  }
+  .tracks h2 {
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    color: #888;
+    letter-spacing: 0.05em;
+  }
+  .tracks button {
+    display: flex;
+    justify-content: space-between;
+    background: none;
+    border: 1px solid transparent;
+    border-radius: 0.3rem;
+    color: #ccc;
+    padding: 0.4rem 0.5rem;
+    cursor: pointer;
+    text-align: left;
+  }
+  .tracks button.active {
+    background: #16161a;
+    border-color: #333;
+    color: #fff;
+  }
+  .count {
+    color: #666;
+    font-size: 0.75rem;
+  }
+  .title-row {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+    flex-wrap: wrap;
+    margin-bottom: 0.75rem;
+  }
+  .title-row h2 {
+    margin: 0;
+    font-size: 1.05rem;
+  }
+  .format,
+  .formant {
+    display: flex;
+    gap: 0.4rem;
+    align-items: center;
+    font-size: 0.8rem;
+    color: #aaa;
+  }
+  .format select {
+    background: #16161a;
+    color: #eee;
+    border: 1px solid #333;
+    border-radius: 0.3rem;
+    padding: 0.2rem 0.4rem;
+  }
+  .stage {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 1.5rem;
+    margin-top: 1.25rem;
+    align-items: start;
+  }
+  .right {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+  .empty {
+    color: #666;
+    font-size: 0.85rem;
+  }
+</style>

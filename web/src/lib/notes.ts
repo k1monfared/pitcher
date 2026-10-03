@@ -48,6 +48,20 @@ export function hzToNote(hz: number): NoteReading {
   };
 }
 
+export function noteToMidi(name: string): number | null {
+  const m = name.trim().match(/^([A-Ga-g])(#|b)?(-?\d+)$/);
+  if (!m) return null;
+  const letters: Record<string, number> = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
+  const base = letters[m[1].toUpperCase()];
+  const acc = m[2] === "#" ? 1 : m[2] === "b" ? -1 : 0;
+  return 12 * (parseInt(m[3], 10) + 1) + base + acc;
+}
+
+export function noteToHz(name: string): number | null {
+  const midi = noteToMidi(name);
+  return midi === null ? null : midiToHz(midi);
+}
+
 export function centsBetweenHz(source: number, target: number): number {
   return 1200 * Math.log2(target / source);
 }

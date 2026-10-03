@@ -6,6 +6,8 @@ import {
   hzToNote,
   midiToHz,
   midiToNote,
+  noteToHz,
+  noteToMidi,
   ratioFromCents,
   semitonesToCents,
 } from "./notes";
@@ -61,6 +63,28 @@ describe("fractional semitones", () => {
   });
   it("5 + 1/16 semitones is 506.25 cents", () => {
     expect(semitonesToCents(5 + 1 / 16)).toBeCloseTo(506.25, 9);
+  });
+});
+
+describe("noteToMidi", () => {
+  it("parses notes and accidentals", () => {
+    expect(noteToMidi("C4")).toBe(60);
+    expect(noteToMidi("C#4")).toBe(61);
+    expect(noteToMidi("Db4")).toBe(61);
+    expect(noteToMidi("A4")).toBe(69);
+    expect(noteToMidi("G5")).toBe(79);
+  });
+  it("rejects bad names", () => {
+    expect(noteToMidi("H4")).toBeNull();
+    expect(noteToMidi("C")).toBeNull();
+    expect(noteToMidi("")).toBeNull();
+  });
+});
+
+describe("noteToHz", () => {
+  it("matches midiToHz", () => {
+    expect(noteToHz("A4")).toBeCloseTo(440, 6);
+    expect(noteToHz("C#4")).toBeCloseTo(midiToHz(61), 6);
   });
 });
 
