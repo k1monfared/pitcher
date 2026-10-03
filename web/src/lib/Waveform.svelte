@@ -33,6 +33,14 @@
 
   const span = $derived(view ?? { start: 0, end: duration });
 
+  const visibleMarks = $derived(
+    duration > 0 && span.end > span.start
+      ? bookmarks
+          .filter((b: Bookmark) => b.t >= span.start && b.t <= span.end)
+          .map((b: Bookmark) => ({ ...b, frac: (b.t - span.start) / (span.end - span.start) }))
+      : [],
+  );
+
   const timeToX = (t: number) =>
     span.end > span.start ? ((t - span.start) / (span.end - span.start)) * width : 0;
   const xToTime = (x: number) =>
@@ -87,26 +95,6 @@
       ctx.moveTo(px, 0);
       ctx.lineTo(px, height);
       ctx.stroke();
-    }
-
-    ctx.font = "10px system-ui, sans-serif";
-    for (const b of bookmarks) {
-      if (b.t < span.start || b.t > span.end) continue;
-      const bx = timeToX(b.t);
-      ctx.strokeStyle = "#ffd166";
-      ctx.fillStyle = "#ffd166";
-      ctx.beginPath();
-      ctx.moveTo(bx, 0);
-      ctx.lineTo(bx, 12);
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.moveTo(bx, 2);
-      ctx.lineTo(bx - 4, 8);
-      ctx.lineTo(bx + 4, 8);
-      ctx.closePath();
-      ctx.fill();
-      const label = b.name?.trim() ? b.name : fmtClock(b.t);
-      ctx.fillText(label.slice(0, 24), bx + 5, 10);
     }
   }
 
@@ -246,6 +234,20 @@
 </script>
 
 <div class="wave">
+  <div class="marker-lane">
+    {#each visibleMarks as b (b.id)}
+      <button
+        type="button"
+        class="mark"
+        style="left: {b.frac * 100}%"
+        title={(b.name?.trim() ? b.name + " · " : "") + fmtClock(b.t)}
+        onclick={() => onseek?.(b.t)}
+      >
+        <span class="pin"></span>
+        <span class="t">{fmtClock(b.t)}</span>
+      </button>
+    {/each}
+  </div>
   <canvas
     bind:this={canvas}
     style="width: 100%; height: {height}px"
@@ -274,6 +276,33 @@
 <style>
   .wave {
     width: 100%;
+  }
+  .marker-lane {
+    position: relative;
+    height: 1.6rem;
+  }
+  .mark {
+    position: absolute;
+    top: 0;
+    transform: translateX(-50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    background: none;
+    border: none;
+    padding: 0 0.2rem;
+    cursor: pointer;
+    color: #ffd166;
+  }
+  .mark .pin {
+    width: 2px;
+    height: 0.85rem;
+    background: #ffd166;
+  }
+  .mark .t {
+    font-size: 0.62rem;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
   }
   canvas {
     display: block;

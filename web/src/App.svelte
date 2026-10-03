@@ -477,18 +477,6 @@
           }}
           onloop={onLoop}
         />
-        <BookmarkStrip
-          {bookmarks}
-          currentTime={time}
-          onadd={addBookmark}
-          onseek={(t) => {
-            engine.seek(t);
-            playhead = t;
-          }}
-          onrename={renameBookmark}
-          onremove={deleteBookmark}
-        />
-
         <Transport
           {playing}
           {tempo}
@@ -508,6 +496,18 @@
             playhead = t;
           }}
           ontempo={onTempoChange}
+        />
+
+        <BookmarkStrip
+          {bookmarks}
+          currentTime={time}
+          onadd={addBookmark}
+          onseek={(t) => {
+            engine.seek(t);
+            playhead = t;
+          }}
+          onrename={renameBookmark}
+          onremove={deleteBookmark}
         />
 
         <div class="stage">
