@@ -18,6 +18,7 @@ pub struct AppState {
     pub db: String,
     pub out_dir: PathBuf,
     pub data_dir: PathBuf,
+    pub web_dir: Option<PathBuf>,
 }
 
 impl AppState {
@@ -91,6 +92,20 @@ pub fn find_free_port(start: u16, max_scan: u16) -> std::io::Result<u16> {
 }
 
 pub fn build_router(state: AppState) -> Router {
+    let api = build_api(state.clone());
+    match &state.web_dir {
+        Some(dir) if dir.is_dir() => {
+            let index = dir.join("index.html");
+            api.fallback_service(
+                tower_http::services::ServeDir::new(dir)
+                    .not_found_service(tower_http::services::ServeFile::new(index)),
+            )
+        }
+        _ => api,
+    }
+}
+
+pub fn build_api(state: AppState) -> Router {
     Router::new()
         .route("/api/health", get(health))
         .route("/api/tracks", get(list_tracks))

@@ -23,10 +23,19 @@ async fn main() -> anyhow::Result<()> {
         .unwrap_or_else(|_| PathBuf::from("data"));
     std::fs::create_dir_all(&data_dir)?;
 
+    let web_dir = std::env::var("PITCHER_WEB")
+        .map(PathBuf::from)
+        .ok()
+        .or_else(|| {
+            let d = PathBuf::from("web/dist");
+            d.is_dir().then_some(d)
+        });
+
     let state = AppState {
         db: data_dir.join("shelf.sqlite").to_string_lossy().to_string(),
         out_dir: data_dir.join("out"),
         data_dir: data_dir.clone(),
+        web_dir,
     };
 
     let app = build_router(state);
