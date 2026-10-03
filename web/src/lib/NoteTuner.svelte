@@ -93,7 +93,7 @@
   </div>
 
   <div class="row source">
-    source: {sourceHz ? `${sourceHz.toFixed(2)} Hz` : "none"}
+    source: {sourceHz ? `${sourceHz.toFixed(1)} Hz` : "none"}
   </div>
 </div>
 

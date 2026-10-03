@@ -139,7 +139,7 @@ fn main() -> anyhow::Result<()> {
     match &cli.command {
         Commands::Note { hz } => {
             let n = hz_to_note(*hz);
-            println!("{} {:.2} Hz {:+.1} cents off", n.name, hz, n.cents_off);
+            println!("{} {:.1} Hz {:+.1} cents off", n.name, hz, n.cents_off);
         }
         Commands::Interval {
             source,
@@ -196,7 +196,7 @@ fn main() -> anyhow::Result<()> {
             let reading = detect_at(Path::new(track), *at, 250, Method::Yin)?;
             match reading {
                 Some(r) => println!(
-                    "{} {:.2} Hz {:+.1} cents off (confidence {:.2})",
+                    "{} {:.1} Hz {:+.1} cents off (confidence {:.2})",
                     r.note.name, r.hz, r.note.cents_off, r.confidence
                 ),
                 None => println!("no pitch"),
