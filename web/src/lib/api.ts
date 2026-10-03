@@ -14,6 +14,7 @@ export interface Track {
 export interface Variant {
   id: number;
   track_id: number;
+  name: string | null;
   cents: number;
   formant: boolean;
   engine: string;
@@ -141,6 +142,20 @@ export class ApiClient {
     return json(
       await fetch(`${this.base}/api/variants/${variantId}`, { method: "DELETE" }),
     );
+  }
+
+  async renameVariant(variantId: number, name: string): Promise<Variant> {
+    return json(
+      await fetch(`${this.base}/api/variants/${variantId}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ name }),
+      }),
+    );
+  }
+
+  exportAllUrl(trackId: number): string {
+    return `${this.base}/api/tracks/${trackId}/export`;
   }
 
   mediaUrl(variantId: number): string {

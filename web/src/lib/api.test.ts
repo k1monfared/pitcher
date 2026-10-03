@@ -87,6 +87,25 @@ describe("ApiClient", () => {
     expect(r.cents).toBe(-100);
   });
 
+  it("renames a variant via PATCH", async () => {
+    const spy = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) =>
+      response({ id: 1, name: "low" }),
+    );
+    globalThis.fetch = spy as unknown as typeof fetch;
+    const c = new ApiClient();
+    const v = await c.renameVariant(1, "low");
+    expect(v).toEqual({ id: 1, name: "low" });
+    const call = spy.mock.calls[0];
+    expect(String(call[0])).toBe("/api/variants/1");
+    expect((call[1] as RequestInit).method).toBe("PATCH");
+    expect(JSON.parse((call[1] as RequestInit).body as string)).toEqual({ name: "low" });
+  });
+
+  it("builds an export-all url", () => {
+    const c = new ApiClient();
+    expect(c.exportAllUrl(5)).toBe("/api/tracks/5/export");
+  });
+
   it("throws on error responses", async () => {
     globalThis.fetch = (async () => response("not found", false, 404)) as unknown as typeof fetch;
     const c = new ApiClient();

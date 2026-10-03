@@ -322,16 +322,42 @@ fn variant_rename_sets_name() {
     let db = dir.join("shelf.sqlite");
     let input = dir.join("in.wav");
     make_tone(&input, 440.0, 1.0);
-    assert!(run(&["--db", db.to_str().unwrap(), "add", input.to_str().unwrap(), "--title", "T"])
-        .status
-        .success());
+    assert!(run(&[
+        "--db",
+        db.to_str().unwrap(),
+        "add",
+        input.to_str().unwrap(),
+        "--title",
+        "T"
+    ])
+    .status
+    .success());
     let add = run(&[
-        "--db", db.to_str().unwrap(), "variant", "add", "1", "--cents", "-100",
-        "--path", dir.join("o.wav").to_str().unwrap(),
+        "--db",
+        db.to_str().unwrap(),
+        "variant",
+        "add",
+        "1",
+        "--cents",
+        "-100",
+        "--path",
+        dir.join("o.wav").to_str().unwrap(),
     ]);
     assert!(add.status.success());
-    let out = run(&["--db", db.to_str().unwrap(), "variant", "rename", "1", "--name", "low end"]);
-    assert!(out.status.success(), "stderr: {}", String::from_utf8_lossy(&out.stderr));
+    let out = run(&[
+        "--db",
+        db.to_str().unwrap(),
+        "variant",
+        "rename",
+        "1",
+        "--name",
+        "low end",
+    ]);
+    assert!(
+        out.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
     assert!(String::from_utf8_lossy(&out.stdout).contains("low end"));
 }
 
@@ -374,8 +400,15 @@ fn shelf_export_copies_everything() {
     let vpath2 = variants.join("o2.wav");
     make_tone(&vpath2, 523.25, 1.0);
     let add2 = run(&[
-        "--db", db.to_str().unwrap(), "variant", "add", "1", "--cents", "300",
-        "--path", vpath2.to_str().unwrap(),
+        "--db",
+        db.to_str().unwrap(),
+        "variant",
+        "add",
+        "1",
+        "--cents",
+        "300",
+        "--path",
+        vpath2.to_str().unwrap(),
     ]);
     assert!(add2.status.success());
     assert!(run(&["--db", db.to_str().unwrap(), "shelf", "star", "1"])
@@ -396,7 +429,10 @@ fn shelf_export_copies_everything() {
         String::from_utf8_lossy(&exp.stderr)
     );
     let count = std::fs::read_dir(dir.join("dump")).unwrap().count();
-    assert_eq!(count, 2, "export must include every kept variant, starred or not");
+    assert_eq!(
+        count, 2,
+        "export must include every kept variant, starred or not"
+    );
 }
 
 #[test]

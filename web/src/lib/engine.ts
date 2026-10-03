@@ -3,9 +3,10 @@ import rbWorkletUrl from "../worklets/rb-live.ts?worker&url";
 
 export type PitchEngineKind = "rubberband" | "fallback";
 
+export type Selection = "original" | "variant";
+
 export interface EngineCallbacks {
   onPosition?: (t: number) => void;
-  onModeChange?: (mode: "original" | "variant") => void;
   onLiveChange?: (live: boolean) => void;
 }
 
@@ -25,10 +26,11 @@ export class PitchAudioEngine {
   private startedAt = 0;
   private offset = 0;
   private playing = false;
-  private mode: "original" | "variant" = "variant";
+  private selected: Selection = "original";
   private loop: LoopRegion | null = null;
   private rafId = 0;
   private pitch = 1;
+  private base = 0;
   private tempo = 1;
 
   constructor(private callbacks: EngineCallbacks = {}) {}
@@ -106,7 +108,7 @@ export class PitchAudioEngine {
         sampleRate: ctx.sampleRate,
         channels,
       });
-      node.port.postMessage({ type: "pitch", value: this.pitch });
+      node.port.postMessage({ type: "pitch", value: this.effectivePitchRatio() });
       node.port.postMessage({ type: "tempo", value: this.tempo });
       if (!(await readyPromise)) {
         node.disconnect();
@@ -158,15 +160,27 @@ export class PitchAudioEngine {
   clearShifted(): void {
     this.stopSource();
     this.shiftedBuffer = null;
-    if (this.mode === "variant") this.mode = "original";
+    if (this.selected === "variant") this.selected = "original";
+  }
+
+  get selection(): Selection {
+    return this.selected;
+  }
+
+  select(kind: Selection): void {
+    if (this.selected === kind) return;
+    this.selected = kind;
+    if (this.playing) {
+      const t = this.currentTime();
+      this.stopSource();
+      this.playing = false;
+      this.offset = t;
+      this.play();
+    }
   }
 
   get duration(): number {
     return this.originalBuffer?.duration ?? 0;
-  }
-
-  get currentMode(): "original" | "variant" {
-    return this.mode;
   }
 
   get hasOriginal(): boolean {
@@ -182,7 +196,7 @@ export class PitchAudioEngine {
   }
 
   activeBufferKind(): "original" | "variant" | null {
-    if (this.mode === "variant" && this.shiftedBuffer) return "variant";
+    if (this.selected === "variant" && this.shiftedBuffer) return "variant";
     if (this.originalBuffer) return "original";
     if (this.shiftedBuffer) return "variant";
     return null;
@@ -196,10 +210,31 @@ export class PitchAudioEngine {
   setPitchRatio(ratio: number): void {
     this.pitch = ratio;
     if (this.worklet && this.liveReady) {
-      this.worklet.port.postMessage({ type: "pitch", value: ratio });
+      this.worklet.port.postMessage({ type: "pitch", value: this.effectivePitchRatio() });
     } else {
       this.restart();
     }
+  }
+
+  get currentPitchRatio(): number {
+    return this.pitch;
+  }
+
+  get baseCents(): number {
+    return this.base;
+  }
+
+  setBaseCents(cents: number): void {
+    this.base = cents;
+    if (this.worklet && this.liveReady) {
+      this.worklet.port.postMessage({ type: "pitch", value: this.effectivePitchRatio() });
+    } else {
+      this.restart();
+    }
+  }
+
+  effectivePitchRatio(ratio: number = this.pitch): number {
+    return ratio / Math.pow(2, this.base / 1200);
   }
 
   setTempo(tempo: number): void {
@@ -211,23 +246,12 @@ export class PitchAudioEngine {
     }
   }
 
-  setMode(mode: "original" | "variant"): void {
-    if (this.mode === mode) return;
-    this.mode = mode;
-    this.callbacks.onModeChange?.(mode);
-    this.restart();
-  }
-
   play(): void {
     if (this.playing) return;
     const kind = this.activeBufferKind();
     if (!kind) return;
     const buffer = kind === "original" ? this.originalBuffer : this.shiftedBuffer;
     if (!buffer) return;
-    if (kind !== this.mode) {
-      this.mode = kind;
-      this.callbacks.onModeChange?.(kind);
-    }
     const ctx = this.ensureContext();
     void ctx.resume();
     this.stopSource();
@@ -237,11 +261,12 @@ export class PitchAudioEngine {
     source.buffer = buffer;
     if (live && this.worklet) {
       this.worklet.port.postMessage({ type: "reset" });
-      this.worklet.port.postMessage({ type: "pitch", value: this.pitch });
+      this.worklet.port.postMessage({ type: "pitch", value: this.effectivePitchRatio() });
       this.worklet.port.postMessage({ type: "tempo", value: this.tempo });
       source.connect(this.worklet);
     } else {
-      source.playbackRate.value = kind === "original" ? 1 : this.pitch * this.tempo;
+      source.playbackRate.value =
+        kind === "original" ? 1 : this.effectivePitchRatio() * this.tempo;
       source.connect(ctx.destination);
     }
     const startAt = Math.min(this.offset, buffer.duration);

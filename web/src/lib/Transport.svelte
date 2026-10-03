@@ -3,28 +3,22 @@
 
   let {
     playing = false,
-    mode = "variant" as "original" | "variant",
-    canToggle = true,
     tempo = 1,
     tempoEnabled = true,
     time = 0,
     duration = 0,
     onplay,
     onpause,
-    ontoggle,
     ontempo,
     onseek,
   } = $props<{
     playing?: boolean;
-    mode?: "original" | "variant";
-    canToggle?: boolean;
     tempo?: number;
     tempoEnabled?: boolean;
     time?: number;
     duration?: number;
     onplay?: () => void;
     onpause?: () => void;
-    ontoggle?: () => void;
     ontempo?: (tempo: number) => void;
     onseek?: (t: number) => void;
   }>();
@@ -51,9 +45,6 @@
 <div class="transport">
   <button type="button" onclick={playing ? onpause : onplay}>
     {playing ? "pause" : "play"}
-  </button>
-  <button type="button" class="toggle" onclick={ontoggle} disabled={!canToggle}>
-    {mode === "original" ? "hearing: original" : "hearing: shifted"}
   </button>
   <label
     class="speed"
@@ -111,9 +102,6 @@
   button:disabled {
     opacity: 0.4;
     cursor: default;
-  }
-  button.toggle {
-    color: #6aa9ff;
   }
   .speed {
     display: flex;

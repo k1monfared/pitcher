@@ -209,7 +209,16 @@ fn variants_list_sorted_by_shift_amount() {
         .unwrap();
     for cents in [200, -100, 0, -300, 100] {
         shelf
-            .add_variant(tid, cents, true, "finer", "quality", None, "/out/a.opus", Some("opus"))
+            .add_variant(
+                tid,
+                cents,
+                true,
+                "finer",
+                "quality",
+                None,
+                "/out/a.opus",
+                Some("opus"),
+            )
             .unwrap();
     }
     let cents: Vec<i32> = shelf

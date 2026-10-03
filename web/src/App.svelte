@@ -36,7 +36,6 @@
   let playhead = $state(0);
   let time = $state(0);
   let playing = $state(false);
-  let mode = $state<"original" | "variant">("variant");
   let tempo = $state(1);
   let peaks: number[] = $state([]);
   let pathInput = $state("");
@@ -69,6 +68,9 @@
     }
     activeVariant = null;
     engine.clearShifted();
+    cents = 0;
+    engine.setBaseCents(0);
+    engine.setPitchRatio(1);
     peaks = [];
     time = 0;
     playhead = 0;
@@ -79,8 +81,7 @@
       const audio = await ctx.decodeAudioData(buf.slice(0));
       peaks = computePeaks(audio.getChannelData(0), 400);
       await ctx.close();
-      engine.setMode("original");
-      mode = "original";
+      engine.select("original");
     } catch (e) {
       status = `cannot load audio: ${e}`;
     }
@@ -149,6 +150,28 @@
     }
   }
 
+  async function selectOriginal() {
+    activeVariant = null;
+    cents = 0;
+    engine.setBaseCents(0);
+    engine.setPitchRatio(1);
+    engine.select("original");
+    await showOriginalPeaks();
+  }
+
+  async function showOriginalPeaks() {
+    if (!activeTrack) return;
+    try {
+      const buf = await (await fetch(api.trackAudioUrl(activeTrack.id))).arrayBuffer();
+      const ctx = new AudioContext();
+      const audio = await ctx.decodeAudioData(buf);
+      peaks = computePeaks(audio.getChannelData(0), 400);
+      await ctx.close();
+    } catch {
+      peaks = [];
+    }
+  }
+
   async function selectVariant(v: Variant) {
     activeVariant = v;
     cents = v.cents;
@@ -160,8 +183,11 @@
       const audio = await ctx.decodeAudioData(buf.slice(0));
       peaks = computePeaks(audio.getChannelData(0), 400);
       await ctx.close();
-      engine.setMode("variant");
-      mode = "variant";
+      // The file already carries the variant's shift, so the live engine
+      // compensates: fader stays absolute from the original.
+      engine.setBaseCents(v.cents);
+      engine.setPitchRatio(Math.pow(2, v.cents / 1200));
+      engine.select("variant");
     } catch (e) {
       status = `cannot load variant: ${e}`;
     }
@@ -215,13 +241,21 @@
     variants = variants.map((x) => (x.id === v.id ? { ...x, favorite } : x));
   }
 
+  async function renameVariant(v: Variant, name: string) {
+    try {
+      const updated = await api.renameVariant(v.id, name);
+      variants = variants.map((x) => (x.id === v.id ? updated : x));
+    } catch (e) {
+      status = `rename failed: ${e}`;
+    }
+  }
+
   async function deleteVariant(v: Variant) {
     await api.deleteVariant(v.id);
     variants = variants.filter((x) => x.id !== v.id);
     if (activeVariant?.id === v.id) {
       activeVariant = null;
       engine.clearShifted();
-      mode = "original";
     }
   }
 
@@ -363,8 +397,6 @@
 
         <Transport
           {playing}
-          {mode}
-          canToggle={activeVariant !== null}
           {tempo}
           tempoEnabled={livePitch}
           time={time}
@@ -376,10 +408,6 @@
           onpause={() => {
             engine.pause();
             playing = false;
-          }}
-          ontoggle={() => {
-            engine.setMode(mode === "original" ? "variant" : "original");
-            mode = mode === "original" ? "variant" : "original";
           }}
           onseek={(t) => {
             engine.seek(t);
@@ -404,10 +432,17 @@
             <VariantShelf
               {variants}
               activeId={activeVariant?.id ?? null}
+              originalActive={activeVariant === null}
+              originalTitle={activeTrack.title}
+              originalAudioUrl={api.trackAudioUrl(activeTrack.id)}
+              exportAllUrl={variants.length > 0 ? api.exportAllUrl(activeTrack.id) : null}
+              mediaUrlFor={(id) => api.mediaUrl(id)}
               renderSummary={renderSummary}
               onselect={selectVariant}
+              onselectOriginal={selectOriginal}
               onstar={starVariant}
               ondelete={deleteVariant}
+              onrename={renameVariant}
               onrender={renderCurrent}
             />
           </div>
