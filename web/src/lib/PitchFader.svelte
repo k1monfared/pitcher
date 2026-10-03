@@ -55,13 +55,14 @@
 </script>
 
 <div class="fader">
-  <div class="marks">
-    <span class="mark top">+{range / 100}</span>
-    <span class="mark zero">0</span>
-    <span class="mark bottom">-{range / 100}</span>
-  </div>
-  <div
-    class="track"
+  <div class="track-row">
+    <div class="marks" style="height: {height}px" title="semitones">
+      <span>+{range / 100}</span>
+      <span>0</span>
+      <span>-{range / 100}</span>
+    </div>
+    <div
+      class="track"
     style="height: {height}px"
     role="slider"
     tabindex="0"
@@ -76,6 +77,7 @@
     <div class="centerline"></div>
     <div class="knob" style="top: {knobY}px"></div>
     <div class="fill" style="top: {Math.min(knobY, height / 2)}px; height: {Math.abs(knobY - height / 2)}px"></div>
+    </div>
   </div>
   <div class="readout">
     <span class="cents">{formatCents(cents)}</span>
@@ -91,13 +93,26 @@
     align-items: center;
     user-select: none;
   }
+  .track-row {
+    display: flex;
+    gap: 0.4rem;
+    align-items: flex-start;
+  }
   .marks {
     display: flex;
     flex-direction: column;
-    align-items: center;
-    height: 100%;
+    justify-content: space-between;
+    align-items: flex-end;
     font-size: 0.7rem;
     color: #888;
+    padding: 0;
+    line-height: 1;
+  }
+  .marks span:first-child {
+    margin-top: -0.35em;
+  }
+  .marks span:last-child {
+    margin-bottom: -0.35em;
   }
   .track {
     position: relative;
