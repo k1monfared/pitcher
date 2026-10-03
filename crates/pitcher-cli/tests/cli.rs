@@ -40,6 +40,25 @@ fn run(args: &[&str]) -> std::process::Output {
     Command::new(bin()).args(args).output().unwrap()
 }
 
+fn run_stdin(args: &[&str], input: &str) -> std::process::Output {
+    use std::io::Write;
+    use std::process::Stdio;
+    let mut child = Command::new(bin())
+        .args(args)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+    child
+        .stdin
+        .take()
+        .unwrap()
+        .write_all(input.as_bytes())
+        .unwrap();
+    child.wait_with_output().unwrap()
+}
+
 #[test]
 fn help_works() {
     let out = run(&["--help"]);
@@ -376,6 +395,81 @@ fn shift_to_target_note() {
     );
     let s = String::from_utf8_lossy(&out.stdout);
     assert!(s.contains("-100") || s.contains("C4"), "output: {s}");
+}
+
+#[test]
+fn try_repl_quits_cleanly() {
+    if !have("ffmpeg") {
+        return;
+    }
+    let dir = tmp_dir("try-quit");
+    let db = dir.join("shelf.sqlite");
+    let input = dir.join("in.wav");
+    make_tone(&input, 440.0, 1.0);
+    assert!(run(&[
+        "--db",
+        db.to_str().unwrap(),
+        "add",
+        input.to_str().unwrap(),
+        "--title",
+        "T"
+    ])
+    .status
+    .success());
+
+    let out = run_stdin(&["--db", db.to_str().unwrap(), "try", "1"], "q\n");
+    assert!(
+        out.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+}
+
+#[test]
+fn try_repl_keep_writes_variant() {
+    if !have("ffmpeg") {
+        return;
+    }
+    let dir = tmp_dir("try-keep");
+    let db = dir.join("shelf.sqlite");
+    let outdir = dir.join("out");
+    let input = dir.join("in.wav");
+    make_tone(&input, 440.0, 1.0);
+    assert!(run(&[
+        "--db",
+        db.to_str().unwrap(),
+        "add",
+        input.to_str().unwrap(),
+        "--title",
+        "T"
+    ])
+    .status
+    .success());
+
+    let script = format!("-150\nk\nq\n");
+    let out = run_stdin(
+        &[
+            "--db",
+            db.to_str().unwrap(),
+            "try",
+            "1",
+            "--outdir",
+            outdir.to_str().unwrap(),
+            "--no-play",
+        ],
+        &script,
+    );
+    assert!(
+        out.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    let list = run(&["--db", db.to_str().unwrap(), "list"]);
+    assert!(
+        String::from_utf8_lossy(&list.stdout).contains("(1 variants)"),
+        "expected a kept variant"
+    );
 }
 
 #[test]
