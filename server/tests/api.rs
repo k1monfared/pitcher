@@ -56,9 +56,42 @@ fn state(tag: &str) -> (AppState, PathBuf) {
             db: db.to_str().unwrap().to_string(),
             out_dir: out.clone(),
             data_dir: dir.clone(),
+            web_dir: None,
         },
         dir,
     )
+}
+
+#[tokio::test]
+async fn serves_web_index_when_present() {
+    let dir = tmp_dir("static");
+    let web = dir.join("web");
+    std::fs::create_dir_all(&web).unwrap();
+    std::fs::write(web.join("index.html"), "<h1>pitcher</h1>").unwrap();
+    let st = AppState {
+        db: dir.join("shelf.sqlite").to_str().unwrap().to_string(),
+        out_dir: dir.join("out"),
+        data_dir: dir.clone(),
+        web_dir: Some(web),
+    };
+    let app = build_router(st);
+    let resp = app
+        .oneshot(Request::get("/").body(Body::empty()).unwrap())
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    assert!(body_text(resp).await.contains("pitcher"));
+}
+
+#[tokio::test]
+async fn unknown_route_404_without_web() {
+    let (st, _d) = state("noroute");
+    let app = build_router(st);
+    let resp = app
+        .oneshot(Request::get("/nope").body(Body::empty()).unwrap())
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::NOT_FOUND);
 }
 
 #[tokio::test]
