@@ -121,7 +121,9 @@ pub fn build_api(state: AppState) -> Router {
         .route("/api/media/{variant_id}", get(media))
         .route("/api/tracks/{id}/audio", get(track_audio))
         .route("/api/variants/{id}/star", post(star))
+        .route("/api/variants/{id}", patch(rename_variant))
         .route("/api/variants/{id}", delete(delete_variant))
+        .route("/api/tracks/{id}/export", get(export_all))
         .with_state(state)
 }
 
@@ -160,6 +162,12 @@ impl From<std::io::Error> for ApiError {
 impl From<pitcher_core::notes::NoteError> for ApiError {
     fn from(e: pitcher_core::notes::NoteError) -> Self {
         ApiError(e.into())
+    }
+}
+
+impl From<zip::result::ZipError> for ApiError {
+    fn from(e: zip::result::ZipError) -> Self {
+        ApiError(anyhow::anyhow!("zip error: {e}"))
     }
 }
 
@@ -458,6 +466,100 @@ async fn star(
     Ok(Json(
         serde_json::json!({ "id": id, "favorite": body.favorite }),
     ))
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VariantPatchBody {
+    pub name: Option<String>,
+    pub favorite: Option<bool>,
+}
+
+async fn rename_variant(
+    State(st): State<AppState>,
+    Path(id): Path<i64>,
+    Json(body): Json<VariantPatchBody>,
+) -> ApiResult<Json<serde_json::Value>> {
+    let shelf = st.shelf()?;
+    if shelf.get_variant(id)?.is_none() {
+        return Err(ApiError(anyhow::anyhow!("variant {id} not found")));
+    }
+    if let Some(name) = body.name.as_deref() {
+        shelf.rename_variant(id, name)?;
+    }
+    if let Some(favorite) = body.favorite {
+        shelf.set_favorite(id, favorite)?;
+    }
+    let variant = shelf.get_variant(id)?.unwrap();
+    Ok(Json(serde_json::to_value(variant)?))
+}
+
+fn safe_filename(s: &str) -> String {
+    let cleaned: String = s
+        .chars()
+        .map(|c| {
+            if c == '/' || c == '\\' || c == '\0' {
+                '_'
+            } else {
+                c
+            }
+        })
+        .collect();
+    let trimmed = cleaned.trim();
+    if trimmed.is_empty() {
+        "track".to_string()
+    } else {
+        trimmed.to_string()
+    }
+}
+
+async fn export_all(State(st): State<AppState>, Path(id): Path<i64>) -> ApiResult<Response> {
+    let shelf = st.shelf()?;
+    let track = shelf
+        .get_track(id)?
+        .ok_or_else(|| anyhow::anyhow!("track {id} not found"))?;
+    let variants = shelf.list_variants(id)?;
+    if variants.is_empty() {
+        return Err(ApiError(anyhow::anyhow!(
+            "track {id} has no variants to export"
+        )));
+    }
+
+    use std::io::Write;
+    let mut buf = std::io::Cursor::new(Vec::new());
+    {
+        let mut zip = zip::ZipWriter::new(&mut buf);
+        let options = zip::write::SimpleFileOptions::default();
+        for v in &variants {
+            let bytes = std::fs::read(&v.output_path)
+                .map_err(|_| anyhow::anyhow!("variant {} file not found on disk", v.id))?;
+            let ext = std::path::Path::new(&v.output_path)
+                .extension()
+                .and_then(|e| e.to_str())
+                .unwrap_or("wav");
+            let stem = v.name.as_deref().unwrap_or("").trim();
+            let entry = if stem.is_empty() {
+                format!("{:+}c.{}", v.cents, ext)
+            } else {
+                format!("{}.{ext}", safe_filename(stem))
+            };
+            zip.start_file(entry, options)?;
+            zip.write_all(&bytes)?;
+        }
+        zip.finish()?;
+    }
+    let bytes = buf.into_inner();
+    let filename = format!("{}.zip", safe_filename(&track.title));
+    Ok((
+        [
+            (axum::http::header::CONTENT_TYPE, "application/zip"),
+            (
+                axum::http::header::CONTENT_DISPOSITION,
+                &format!("attachment; filename=\"{filename}\"")[..],
+            ),
+        ],
+        bytes,
+    )
+        .into_response())
 }
 
 async fn delete_variant(

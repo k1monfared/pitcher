@@ -116,7 +116,16 @@ fn rename_variant_sets_name() {
         .add_track("/music/a.wav", "file", None, "A", "", 12.0, 44100)
         .unwrap();
     let v = shelf
-        .add_variant(tid, -100, true, "finer", "quality", None, "/out/a.opus", Some("opus"))
+        .add_variant(
+            tid,
+            -100,
+            true,
+            "finer",
+            "quality",
+            None,
+            "/out/a.opus",
+            Some("opus"),
+        )
         .unwrap();
     shelf.rename_variant(v, "my low version").unwrap();
     let got = shelf.get_variant(v).unwrap().unwrap();
@@ -130,7 +139,16 @@ fn variants_default_to_no_name() {
         .add_track("/music/a.wav", "file", None, "A", "", 12.0, 44100)
         .unwrap();
     let v = shelf
-        .add_variant(tid, -100, true, "finer", "quality", None, "/out/a.opus", Some("opus"))
+        .add_variant(
+            tid,
+            -100,
+            true,
+            "finer",
+            "quality",
+            None,
+            "/out/a.opus",
+            Some("opus"),
+        )
         .unwrap();
     let got = shelf.get_variant(v).unwrap().unwrap();
     assert_eq!(got.name, None);
@@ -165,7 +183,16 @@ fn old_db_without_name_column_migrates() {
         .add_track("/music/a.wav", "file", None, "A", "", 12.0, 44100)
         .unwrap();
     let v = shelf
-        .add_variant(tid, -100, true, "finer", "quality", None, "/out/a.opus", Some("opus"))
+        .add_variant(
+            tid,
+            -100,
+            true,
+            "finer",
+            "quality",
+            None,
+            "/out/a.opus",
+            Some("opus"),
+        )
         .unwrap();
     shelf.rename_variant(v, "migrated").unwrap();
     assert_eq!(

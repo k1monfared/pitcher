@@ -58,8 +58,17 @@ impl Shelf {
         Ok(Shelf { conn })
     }
 
-    pub fn rename_variant(&self, _id: i64, _name: &str) -> anyhow::Result<()> {
-        unimplemented!()
+    pub fn rename_variant(&self, id: i64, name: &str) -> anyhow::Result<()> {
+        let name_opt = if name.trim().is_empty() {
+            None
+        } else {
+            Some(name.trim())
+        };
+        self.conn.execute(
+            "UPDATE variants SET name = ?2 WHERE id = ?1",
+            params![id, name_opt],
+        )?;
+        Ok(())
     }
 
     #[allow(clippy::too_many_arguments)]

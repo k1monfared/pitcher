@@ -21,6 +21,7 @@ tokio = { version = "1.53.2", features = ["full"] }
 tower-http = { version = "0.7.1", features = ["fs", "cors"] }
 serde.workspace = true
 serde_json.workspace = true
+zip = "8.6.0"
 
 [dev-dependencies]
 http-body-util = "0.1.5"

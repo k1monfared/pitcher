@@ -410,6 +410,115 @@ async fn delete_track_removes_db_rows_and_variant_files_but_keeps_local_source()
     assert_eq!(body_json(resp).await.as_array().unwrap().len(), 0);
 }
 
+async fn import_tone(app: &axum::Router, dir: &std::path::Path) {
+    let input = dir.join("in.wav");
+    make_tone(&input, 440.0, 1.0);
+    let imp = serde_json::json!({ "path": input.to_str().unwrap(), "title": "Tone" });
+    app.clone()
+        .oneshot(
+            Request::post("/api/import")
+                .header("content-type", "application/json")
+                .body(Body::from(imp.to_string()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+}
+
+#[tokio::test]
+async fn rename_variant_via_patch() {
+    if !have("ffmpeg") {
+        return;
+    }
+    let (st, dir) = state("vpatch");
+    import_tone(&build_router(st.clone()), &dir).await;
+    let app = build_router(st);
+
+    let payload = serde_json::json!({ "cents": -100, "format": "wav" });
+    app.clone()
+        .oneshot(
+            Request::post("/api/tracks/1/shift")
+                .header("content-type", "application/json")
+                .body(Body::from(payload.to_string()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    let resp = app
+        .clone()
+        .oneshot(
+            Request::patch("/api/variants/1")
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    serde_json::json!({ "name": "low and slow" }).to_string(),
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let v = body_json(resp).await;
+    assert_eq!(v["name"], "low and slow");
+}
+
+#[tokio::test]
+async fn export_all_returns_zip_of_every_variant() {
+    if !have("ffmpeg") {
+        return;
+    }
+    let (st, dir) = state("exportall");
+    import_tone(&build_router(st.clone()), &dir).await;
+    let app = build_router(st);
+
+    for cents in [-100, 200] {
+        let payload = serde_json::json!({ "cents": cents, "format": "wav" });
+        app.clone()
+            .oneshot(
+                Request::post("/api/tracks/1/shift")
+                    .header("content-type", "application/json")
+                    .body(Body::from(payload.to_string()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+    }
+
+    let resp = app
+        .clone()
+        .oneshot(
+            Request::get("/api/tracks/1/export")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    assert_eq!(
+        resp.headers().get("content-type").unwrap(),
+        "application/zip"
+    );
+    let bytes = resp.into_body().collect().await.unwrap().to_bytes();
+    assert!(bytes.starts_with(b"PK"), "expected a zip archive");
+    let archive = zip::ZipArchive::new(std::io::Cursor::new(bytes.to_vec())).unwrap();
+    assert_eq!(archive.len(), 2, "expected every variant in the zip");
+}
+
+#[tokio::test]
+async fn export_missing_track_404() {
+    let (st, _d) = state("export404");
+    let app = build_router(st);
+    let resp = app
+        .oneshot(
+            Request::get("/api/tracks/999/export")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+}
+
 #[tokio::test]
 async fn missing_track_returns_404() {
     let (st, _d) = state("404");
