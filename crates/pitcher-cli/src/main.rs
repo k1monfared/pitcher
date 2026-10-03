@@ -23,6 +23,8 @@ enum Commands {
         output: String,
         #[arg(long, default_value_t = 0, allow_hyphen_values = true)]
         cents: i32,
+        #[arg(long, allow_hyphen_values = true)]
+        semitones: Option<f64>,
         #[arg(long)]
         to_note: Option<String>,
         #[arg(long)]
@@ -160,6 +162,7 @@ fn main() -> anyhow::Result<()> {
             input,
             output,
             cents,
+            semitones,
             to_note,
             from_note,
             formant,
@@ -176,6 +179,9 @@ fn main() -> anyhow::Result<()> {
                             )
                         })?;
                     cents_between_hz(reading.hz, note_to_hz(target)?).round() as i32
+                }
+                _ if semitones.is_some() => {
+                    (semitones.unwrap() * 100.0).round() as i32
                 }
                 _ => resolve_cents(*cents, None, None)?,
             };

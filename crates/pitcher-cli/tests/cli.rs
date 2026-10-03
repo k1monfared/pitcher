@@ -94,6 +94,36 @@ fn detect_interval_subcommand_works() {
 }
 
 #[test]
+fn pitch_accepts_semitones_including_fractional() {
+    if !have("ffmpeg") {
+        return;
+    }
+    let dir = tmp_dir("semitones");
+    let input = dir.join("in.wav");
+    make_tone(&input, 440.0, 1.0);
+
+    let out = run(&[
+        "pitch",
+        input.to_str().unwrap(),
+        dir.join("down.wav").to_str().unwrap(),
+        "--semitones",
+        "-2",
+    ]);
+    assert!(out.status.success(), "stderr: {}", String::from_utf8_lossy(&out.stderr));
+    assert!(String::from_utf8_lossy(&out.stdout).contains("-200"));
+
+    let out = run(&[
+        "pitch",
+        input.to_str().unwrap(),
+        dir.join("up.wav").to_str().unwrap(),
+        "--semitones",
+        "2.25",
+    ]);
+    assert!(out.status.success(), "stderr: {}", String::from_utf8_lossy(&out.stderr));
+    assert!(String::from_utf8_lossy(&out.stdout).contains("+225"));
+}
+
+#[test]
 fn pitch_shifts_a_file() {
     if !have("ffmpeg") {
         return;

@@ -1,10 +1,15 @@
 <script lang="ts">
-  import { hzToNote, midiToHz } from "../lib/notes";
+  import { hzToNote, midiToHz, noteToHz, noteToMidi } from "../lib/notes";
+
+  function round1(hz: number): number {
+    return Math.round(hz * 10) / 10;
+  }
 
   let {
     detectedHz = null,
     manualHz = $bindable<number | null>(null),
     targetNote = $bindable<string>(""),
+    manualTargetHz = $bindable<number | null>(null),
     statusText = "",
     ondetect,
     onapply,
@@ -12,6 +17,7 @@
     detectedHz?: number | null;
     manualHz?: number | null;
     targetNote?: string;
+    manualTargetHz?: number | null;
     statusText?: string;
     ondetect?: () => void;
     onapply?: (cents: number) => void;
@@ -25,15 +31,13 @@
     manualHz && manualHz > 0 ? manualHz : detectedHz ?? null,
   );
 
-  const targetHz = $derived(targetNote ? midiToHz(noteToMidi(targetNote)) : null);
+  const targetHz = $derived.by(() => {
+    if (manualTargetHz && manualTargetHz > 0) return manualTargetHz;
+    if (!targetNote.trim()) return null;
+    return noteToHz(targetNote);
+  });
 
-  function noteToMidi(name: string): number {
-    const m = name.match(/^([A-G]#?)(-?\d+)$/);
-    if (!m) return 69;
-    const idx = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"].indexOf(m[1]);
-    if (idx < 0) return 69;
-    return 12 * (parseInt(m[2], 10) + 1) + idx;
-  }
+  const targetReading = $derived(targetHz ? hzToNote(targetHz) : null);
 
   const interval = $derived(
     sourceHz && targetHz ? 1200 * Math.log2(targetHz / sourceHz) : null,
@@ -41,7 +45,8 @@
 
   function applyManualNote() {
     const midi = noteToMidi(manualNote);
-    manualHz = midiToHz(midi);
+    if (midi === null) return;
+    manualHz = round1(midiToHz(midi));
   }
 </script>
 
@@ -80,6 +85,25 @@
       target note
       <input bind:value={targetNote} placeholder="C4" />
     </label>
+    <label>
+      target Hz
+      <input
+        type="number"
+        step="0.1"
+        min="0"
+        bind:value={manualTargetHz}
+        placeholder="261.6"
+      />
+    </label>
+    {#if targetHz}
+      <span class="detected">
+        {targetReading?.name ?? ""}
+        <small>{targetHz.toFixed(1)} Hz</small>
+      </span>
+    {/if}
+  </div>
+
+  <div class="row">
     {#if interval !== null}
       <span class="interval">{interval >= 0 ? "+" : ""}{interval.toFixed(0)} cents</span>
       <button

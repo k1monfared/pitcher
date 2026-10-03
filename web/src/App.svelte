@@ -28,6 +28,7 @@
   let formant = $state(true);
   let outputFormat = $state("opus");
   let targetNote = $state("");
+  let manualTargetHz = $state<number | null>(null);
   let manualHz = $state<number | null>(null);
   let detectedHz = $state<number | null>(null);
   let detectStatus = $state("");
@@ -166,11 +167,13 @@
         formant,
         format: outputFormat,
       };
-      if (manualHz && targetNote) {
-        body.from_hz = manualHz;
-        body.target_note = targetNote;
-      } else if (targetNote && detectedHz) {
-        body.from_hz = detectedHz;
+      const srcHz = manualHz && manualHz > 0 ? manualHz : detectedHz;
+      const dstHz = manualTargetHz && manualTargetHz > 0 ? manualTargetHz : null;
+      if (srcHz && dstHz) {
+        body.from_hz = srcHz;
+        body.to_hz = dstHz;
+      } else if (srcHz && targetNote) {
+        body.from_hz = srcHz;
         body.target_note = targetNote;
       }
       if (loop) body.section = loop;
@@ -519,6 +522,7 @@
               detectedHz={detectedHz}
               bind:manualHz
               bind:targetNote
+              bind:manualTargetHz
               statusText={detectStatus}
               ondetect={detectAtPlayhead}
               onapply={applyIntervalToFader}
