@@ -120,6 +120,7 @@
       peaks = computePeaks(audio.getChannelData(0), 2000);
       await ctx.close();
       engine.select("original");
+      engine.seek(0);
     } catch (e) {
       status = `cannot load audio: ${e}`;
     }
@@ -193,8 +194,8 @@
   async function selectOriginal() {
     activeVariant = null;
     cents = 0;
-    engine.setPitchCents(0);
     engine.select("original");
+    engine.setPitchCents(0);
     await showOriginalPeaks();
   }
 
@@ -215,6 +216,7 @@
     activeVariant = v;
     cents = v.cents;
     formant = v.formant;
+    const resume = engine.isPlaying;
     try {
       const buf = await (await fetch(api.mediaUrl(v.id))).arrayBuffer();
       await engine.loadShifted(buf);
@@ -223,7 +225,8 @@
       peaks = computePeaks(audio.getChannelData(0), 2000);
       await ctx.close();
       engine.setPitchCents(v.cents);
-      engine.select("variant", v.cents);
+      engine.select("variant", v.cents, v.id);
+      if (resume) engine.play();
     } catch (e) {
       status = `cannot load variant: ${e}`;
     }

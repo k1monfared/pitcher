@@ -26,6 +26,7 @@ export class PitchAudioEngine {
   private playing = false;
   private selected: Selection = "original";
   private refCents = 0;
+  private selKey: string | number = "";
   private loop: LoopRegion | null = null;
   private rafId = 0;
   private faderCents = 0;
@@ -40,32 +41,31 @@ export class PitchAudioEngine {
 
   async loadOriginal(arrayBuffer: ArrayBuffer): Promise<void> {
     const t = this.currentTime();
-    const wasPlaying = this.playing;
     this.stopAll();
     this.playing = false;
     const ctx = this.ensureContext();
     this.originalBuffer = await ctx.decodeAudioData(arrayBuffer.slice(0));
     this.dropShifter();
     this.offset = Math.min(t, this.originalBuffer.duration);
-    if (wasPlaying) this.play();
   }
 
   async loadShifted(arrayBuffer: ArrayBuffer): Promise<void> {
     const t = this.currentTime();
-    const wasPlaying = this.playing;
     this.stopAll();
     this.playing = false;
     const ctx = this.ensureContext();
     this.shiftedBuffer = await ctx.decodeAudioData(arrayBuffer.slice(0));
     this.offset = Math.min(t, this.shiftedBuffer.duration);
-    if (wasPlaying) this.play();
   }
 
   clearShifted(): void {
+    this.offset = this.currentTime();
     this.stopAll();
     this.playing = false;
     this.shiftedBuffer = null;
     if (this.selected === "variant") this.selected = "original";
+    this.refCents = 0;
+    this.selKey = "";
   }
 
   get duration(): number {
@@ -92,11 +92,18 @@ export class PitchAudioEngine {
     return this.shiftedBuffer !== null;
   }
 
-  select(kind: Selection, refCents = 0): void {
-    if (this.selected === kind && this.refCents === refCents) return;
+  get isPlaying(): boolean {
+    return this.playing;
+  }
+
+  select(kind: Selection, refCents = 0, key: string | number = ""): void {
+    if (this.selected === kind && this.refCents === refCents && this.selKey === key) {
+      return;
+    }
     const t = this.playing ? this.currentTime() : this.offset;
     this.selected = kind;
     this.refCents = refCents;
+    this.selKey = key;
     if (this.playing) {
       this.stopAll();
       this.playing = false;

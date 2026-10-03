@@ -20,11 +20,41 @@ describe("selection", () => {
 
   it("select switches buffers", () => {
     const e = engineWith({ original: fakeBuffer, shifted: fakeBuffer });
-    e.select("variant", -600);
+    e.select("variant", -600, 7);
     expect(e.selection).toBe("variant");
     expect(e.activeBufferKind()).toBe("variant");
     e.select("original");
     expect(e.activeBufferKind()).toBe("original");
+  });
+
+  it("same key is a silent no-op even while playing", () => {
+    const e = engineWith({ original: fakeBuffer, shifted: fakeBuffer });
+    e.select("variant", -600, 7);
+    const anyE = e as unknown as Record<string, unknown>;
+    anyE["playing"] = true;
+    expect(() => e.select("variant", -600, 7)).not.toThrow();
+    expect(e.selection).toBe("variant");
+  });
+
+  it("same cents with a different key is a new selection", () => {
+    const e = engineWith({ original: fakeBuffer, shifted: fakeBuffer });
+    e.select("variant", -600, 7);
+    e.select("variant", -600, 9);
+    expect(e.selection).toBe("variant");
+  });
+
+  it("reports playing state", () => {
+    const e = engineWith({});
+    expect(e.isPlaying).toBe(false);
+    (e as unknown as Record<string, unknown>)["playing"] = true;
+    expect(e.isPlaying).toBe(true);
+  });
+
+  it("clearShifted resets selection identity", () => {
+    const e = engineWith({ original: fakeBuffer, shifted: fakeBuffer });
+    e.select("variant", -600, 7);
+    e.clearShifted();
+    expect(e.selection).toBe("original");
   });
 
   it("falls back to shifted when original is missing", () => {
