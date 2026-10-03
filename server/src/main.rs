@@ -40,12 +40,16 @@ async fn main() -> anyhow::Result<()> {
 
     let app = build_router(state);
 
-    let port = find_free_port(PREFERRED_PORT, MAX_SCAN)?;
+    let preferred = std::env::var("PITCHER_PORT")
+        .ok()
+        .and_then(|p| p.parse::<u16>().ok())
+        .unwrap_or(PREFERRED_PORT);
+    let port = find_free_port(preferred, MAX_SCAN)?;
     let addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::UNSPECIFIED), port);
     let listener = tokio::net::TcpListener::bind(addr).await?;
 
-    if port != PREFERRED_PORT {
-        println!("port {PREFERRED_PORT} was busy, using {port}");
+    if port != preferred {
+        println!("port {preferred} was busy, using {port}");
     }
     println!("pitcher server listening on http://localhost:{port}");
     if let Some(ip) = lan_ip() {
