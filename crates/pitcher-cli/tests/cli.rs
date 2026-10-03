@@ -457,7 +457,7 @@ fn try_repl_keep_writes_variant() {
             outdir.to_str().unwrap(),
             "--no-play",
         ],
-        &script,
+        script,
     );
     assert!(
         out.status.success(),
