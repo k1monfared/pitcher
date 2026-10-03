@@ -50,9 +50,9 @@ fn goertzel_power(samples: &[f64], sr: f64, target: f64) -> f64 {
     let k = (0.5 + (n * target / sr)).floor();
     let w = 2.0 * std::f64::consts::PI * k / n;
     let coeff = 2.0 * w.cos();
-    let (mut s0, mut s1, mut s2) = (0.0, 0.0, 0.0);
+    let (mut s1, mut s2) = (0.0, 0.0);
     for &x in samples {
-        s0 = x + coeff * s1 - s2;
+        let s0 = x + coeff * s1 - s2;
         s2 = s1;
         s1 = s0;
     }
