@@ -446,7 +446,7 @@ fn try_repl_keep_writes_variant() {
     .status
     .success());
 
-    let script = format!("-150\nk\nq\n");
+    let script = "-150\nk\nq\n";
     let out = run_stdin(
         &[
             "--db",
