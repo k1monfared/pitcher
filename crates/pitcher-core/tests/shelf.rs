@@ -22,6 +22,30 @@ fn add_and_list_track() {
 }
 
 #[test]
+fn rename_track_updates_title_and_artist() {
+    let shelf = Shelf::open(tmp_db("rename")).unwrap();
+    let id = shelf
+        .add_track("/music/a.wav", "file", None, "Old", "Nobody", 12.0, 44100)
+        .unwrap();
+    shelf.rename_track(id, Some("New"), Some("Somebody")).unwrap();
+    let t = shelf.get_track(id).unwrap().unwrap();
+    assert_eq!(t.title, "New");
+    assert_eq!(t.artist.as_deref(), Some("Somebody"));
+}
+
+#[test]
+fn rename_track_partial_keeps_other_field() {
+    let shelf = Shelf::open(tmp_db("renamep")).unwrap();
+    let id = shelf
+        .add_track("/music/a.wav", "file", None, "Old", "Nobody", 12.0, 44100)
+        .unwrap();
+    shelf.rename_track(id, Some("New"), None).unwrap();
+    let t = shelf.get_track(id).unwrap().unwrap();
+    assert_eq!(t.title, "New");
+    assert_eq!(t.artist.as_deref(), Some("Nobody"));
+}
+
+#[test]
 fn add_variant_and_count() {
     let shelf = Shelf::open(tmp_db("var")).unwrap();
     let tid = shelf

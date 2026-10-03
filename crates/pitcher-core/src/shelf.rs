@@ -208,6 +208,15 @@ impl Shelf {
         Ok(())
     }
 
+    pub fn rename_track(
+        &self,
+        _id: i64,
+        _title: Option<&str>,
+        _artist: Option<&str>,
+    ) -> anyhow::Result<()> {
+        unimplemented!()
+    }
+
     pub fn delete_track(&self, id: i64) -> anyhow::Result<()> {
         self.conn
             .execute("DELETE FROM tracks WHERE id = ?1", [id])?;
