@@ -473,6 +473,74 @@ fn try_repl_keep_writes_variant() {
 }
 
 #[test]
+fn rename_track_updates_title() {
+    if !have("ffmpeg") {
+        return;
+    }
+    let dir = tmp_dir("rename");
+    let db = dir.join("shelf.sqlite");
+    let input = dir.join("in.wav");
+    make_tone(&input, 440.0, 1.0);
+    assert!(run(&["--db", db.to_str().unwrap(), "add", input.to_str().unwrap(), "--title", "Old"])
+        .status
+        .success());
+
+    let out = run(&["--db", db.to_str().unwrap(), "rename", "1", "--title", "New"]);
+    assert!(out.status.success(), "stderr: {}", String::from_utf8_lossy(&out.stderr));
+
+    let list = run(&["--db", db.to_str().unwrap(), "list"]);
+    let s = String::from_utf8_lossy(&list.stdout);
+    assert!(s.contains("New"), "expected renamed title:\n{s}");
+    assert!(!s.contains("Old"), "old title should be gone:\n{s}");
+}
+
+#[test]
+fn delete_track_removes_variants_and_keeps_external_source() {
+    if !have("ffmpeg") {
+        return;
+    }
+    let dir = tmp_dir("delcli");
+    let db = dir.join("shelf.sqlite");
+    let input = dir.join("in.wav");
+    make_tone(&input, 440.0, 1.0);
+    assert!(run(&["--db", db.to_str().unwrap(), "add", input.to_str().unwrap(), "--title", "T"])
+        .status
+        .success());
+
+    let outdir = dir.join("out");
+    let script = "-100\nk\nq\n";
+    let t = run_stdin(
+        &[
+            "--db",
+            db.to_str().unwrap(),
+            "try",
+            "1",
+            "--outdir",
+            outdir.to_str().unwrap(),
+            "--no-play",
+        ],
+        script,
+    );
+    assert!(t.status.success());
+
+    let variant_path = std::fs::read_dir(&outdir)
+        .unwrap()
+        .filter_map(|e| e.ok())
+        .map(|e| e.path())
+        .find(|p| p.extension().map(|x| x == "opus").unwrap_or(false))
+        .expect("expected a kept opus variant");
+    assert!(variant_path.exists());
+
+    let del = run(&["--db", db.to_str().unwrap(), "delete", "1", "--yes"]);
+    assert!(del.status.success(), "stderr: {}", String::from_utf8_lossy(&del.stderr));
+    assert!(!variant_path.exists(), "variant file should be removed");
+    assert!(input.exists(), "external source must be kept");
+
+    let list = run(&["--db", db.to_str().unwrap(), "list"]);
+    assert!(!String::from_utf8_lossy(&list.stdout).contains('T'));
+}
+
+#[test]
 fn manual_note_interval() {
     let out = run(&["interval", "--source-hz", "277.18", "--target-note", "G5"]);
     assert!(

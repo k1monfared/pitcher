@@ -80,6 +80,18 @@ enum Commands {
         #[arg(long)]
         formant: bool,
     },
+    Rename {
+        track_id: i64,
+        #[arg(long)]
+        title: Option<String>,
+        #[arg(long)]
+        artist: Option<String>,
+    },
+    Delete {
+        track_id: i64,
+        #[arg(long)]
+        yes: bool,
+    },
 }
 
 #[derive(Subcommand)]
@@ -271,6 +283,9 @@ fn main() -> anyhow::Result<()> {
             no_play,
             formant,
         } => run_try(&cli.db, *track_id, outdir, *no_play, *formant)?,
+        Commands::Rename { .. } | Commands::Delete { .. } => {
+            anyhow::bail!("not implemented yet");
+        }
     }
     Ok(())
 }
