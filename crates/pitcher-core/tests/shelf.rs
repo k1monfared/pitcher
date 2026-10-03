@@ -202,6 +202,49 @@ fn old_db_without_name_column_migrates() {
 }
 
 #[test]
+fn find_variant_matches_render_settings() {
+    let shelf = Shelf::open(tmp_db("findv")).unwrap();
+    let tid = shelf
+        .add_track("/music/a.wav", "file", None, "A", "", 12.0, 44100)
+        .unwrap();
+    let v = shelf
+        .add_variant_full(
+            tid,
+            &pitcher_core::model::VariantSpec {
+                cents: -600,
+                formant: true,
+                engine: "finer".into(),
+                pitch_quality: "quality".into(),
+                section: None,
+                output_path: "/out/a.opus".into(),
+                output_format: Some("opus".into()),
+                src_note: None,
+                src_hz: None,
+                target_note: None,
+                target_hz: None,
+            },
+        )
+        .unwrap();
+    let found = shelf
+        .find_variant(tid, -600, true, None, Some("opus"))
+        .unwrap()
+        .unwrap();
+    assert_eq!(found.id, v);
+    assert!(shelf
+        .find_variant(tid, -500, true, None, Some("opus"))
+        .unwrap()
+        .is_none());
+    assert!(shelf
+        .find_variant(tid, -600, false, None, Some("opus"))
+        .unwrap()
+        .is_none());
+    assert!(shelf
+        .find_variant(tid, -600, true, Some((1.0, 2.0)), Some("opus"))
+        .unwrap()
+        .is_none());
+}
+
+#[test]
 fn variants_list_sorted_by_shift_amount() {
     let shelf = Shelf::open(tmp_db("sorted")).unwrap();
     let tid = shelf

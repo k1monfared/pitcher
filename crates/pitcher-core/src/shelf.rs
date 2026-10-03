@@ -193,6 +193,17 @@ impl Shelf {
         Ok(rows.collect::<Result<Vec<_>, _>>()?)
     }
 
+    pub fn find_variant(
+        &self,
+        _track_id: i64,
+        _cents: i32,
+        _formant: bool,
+        _section: Option<(f64, f64)>,
+        _format: Option<&str>,
+    ) -> anyhow::Result<Option<Variant>> {
+        unimplemented!()
+    }
+
     pub fn get_variant(&self, id: i64) -> anyhow::Result<Option<Variant>> {
         let mut stmt = self.conn.prepare(
             "SELECT id, track_id, name, cents, formant, engine, pitch_quality, section_start,
