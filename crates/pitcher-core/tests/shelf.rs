@@ -202,6 +202,26 @@ fn old_db_without_name_column_migrates() {
 }
 
 #[test]
+fn variants_list_sorted_by_shift_amount() {
+    let shelf = Shelf::open(tmp_db("sorted")).unwrap();
+    let tid = shelf
+        .add_track("/music/a.wav", "file", None, "A", "", 12.0, 44100)
+        .unwrap();
+    for cents in [200, -100, 0, -300, 100] {
+        shelf
+            .add_variant(tid, cents, true, "finer", "quality", None, "/out/a.opus", Some("opus"))
+            .unwrap();
+    }
+    let cents: Vec<i32> = shelf
+        .list_variants(tid)
+        .unwrap()
+        .iter()
+        .map(|v| v.cents)
+        .collect();
+    assert_eq!(cents, vec![-300, -100, 0, 100, 200]);
+}
+
+#[test]
 fn add_variant_and_count() {
     let shelf = Shelf::open(tmp_db("var")).unwrap();
     let tid = shelf
