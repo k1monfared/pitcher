@@ -7,8 +7,10 @@
     activeId = null,
     originalActive = false,
     originalTitle = "original",
+    originalArtist = null,
     originalAudioUrl = null,
     exportAllUrl = null,
+    outputFormat = "opus",
     mediaUrlFor = null,
     renderSummary = "",
     renderMsg = "",
@@ -18,13 +20,16 @@
     ondelete,
     onrename,
     onrender,
+    onformat,
   } = $props<{
     variants?: Variant[];
     activeId?: number | null;
     originalActive?: boolean;
     originalTitle?: string;
+    originalArtist?: string | null;
     originalAudioUrl?: string | null;
     exportAllUrl?: string | null;
+    outputFormat?: string;
     mediaUrlFor?: ((id: number) => string) | null;
     renderSummary?: string;
     renderMsg?: string;
@@ -34,6 +39,7 @@
     ondelete?: (v: Variant) => void;
     onrename?: (v: Variant, name: string) => void;
     onrender?: () => void;
+    onformat?: (format: string) => void;
   }>();
 
   let renamingId = $state<number | null>(null);
@@ -73,11 +79,6 @@
       <span class="summary" class:error={renderMsg.includes("failed")}>{renderMsg}</span>
     {:else if renderSummary}
       <span class="summary" title="exactly what the server will render and store">{renderSummary}</span>
-    {/if}
-    {#if exportAllUrl && variants.length > 0}
-      <a class="export" href={exportAllUrl} download title="download every kept pitch as one zip, in the format above">
-        export all {variants.length} pitches (.zip)
-      </a>
     {/if}
   </div>
   {#snippet variantCard(v: Variant)}
@@ -129,6 +130,9 @@
       <button class="pick" type="button" onclick={() => onselectOriginal?.()}>
         <span class="cents">original</span>
         <span class="note">{originalTitle}</span>
+        {#if originalArtist}
+          <span class="note">{originalArtist}</span>
+        {/if}
         <span class="note">+0c</span>
       </button>
       <div class="actions">
@@ -144,6 +148,27 @@
       {@render variantCard(v)}
     {/each}
   </div>
+  {#if exportAllUrl && variants.length > 0}
+    <div class="export-row">
+      <label class="format">
+        format
+        <select
+          value={outputFormat}
+          onchange={(e) => onformat?.((e.currentTarget as HTMLSelectElement).value)}
+        >
+          <option value="opus">opus</option>
+          <option value="flac">flac</option>
+          <option value="mp3">mp3</option>
+          <option value="ogg">ogg</option>
+          <option value="m4a">m4a</option>
+          <option value="wav">wav</option>
+        </select>
+      </label>
+      <a class="export" href={exportAllUrl} download title="download the original plus every kept pitch as one zip, in this format">
+        export all {variants.length + 1} pitches (.zip)
+      </a>
+    </div>
+  {/if}
 </div>
 
 <style>
@@ -166,6 +191,25 @@
     border: 1px solid #333;
     border-radius: 0.3rem;
     padding: 0.25rem 0.5rem;
+  }
+  .export-row {
+    display: flex;
+    gap: 0.75rem;
+    align-items: center;
+  }
+  .format {
+    display: flex;
+    gap: 0.4rem;
+    align-items: center;
+    font-size: 0.8rem;
+    color: #aaa;
+  }
+  .format select {
+    background: #16161a;
+    color: #eee;
+    border: 1px solid #333;
+    border-radius: 0.3rem;
+    padding: 0.2rem 0.4rem;
   }
   .keep {
     display: flex;

@@ -453,17 +453,9 @@
       {#if activeTrack}
         <div class="title-row">
           <h2>{activeTrack.title}</h2>
-          <label class="format">
-            format
-            <select bind:value={outputFormat}>
-              <option value="opus">opus</option>
-              <option value="flac">flac</option>
-              <option value="mp3">mp3</option>
-              <option value="ogg">ogg</option>
-              <option value="m4a">m4a</option>
-              <option value="wav">wav</option>
-            </select>
-          </label>
+          {#if activeTrack.artist}
+            <span class="artist">{activeTrack.artist}</span>
+          {/if}
           <label class="formant">
             <input type="checkbox" bind:checked={formant} />
             preserve formants
@@ -533,8 +525,10 @@
               activeId={activeVariant?.id ?? null}
               originalActive={activeVariant === null}
               originalTitle={activeTrack.title}
+              originalArtist={activeTrack.artist}
               originalAudioUrl={api.trackAudioUrl(activeTrack.id)}
               exportAllUrl={variants.length > 0 ? api.exportAllUrl(activeTrack.id, outputFormat) : null}
+              outputFormat={outputFormat}
               mediaUrlFor={(id) => api.mediaUrl(id, outputFormat)}
               renderSummary={renderSummary}
               renderMsg={renderMsg}
@@ -544,6 +538,7 @@
               ondelete={deleteVariant}
               onrename={renameVariant}
               onrender={renderCurrent}
+              onformat={(f) => (outputFormat = f)}
             />
           </div>
         </div>
@@ -709,7 +704,6 @@
     margin: 0;
     font-size: 1.05rem;
   }
-  .format,
   .formant {
     display: flex;
     gap: 0.4rem;
@@ -717,12 +711,9 @@
     font-size: 0.8rem;
     color: #aaa;
   }
-  .format select {
-    background: #16161a;
-    color: #eee;
-    border: 1px solid #333;
-    border-radius: 0.3rem;
-    padding: 0.2rem 0.4rem;
+  .artist {
+    font-size: 0.85rem;
+    color: #888;
   }
   .stage {
     display: grid;
