@@ -9,6 +9,7 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.media3.common.MediaItem
+import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
@@ -23,6 +24,7 @@ import pitcher.android.data.Bookmark
 import pitcher.android.data.ShelfRepository
 import pitcher.android.data.Track
 import pitcher.android.data.Variant
+import pitcher.android.data.VariantSpec
 import pitcher.android.media.MediaImporter
 import pitcher.android.media.PlaybackService
 import pitcher.android.media.TunerDecoder
@@ -56,7 +58,11 @@ class PitcherViewModel(app: Application) : AndroidViewModel(app) {
         private set
     var detectMessage by mutableStateOf<String?>(null)
         private set
-    var pendingShiftCents by mutableStateOf<Int?>(null)
+    var faderCents by mutableStateOf(0)
+        private set
+    var tempo by mutableStateOf(1f)
+        private set
+    var selectedVariantId by mutableStateOf<Long?>(null)
         private set
 
     private var controller: MediaController? = null
@@ -138,12 +144,15 @@ class PitcherViewModel(app: Application) : AndroidViewModel(app) {
         peaks = FloatArray(0)
         detectedHz = null
         detectMessage = null
+        faderCents = 0
+        selectedVariantId = null
         positionMs = 0
         durationMs = (track.durationS * 1000).toLong()
         controller?.apply {
             setMediaItem(MediaItem.fromUri(Uri.fromFile(File(track.sourcePath))))
             prepare()
             seekTo(0)
+            setPlaybackParameters(PlaybackParameters(tempo, 1f))
         }
         viewModelScope.launch {
             val p = withContext(Dispatchers.IO) { WaveformDecoder.decodePeaks(track.sourcePath) }
@@ -202,7 +211,8 @@ class PitcherViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun selectOriginal() {
-        current?.let { variants = repo.listVariants(it.id) }
+        selectedVariantId = null
+        setPitchCents(0)
     }
 
     fun detectAtPlayhead() {
@@ -233,8 +243,61 @@ class PitcherViewModel(app: Application) : AndroidViewModel(app) {
         detectMessage = null
     }
 
-    fun applyShiftCents(cents: Int) {
-        pendingShiftCents = cents
+    fun setPitchCents(cents: Int) {
+        faderCents = cents
+        applyPlaybackParams()
+    }
+
+    fun changeTempo(value: Float) {
+        tempo = value
+        applyPlaybackParams()
+    }
+
+    private fun applyPlaybackParams() {
+        val pitch = Math.pow(2.0, faderCents / 1200.0).toFloat()
+        controller?.setPlaybackParameters(PlaybackParameters(tempo, pitch))
+    }
+
+    fun selectVariant(variant: Variant) {
+        selectedVariantId = variant.id
+        setPitchCents(variant.cents)
+    }
+
+    fun keepCurrent(name: String?) {
+        val track = current ?: return
+        val existing = repo.findVariant(track.id, faderCents, true, null, "live")
+        if (existing != null) {
+            if (!name.isNullOrBlank()) repo.renameVariant(existing.id, name)
+            variants = repo.listVariants(track.id)
+            selectedVariantId = existing.id
+            return
+        }
+        val id = repo.addVariantFull(
+            track.id,
+            VariantSpec(
+                cents = faderCents,
+                formant = true,
+                engine = "sonic",
+                pitchQuality = "quality",
+                section = null,
+                outputPath = "",
+                outputFormat = "live",
+                targetNote = name?.takeIf { it.isNotBlank() },
+            ),
+        )
+        variants = repo.listVariants(track.id)
+        selectedVariantId = id
+    }
+
+    fun renameVariant(variant: Variant, name: String) {
+        repo.renameVariant(variant.id, name)
+        current?.let { variants = repo.listVariants(it.id) }
+    }
+
+    fun deleteVariant(variant: Variant) {
+        repo.deleteVariant(variant.id)
+        variants = variants.filterNot { it.id == variant.id }
+        if (selectedVariantId == variant.id) selectOriginal()
     }
 
     override fun onCleared() {

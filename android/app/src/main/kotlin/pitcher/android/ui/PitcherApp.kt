@@ -91,25 +91,33 @@ fun PitcherApp(vm: PitcherViewModel = viewModel()) {
                     onDeleteBookmark = { vm.deleteBookmark(it) },
                     modifier = modifier,
                 )
-                Destination.Pitch -> PlaceholderScreen(
-                    "Pitch Lab",
-                    "Move the fader in cents or semitones and keep the pitches you like. " +
-                        "The fader always reads total cents from the original.",
-                    modifier,
+                Destination.Pitch -> PitchLabScreen(
+                    track = vm.current,
+                    variants = vm.variants,
+                    cents = vm.faderCents,
+                    selectedVariantId = vm.selectedVariantId,
+                    onCents = { vm.setPitchCents(it) },
+                    onKeep = { vm.keepCurrent(it) },
+                    modifier = modifier,
                 )
                 Destination.Tuner -> TunerScreen(
                     track = vm.current,
                     detectedHz = vm.detectedHz,
                     detectMessage = vm.detectMessage,
-                    pendingShiftCents = vm.pendingShiftCents,
+                    pendingShiftCents = vm.faderCents,
                     onDetect = { vm.detectAtPlayhead() },
-                    onApply = { vm.applyShiftCents(it) },
+                    onApply = { vm.setPitchCents(it) },
                     modifier = modifier,
                 )
-                Destination.Pitches -> PlaceholderScreen(
-                    "Pitches",
-                    "The original plus every kept pitch, sorted by how far it shifted.",
-                    modifier,
+                Destination.Pitches -> PitchesScreen(
+                    track = vm.current,
+                    variants = vm.variants,
+                    selectedVariantId = vm.selectedVariantId,
+                    onSelectOriginal = { vm.selectOriginal() },
+                    onSelectVariant = { vm.selectVariant(it) },
+                    onRenameVariant = { v, n -> vm.renameVariant(v, n) },
+                    onDeleteVariant = { vm.deleteVariant(it) },
+                    modifier = modifier,
                 )
             }
         }
