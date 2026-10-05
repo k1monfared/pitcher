@@ -20,19 +20,23 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.dp
-import kotlin.math.roundToInt
 import pitcher.android.data.Track
 import pitcher.android.data.Variant
+import pitcher.core.FaderMath
 
 private val PRESETS = listOf(-1200, -700, -500, -200, -100, 100, 200, 500, 700, 1200)
 
@@ -94,6 +98,11 @@ fun PitchLabScreen(
                 }
             }
         }
+        Text(
+            "drag to shift · slide left = fine · slide right = fast · double-tap resets",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
 
         Row(
             modifier = Modifier.fillMaxSize(),
@@ -146,25 +155,73 @@ private fun PitchFader(
 ) {
     val trackColor = Color(0xFF1B1B1F)
     val accent = Color(0xFF6AA9FF)
+    val fineColor = Color(0xFF7DDF9A)
+    val coarseColor = Color(0xFFFFD166)
+
+    val currentCents by rememberUpdatedState(cents)
+    var dragging by remember { mutableStateOf(false) }
+    var mode by remember { mutableStateOf(FaderMath.Mode.NORMAL) }
+    val anchor = remember { mutableStateOf(Offset.Zero) }
+    val startCents = remember { mutableIntStateOf(0) }
+    val haptics = LocalHapticFeedback.current
+
+    val accentNow = when (mode) {
+        FaderMath.Mode.FINE -> fineColor
+        FaderMath.Mode.COARSE -> coarseColor
+        FaderMath.Mode.NORMAL -> accent
+    }
+
     Canvas(
         modifier = modifier
             .pointerInput(range) {
-                detectTapGestures { off -> onCents(centsFor(off.y, size.height.toFloat(), range)) }
+                detectTapGestures(
+                    onDoubleTap = { onCents(0) },
+                )
             }
             .pointerInput(range) {
-                detectDragGestures { change, _ ->
-                    onCents(centsFor(change.position.y, size.height.toFloat(), range))
+                val zonePx = (FaderMath.ZONE_FRAC * size.height).toFloat()
+                detectDragGestures(
+                    onDragStart = { off ->
+                        dragging = true
+                        anchor.value = off
+                        startCents.intValue = currentCents
+                        mode = FaderMath.Mode.NORMAL
+                    },
+                    onDragEnd = {
+                        dragging = false
+                        mode = FaderMath.Mode.NORMAL
+                    },
+                    onDragCancel = {
+                        dragging = false
+                        mode = FaderMath.Mode.NORMAL
+                    },
+                ) { change, _ ->
+                    val dx = change.position.x - anchor.value.x
+                    val dy = anchor.value.y - change.position.y
+                    val nextMode = FaderMath.modeFor(dx, zonePx)
+                    if (nextMode != mode) {
+                        mode = nextMode
+                        haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    }
+                    onCents(
+                        FaderMath.centsFromDrag(
+                            startCents.intValue,
+                            dy,
+                            dx,
+                            size.height.toFloat(),
+                            range,
+                        ),
+                    )
                 }
             },
     ) {
         val w = size.width
         val h = size.height
-        val corner = 12f
         drawRoundRect(
             color = trackColor,
             topLeft = Offset(0f, 0f),
             size = Size(w, h),
-            cornerRadius = androidx.compose.ui.geometry.CornerRadius(corner, corner),
+            cornerRadius = androidx.compose.ui.geometry.CornerRadius(12f, 12f),
         )
         drawLine(
             color = Color(0xFF444444),
@@ -176,17 +233,15 @@ private fun PitchFader(
         val knobY = (frac * h).toFloat().coerceIn(0f, h)
         val cx = w / 2f
         drawLine(
-            color = accent.copy(alpha = 0.4f),
+            color = accentNow.copy(alpha = 0.4f),
             start = Offset(cx, h / 2f),
             end = Offset(cx, knobY),
             strokeWidth = 4f,
         )
-        drawCircle(color = accent, radius = w * 0.28f, center = Offset(cx, knobY))
+        drawCircle(
+            color = accentNow,
+            radius = w * if (dragging) 0.34f else 0.28f,
+            center = Offset(cx, knobY),
+        )
     }
-}
-
-private fun centsFor(y: Float, height: Float, range: Int): Int {
-    if (height <= 0f) return 0
-    val frac = (y / height).coerceIn(0f, 1f)
-    return (range - frac * 2 * range).roundToInt()
 }
