@@ -17,9 +17,10 @@ clean multi-screen UI. Fully offline, fully FOSS, F-Droid friendly.
 
 ## Non-goals (v1)
 
-- No YouTube/SoundCloud/Spotify importing. If downloading ever comes back it is a
-  separate milestone with its own legal review (see `docs/LEGALITY.md`).
-- No account, no cloud, no analytics, no network permission at all.
+- No built-in YouTube/SoundCloud/Spotify downloading: the app bundles no downloader
+  and has no network permission (see `docs/LEGALITY.md`). Online sources are
+  supported by sharing a downloaded file into pitcher from any other app, or by
+  opening it with pitcher from a file manager.
 - No polyphonic transcription (same as web v1: monophonic tuner).
 
 ## Stack
@@ -28,10 +29,10 @@ clean multi-screen UI. Fully offline, fully FOSS, F-Droid friendly.
 |---|---|---|
 | Language/UI | Kotlin + Jetpack Compose (Material 3) | Native, no bridge, best gesture support |
 | Tuner | Kotlin port of the desktop YIN (`core/Tuner.kt`) | Exact parity with the Rust `tuner.rs`, tested against the same vectors, no extra dependency. TarsosDSP was the original choice but is not on Maven Central (only third-party forks), so a port is safer |
-| Pitch shift (m4) | TBD: SoundTouch via JNI, a ported WSOLA/phase-vocoder, or a Maven-available lib | Needs a real quality evaluation; hidden behind a `PitchEngine` interface |
-
-| Playback | Media3 (ExoPlayer) for plain play; TarsosDSP pipeline for shifted/speed preview | Media3 for the exact-file path, DSP chain only when pitch or tempo differs |
-| Storage | Room (SQLite) + app-private files | Same tables as the server: tracks, variants, bookmarks; keep-all semantics |
+| Live pitch/tempo | Media3 ExoPlayer `PlaybackParameters(speed, pitch)` (Sonic) | Real-time pitch at fixed tempo and tempo at fixed pitch, no extra dependency, no render |
+| Offline render | In-app WSOLA + resample (`core/PitchShifter.kt`) | Dependency-free, tested with the YIN tuner, used for kept/exported WAVs |
+| Playback | Media3 ExoPlayer + `MediaSessionService` | Background play and lock-screen controls; controller in the ViewModel |
+| Storage | Hand-rolled SQLite (`ShelfRepository`) | Same tables as the server; avoids a KSP annotation processor and mirrors the server SQL directly |
 | Video sources | MediaExtractor + MediaMuxer | Import extracts the audio track to an audio-only file, no re-encode, no video kept |
 | Waveform | Custom Compose Canvas | Full control of zoom/pan/markers, no chart dependency |
 | Background | Foreground service + Media3 notification (optional toggle) | Playback survives screen-off when the user wants it |
