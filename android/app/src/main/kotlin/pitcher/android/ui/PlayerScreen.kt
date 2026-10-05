@@ -66,7 +66,8 @@ fun PlayerScreen(
             peaks = peaks,
             positionMs = positionMs,
             durationMs = durationMs,
-            onSeekFraction = { f -> onSeekMs((f * durationMs).toLong()) },
+            bookmarks = bookmarks,
+            onSeekMs = onSeekMs,
             modifier = Modifier.padding(horizontal = 8.dp),
         )
         Row(
@@ -83,6 +84,17 @@ fun PlayerScreen(
                 Waveform.formatClock(durationMs / 1000.0),
                 style = MaterialTheme.typography.bodyMedium,
             )
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            listOf(-5000L, -1000L, 1000L, 5000L).forEach { delta ->
+                TextButton(onClick = { onSeekMs(positionMs + delta) }) {
+                    Text(if (delta > 0) "+${delta / 1000}s" else "${delta / 1000}s")
+                }
+            }
         }
         Slider(
             value = if (durationMs > 0) positionMs.toFloat() / durationMs else 0f,

@@ -1,6 +1,7 @@
 package pitcher.android.ui
 
 import android.app.Application
+import android.content.ComponentName
 import android.net.Uri
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -9,7 +10,9 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
-import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.session.MediaController
+import androidx.media3.session.SessionToken
+import com.google.common.util.concurrent.MoreExecutors
 import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -21,6 +24,7 @@ import pitcher.android.data.ShelfRepository
 import pitcher.android.data.Track
 import pitcher.android.data.Variant
 import pitcher.android.media.MediaImporter
+import pitcher.android.media.PlaybackService
 import pitcher.android.media.WaveformDecoder
 
 class PitcherViewModel(app: Application) : AndroidViewModel(app) {
@@ -46,39 +50,51 @@ class PitcherViewModel(app: Application) : AndroidViewModel(app) {
     var message by mutableStateOf<String?>(null)
         private set
 
-    private val player: ExoPlayer = ExoPlayer.Builder(app).build().apply {
-        addListener(object : Player.Listener {
-            override fun onIsPlayingChanged(playing: Boolean) {
-                this@PitcherViewModel.isPlaying = playing
-            }
+    private var controller: MediaController? = null
 
-            override fun onPlaybackStateChanged(state: Int) {
-                if (state == Player.STATE_READY) {
-                    this@PitcherViewModel.durationMs = duration.coerceAtLeast(0)
-                }
-                if (state == Player.STATE_ENDED) {
-                    this@PitcherViewModel.isPlaying = false
-                }
+    private val listener = object : Player.Listener {
+        override fun onIsPlayingChanged(playing: Boolean) {
+            isPlaying = playing
+        }
+
+        override fun onPlaybackStateChanged(state: Int) {
+            if (state == Player.STATE_READY) {
+                durationMs = (controller?.duration ?: 0L).coerceAtLeast(0)
             }
-        })
+            if (state == Player.STATE_ENDED) {
+                isPlaying = false
+            }
+        }
     }
 
     init {
         refreshTracks()
+        connectController()
         viewModelScope.launch {
             while (isActive) {
-                if (isPlaying) positionMs = player.currentPosition
+                if (isPlaying) positionMs = controller?.currentPosition ?: 0L
                 delay(50)
             }
         }
     }
 
-    fun refreshTracks() {
-        tracks = repo.listTracks()
+    private fun connectController() {
+        val app = getApplication<Application>()
+        val token = SessionToken(app, ComponentName(app, PlaybackService::class.java))
+        val future = MediaController.Builder(app, token).buildAsync()
+        future.addListener(
+            {
+                runCatching { future.get() }.onSuccess { c ->
+                    controller = c
+                    c.addListener(listener)
+                }
+            },
+            MoreExecutors.directExecutor(),
+        )
     }
 
-    fun clearMessage() {
-        message = null
+    fun refreshTracks() {
+        tracks = repo.listTracks()
     }
 
     fun import(uri: Uri, onDone: () -> Unit) {
@@ -112,9 +128,12 @@ class PitcherViewModel(app: Application) : AndroidViewModel(app) {
         bookmarks = repo.listBookmarks(track.id)
         peaks = FloatArray(0)
         positionMs = 0
-        player.setMediaItem(MediaItem.fromUri(Uri.fromFile(File(track.sourcePath))))
-        player.prepare()
-        player.seekTo(0)
+        durationMs = (track.durationS * 1000).toLong()
+        controller?.apply {
+            setMediaItem(MediaItem.fromUri(Uri.fromFile(File(track.sourcePath))))
+            prepare()
+            seekTo(0)
+        }
         viewModelScope.launch {
             val p = withContext(Dispatchers.IO) { WaveformDecoder.decodePeaks(track.sourcePath) }
             if (current?.id == track.id) peaks = p
@@ -123,12 +142,13 @@ class PitcherViewModel(app: Application) : AndroidViewModel(app) {
 
     fun togglePlay() {
         if (current == null) return
-        if (isPlaying) player.pause() else player.play()
+        val c = controller ?: return
+        if (isPlaying) c.pause() else c.play()
     }
 
     fun seekTo(ms: Long) {
         val clamped = ms.coerceIn(0, maxOf(durationMs, 0))
-        player.seekTo(clamped)
+        controller?.seekTo(clamped)
         positionMs = clamped
     }
 
@@ -140,7 +160,7 @@ class PitcherViewModel(app: Application) : AndroidViewModel(app) {
 
     fun deleteTrack(track: Track) {
         val dataDir = File(getApplication<Application>().filesDir, "imports").parentFile!!
-        player.stop()
+        controller?.stop()
         repo.deleteTrackWithFiles(track.id, dataDir)
         if (current?.id == track.id) {
             current = null
@@ -155,7 +175,7 @@ class PitcherViewModel(app: Application) : AndroidViewModel(app) {
 
     fun addBookmark(name: String?) {
         val track = current ?: return
-        val t = player.currentPosition / 1000.0
+        val t = (controller?.currentPosition ?: positionMs) / 1000.0
         repo.addBookmark(track.id, t, name)
         bookmarks = repo.listBookmarks(track.id)
     }
@@ -175,7 +195,7 @@ class PitcherViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     override fun onCleared() {
-        player.release()
+        controller?.release()
         repo.close()
         super.onCleared()
     }
