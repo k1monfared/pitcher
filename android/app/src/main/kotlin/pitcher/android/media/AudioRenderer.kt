@@ -8,9 +8,9 @@ import pitcher.core.WavWriter
 
 /**
  * Renders a pitch-shifted file in the requested format. Decodes stereo PCM for
- * the given time range (falling back to mono if memory is tight), shifts each
- * channel with the core WSOLA shifter, then encodes. A whole-track zero-cent
- * request is a straight copy of the original.
+ * the given time range, shifts each channel with the core WSOLA shifter, then
+ * encodes. Falls back to mono (and reports) if memory runs out. A whole-track
+ * zero-cent request in the same format is a straight copy of the original.
  */
 object AudioRenderer {
 
@@ -23,15 +23,37 @@ object AudioRenderer {
         endMs: Long = -1L,
     ) {
         val isWholeTrack = startMs <= 0L && endMs <= 0L
-        if (cents == 0 && isWholeTrack) {
+        if (cents == 0 && isWholeTrack && sameFormat(sourcePath, format)) {
             File(sourcePath).copyTo(target, overwrite = true)
             return
         }
 
-        val decoded = decodeWithFallback(sourcePath, startMs, endMs)
+        try {
+            renderWith(sourcePath, target, format, cents, startMs, endMs, maxChannels = 2)
+        } catch (e: OutOfMemoryError) {
+            // Retry as mono; stereo float PCM plus the shifter temporaries can
+            // exceed the heap on long tracks.
+            renderWith(sourcePath, target, format, cents, startMs, endMs, maxChannels = 1)
+        }
+    }
+
+    private fun renderWith(
+        sourcePath: String,
+        target: File,
+        format: ExportFormat,
+        cents: Int,
+        startMs: Long,
+        endMs: Long,
+        maxChannels: Int,
+    ) {
+        val decoded = PcmDecoder.decodeChannels(sourcePath, startMs, endMs, maxChannels)
             ?: error("cannot decode audio")
-        val shifted = Array(decoded.channels.size) { c ->
-            PitchShifter.shift(decoded.channels[c], decoded.sampleRate, cents)
+
+        val channels = decoded.channels
+        val shifted = Array(channels.size) { c ->
+            val out = PitchShifter.shift(channels[c], decoded.sampleRate, cents)
+            channels[c] = FloatArray(0) // free the input channel as we go
+            out
         }
 
         when (format) {
@@ -42,15 +64,8 @@ object AudioRenderer {
         }
     }
 
-    private fun decodeWithFallback(
-        sourcePath: String,
-        startMs: Long,
-        endMs: Long,
-    ): WindowedAudioChannels? {
-        return try {
-            PcmDecoder.decodeChannels(sourcePath, startMs, endMs, maxChannels = 2)
-        } catch (_: OutOfMemoryError) {
-            PcmDecoder.decodeChannels(sourcePath, startMs, endMs, maxChannels = 1)
-        }
+    private fun sameFormat(sourcePath: String, format: ExportFormat): Boolean {
+        val ext = sourcePath.substringAfterLast('.', "").lowercase()
+        return ext == format.extension || (format == ExportFormat.Opus && ext == "ogg")
     }
 }

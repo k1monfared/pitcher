@@ -45,12 +45,12 @@ object PitchShifter {
         val overlap = FRAME - SYNTH_HOP
         val window = hann(FRAME)
 
-        val desired = (n * stretch).roundToInt().coerceAtLeast(FRAME)
-        val output = FloatArray(desired + FRAME)
+        val numFrames = ((n - FRAME) / analysisHop) + 1
+        val outLen = (numFrames - 1) * SYNTH_HOP + FRAME
+        val output = FloatArray(outLen)
 
         for (j in 0 until FRAME) output[j] += input[j] * window[j]
 
-        val numFrames = ((n - FRAME) / analysisHop) + 1
         var outPos = 0
         for (k in 1 until numFrames) {
             val target = k * analysisHop
@@ -76,12 +76,8 @@ object PitchShifter {
             outPos = sStart
         }
 
-        val result = FloatArray(desired)
-        for (i in 0 until desired) {
-            val v = if (i < output.size) output[i] else 0f
-            result[i] = v.coerceIn(-1f, 1f)
-        }
-        return result
+        for (i in output.indices) output[i] = output[i].coerceIn(-1f, 1f)
+        return output
     }
 
     private fun hann(size: Int): FloatArray {

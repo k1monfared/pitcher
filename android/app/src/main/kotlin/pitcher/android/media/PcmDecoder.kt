@@ -43,11 +43,25 @@ object PcmDecoder {
             }
             val outChannels = sourceChannels.coerceIn(1, maxChannels.coerceAtLeast(1))
 
+            val durationUs = if (inputFormat.containsKey(MediaFormat.KEY_DURATION)) {
+                inputFormat.getLong(MediaFormat.KEY_DURATION)
+            } else {
+                0L
+            }
+            val rangeEndUs = if (endUs == Long.MAX_VALUE) durationUs else endUs
+            val estimate = if (durationUs > 0 && rangeEndUs > startUs) {
+                ((rangeEndUs - startUs) / 1_000_000.0 * sampleRate).toInt() + sampleRate
+            } else {
+                0
+            }
+
             codec = MediaCodec.createDecoderByType(mime)
             codec.configure(inputFormat, null, null, 0)
             codec.start()
 
-            val builders = Array(outChannels) { FloatBuilder() }
+            val builders = Array(outChannels) {
+                FloatBuilder(estimate.coerceAtLeast(1 shl 12))
+            }
             var channels = sourceChannels
             var shorts = ShortArray(0)
             val info = MediaCodec.BufferInfo()
@@ -154,7 +168,10 @@ object PcmDecoder {
         private var size = 0
 
         fun add(value: Float) {
-            if (size == data.size) data = data.copyOf(data.size * 2)
+            if (size == data.size) {
+                val grown = data.size + (data.size shr 1) + 4096
+                data = data.copyOf(grown)
+            }
             data[size++] = value
         }
 

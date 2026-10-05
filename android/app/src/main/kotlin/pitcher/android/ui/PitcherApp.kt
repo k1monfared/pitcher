@@ -142,6 +142,7 @@ fun PitcherApp(
                     cents = vm.faderCents,
                     selectedVariantId = vm.selectedVariantId,
                     exportMessage = vm.exportMessage,
+                    exporting = vm.exporting,
                     exportFormat = vm.exportFormat,
                     exportLoopOnly = vm.exportLoopOnly,
                     loopAvailable = vm.loopStartMs != null && vm.loopEndMs != null,

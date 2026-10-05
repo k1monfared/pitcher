@@ -55,6 +55,7 @@ fun PitchLabScreen(
     cents: Int,
     selectedVariantId: Long?,
     exportMessage: String?,
+    exporting: Boolean,
     exportFormat: ExportFormat,
     exportLoopOnly: Boolean,
     loopAvailable: Boolean,
@@ -190,9 +191,12 @@ fun PitchLabScreen(
         }
         Button(
             onClick = { onExport(cents, name.trim().ifEmpty { null }) },
+            enabled = !exporting,
             modifier = Modifier.fillMaxWidth(),
         ) {
-            Text("Export & share this pitch (${exportFormat.id})")
+            Text(
+                if (exporting) "Rendering..." else "Export & share this pitch (${exportFormat.id})",
+            )
         }
         if (exportMessage != null) {
             Text(

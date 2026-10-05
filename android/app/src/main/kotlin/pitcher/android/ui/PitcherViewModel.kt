@@ -84,6 +84,8 @@ class PitcherViewModel(app: Application) : AndroidViewModel(app) {
         private set
     var exportMime by mutableStateOf(ExportFormat.M4a.mime)
         private set
+    var exporting by mutableStateOf(false)
+        private set
     var keepScreenOn by mutableStateOf(true)
         private set
     var storageImportsBytes by mutableStateOf(0L)
@@ -296,6 +298,8 @@ class PitcherViewModel(app: Application) : AndroidViewModel(app) {
 
     fun exportAndShare(cents: Int, name: String?) {
         val track = current ?: return
+        if (exporting) return
+        exporting = true
         val format = exportFormat
         val section = if (exportLoopOnly && loopStartMs != null && loopEndMs != null) {
             loopStartMs!! to loopEndMs!!
@@ -327,8 +331,14 @@ class PitcherViewModel(app: Application) : AndroidViewModel(app) {
                 )
                 exportMime = format.mime
                 exportMessage = "ready to share"
-            } catch (e: Exception) {
-                exportMessage = "export failed: ${e.message}"
+            } catch (e: Throwable) {
+                val reason = when (e) {
+                    is OutOfMemoryError -> "not enough memory for this track; try a shorter track or a smaller section"
+                    else -> e.message ?: e.toString()
+                }
+                exportMessage = "export failed: $reason"
+            } finally {
+                exporting = false
             }
         }
     }

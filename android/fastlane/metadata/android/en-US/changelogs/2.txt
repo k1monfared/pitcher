@@ -1,0 +1,3 @@
+- Fixed a crash when exporting.
+- Export now uses much less memory, retries as mono if needed, and reports a
+  clear message instead of closing the app.

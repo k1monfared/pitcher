@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.0.1
+
+- Fix a crash when exporting. Rendering now uses much less memory: decode
+  buffers are preallocated, the pitch shifter allocates one fewer buffer per
+  channel, decoded channels are freed as they are shifted, and the app asks for
+  a large heap. If stereo still does not fit, it retries as mono and reports a
+  clear message instead of dying. Exports can no longer run two at a time.
+
 ## 1.0.0
 
 First release.

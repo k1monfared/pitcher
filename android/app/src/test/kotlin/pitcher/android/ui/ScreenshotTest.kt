@@ -112,6 +112,7 @@ class ScreenshotTest {
                     cents = -600,
                     selectedVariantId = 1,
                     exportMessage = null,
+                    exporting = false,
                     exportFormat = ExportFormat.M4a,
                     exportLoopOnly = false,
                     loopAvailable = true,
