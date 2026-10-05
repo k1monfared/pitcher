@@ -33,6 +33,8 @@ docs/PLAN.md           the plan
 docs/ANDROID_PLAN.md   the Android app plan
 docs/LEGALITY.md       source/ToS notes
 data/                  sqlite db + rendered variants (gitignored)
+android/core/          pure-Kotlin note math (ported from notes.rs), tested on JVM
+android/app/           native Android app (Kotlin + Compose), offline only
 ```
 
 ## Conventions
@@ -67,7 +69,12 @@ cargo clippy --all-targets       # lint
 cargo fmt                        # format
 cd web && npm install && npm run build   # frontend
 cd web && npm test               # frontend tests
+cd android && ./gradlew :core:test        # Android core note-math tests
+cd android && ./gradlew :app:assembleDebug  # build debug APK
 ```
+
+Android builds need `android/local.properties` with `sdk.dir=/path/to/Android/Sdk`
+(gitignored). Java 17+ and the Android SDK (platform 36, build-tools) are required.
 
 ## System dependencies
 
