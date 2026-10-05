@@ -10,3 +10,13 @@ web/dist
 *.m4a
 *.opus
 !web/public/**/*.wasm
+
+# Android
+android/.gradle/
+android/build/
+android/**/build/
+android/local.properties
+android/.kotlin/
+android/captures/
+*.apk
+*.aab
