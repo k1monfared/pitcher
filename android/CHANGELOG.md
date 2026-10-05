@@ -2,6 +2,9 @@
 
 ## 1.0.1
 
+- Exported file names are now `song - artist - pitch`, skipping the artist when
+  there is none. An unnamed pitch uses its shift (for example `-600`), and a
+  missing song title falls back to the original file name.
 - Fix a crash when exporting. Rendering now uses much less memory: decode
   buffers are preallocated, the pitch shifter allocates one fewer buffer per
   channel, decoded channels are freed as they are shifted, and the app asks for

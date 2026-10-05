@@ -1,5 +1,7 @@
 package pitcher.core
 
+import java.io.File
+
 data class NoteReading(
     val name: String,
     val midi: Int,
@@ -91,17 +93,29 @@ object Notes {
 
     fun downloadFilename(
         trackTitle: String,
+        artist: String?,
+        sourcePath: String,
         variantName: String?,
         cents: Int,
         ext: String,
     ): String {
-        val name = variantName?.trim().orEmpty()
-        val pitch = if (name.isEmpty()) {
-            "pitch " + signedCents(cents)
+        val title = trackTitle.trim()
+        val song = if (title.isEmpty()) {
+            File(sourcePath).nameWithoutExtension.ifEmpty { "audio" }
         } else {
-            sanitizeFilename(name)
+            title
         }
-        return "${sanitizeFilename(trackTitle)} - $pitch.$ext"
+
+        val parts = mutableListOf(sanitizeFilename(song))
+        artist?.trim()?.takeIf { it.isNotEmpty() }?.let {
+            parts.add(sanitizeFilename(it))
+        }
+        val pitch = variantName?.trim()?.takeIf { it.isNotEmpty() }
+            ?.let { sanitizeFilename(it) }
+            ?: signedCents(cents)
+        parts.add(pitch)
+
+        return parts.joinToString(" - ") + "." + ext
     }
 
     private fun signedCents(cents: Int): String =

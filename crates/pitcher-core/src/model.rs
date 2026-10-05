@@ -56,15 +56,37 @@ pub fn sanitize_filename(s: &str) -> String {
 
 pub fn download_filename(
     track_title: &str,
+    artist: Option<&str>,
+    source_path: &str,
     variant_name: Option<&str>,
     cents: i32,
     ext: &str,
 ) -> String {
+    let title = track_title.trim();
+    let song = if title.is_empty() {
+        std::path::Path::new(source_path)
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or("audio")
+            .to_string()
+    } else {
+        title.to_string()
+    };
+
+    let mut parts = vec![sanitize_filename(&song)];
+    if let Some(a) = artist {
+        let a = a.trim();
+        if !a.is_empty() {
+            parts.push(sanitize_filename(a));
+        }
+    }
     let pitch = match variant_name.map(str::trim) {
         Some(n) if !n.is_empty() => sanitize_filename(n),
-        _ => format!("pitch {cents:+}"),
+        _ => format!("{cents:+}"),
     };
-    format!("{} - {}.{}", sanitize_filename(track_title), pitch, ext)
+    parts.push(pitch);
+
+    format!("{}.{}", parts.join(" - "), ext)
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

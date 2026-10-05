@@ -112,9 +112,33 @@ class NotesTest {
 
     @Test
     fun downloadFilenameMatchesServerRules() {
-        assertEquals("nava sol darya - low.opus", Notes.downloadFilename("nava sol darya", "low", -600, "opus"))
-        assertEquals("nava sol darya - pitch -600.opus", Notes.downloadFilename("nava sol darya", null, -600, "opus"))
-        assertEquals("nava sol darya - pitch +200.mp3", Notes.downloadFilename("nava sol darya", "  ", 200, "mp3"))
-        assertEquals("a_b_c - x_y.wav", Notes.downloadFilename("a/b\\c", "x/y", 0, "wav"))
+        assertEquals(
+            "nava sol darya - Tasnife Yad Bad - low.opus",
+            Notes.downloadFilename("nava sol darya", "Tasnife Yad Bad", "/x/y.opus", "low", -600, "opus"),
+        )
+        assertEquals(
+            "nava sol darya - low.opus",
+            Notes.downloadFilename("nava sol darya", null, "/x/y.opus", "low", -600, "opus"),
+        )
+        assertEquals(
+            "nava sol darya - low.opus",
+            Notes.downloadFilename("nava sol darya", "  ", "/x/y.opus", "low", -600, "opus"),
+        )
+        assertEquals(
+            "nava sol darya - Artist - -600.opus",
+            Notes.downloadFilename("nava sol darya", "Artist", "/x/y.opus", null, -600, "opus"),
+        )
+        assertEquals(
+            "nava sol darya - +200.mp3",
+            Notes.downloadFilename("nava sol darya", null, "/x/y.opus", "  ", 200, "mp3"),
+        )
+        assertEquals(
+            "Original Song - Artist - low.opus",
+            Notes.downloadFilename("", "Artist", "/music/Original Song.wav", "low", -600, "opus"),
+        )
+        assertEquals(
+            "a_b_c - x_y - n_m.wav",
+            Notes.downloadFilename("a/b\\c", "x/y", "/x/z", "n/m", 0, "wav"),
+        )
     }
 }

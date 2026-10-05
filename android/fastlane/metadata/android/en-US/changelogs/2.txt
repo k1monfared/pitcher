@@ -1,3 +1,6 @@
+- Exported file names are now "song - artist - pitch", skipping the artist when
+  there is none. An unnamed pitch uses its shift (for example -600), and a
+  missing song title falls back to the original file name.
 - Fixed a crash when exporting.
 - Export now uses much less memory, retries as mono if needed, and reports a
   clear message instead of closing the app.

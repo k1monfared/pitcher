@@ -448,14 +448,16 @@ fn converted_path(
 
 fn serve_variant_file(
     out_dir: &std::path::Path,
-    track_title: &str,
+    track: &pitcher_core::model::Track,
     variant: &pitcher_core::model::Variant,
     requested: Option<&str>,
 ) -> anyhow::Result<(Vec<u8>, &'static str, String)> {
     let ext = stored_ext(&variant.output_path);
     let target = target_format(requested, &ext)?;
     let filename = pitcher_core::model::download_filename(
-        track_title,
+        &track.title,
+        track.artist.as_deref(),
+        &track.source_path,
         variant.name.as_deref(),
         variant.cents,
         target.extension(),
@@ -496,12 +498,11 @@ async fn media(
     let variant = shelf
         .get_variant(variant_id)?
         .ok_or_else(|| anyhow::anyhow!("variant {variant_id} not found"))?;
-    let track_title = shelf
+    let track = shelf
         .get_track(variant.track_id)?
-        .map(|t| t.title)
-        .unwrap_or_else(|| "track".to_string());
+        .ok_or_else(|| anyhow::anyhow!("track {} not found", variant.track_id))?;
     let (bytes, mime, filename) =
-        serve_variant_file(&st.out_dir, &track_title, &variant, q.format.as_deref())?;
+        serve_variant_file(&st.out_dir, &track, &variant, q.format.as_deref())?;
     Ok((
         [
             (axum::http::header::CONTENT_TYPE, mime),
@@ -652,7 +653,7 @@ async fn export_all(
         }
         for v in &variants {
             let (bytes, _, filename) =
-                serve_variant_file(&st.out_dir, &track.title, v, q.format.as_deref())
+                serve_variant_file(&st.out_dir, &track, v, q.format.as_deref())
                     .map_err(|e| anyhow::anyhow!("variant {}: {e}", v.id))?;
             zip.start_file(filename, options)?;
             zip.write_all(&bytes)?;

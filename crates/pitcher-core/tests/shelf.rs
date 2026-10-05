@@ -245,23 +245,35 @@ fn find_variant_matches_render_settings() {
 }
 
 #[test]
-fn download_filename_combines_song_and_pitch() {
+fn download_filename_combines_song_artist_and_pitch() {
     use pitcher_core::model::download_filename;
     assert_eq!(
-        download_filename("nava sol darya", Some("low"), -600, "opus"),
+        download_filename("nava sol darya", Some("Tasnife Yad Bad"), "/x/y.opus", Some("low"), -600, "opus"),
+        "nava sol darya - Tasnife Yad Bad - low.opus"
+    );
+    assert_eq!(
+        download_filename("nava sol darya", None, "/x/y.opus", Some("low"), -600, "opus"),
         "nava sol darya - low.opus"
     );
     assert_eq!(
-        download_filename("nava sol darya", None, -600, "opus"),
-        "nava sol darya - pitch -600.opus"
+        download_filename("nava sol darya", Some("  "), "/x/y.opus", Some("low"), -600, "opus"),
+        "nava sol darya - low.opus"
     );
     assert_eq!(
-        download_filename("nava sol darya", Some("  "), 200, "mp3"),
-        "nava sol darya - pitch +200.mp3"
+        download_filename("nava sol darya", Some("Artist"), "/x/y.opus", None, -600, "opus"),
+        "nava sol darya - Artist - -600.opus"
     );
     assert_eq!(
-        download_filename("a/b\\c", Some("x/y"), 0, "wav"),
-        "a_b_c - x_y.wav"
+        download_filename("nava sol darya", None, "/x/y.opus", Some("  "), 200, "mp3"),
+        "nava sol darya - +200.mp3"
+    );
+    assert_eq!(
+        download_filename("", Some("Artist"), "/music/Original Song.wav", Some("low"), -600, "opus"),
+        "Original Song - Artist - low.opus"
+    );
+    assert_eq!(
+        download_filename("a/b\\c", Some("x/y"), "/x/z", Some("n/m"), 0, "wav"),
+        "a_b_c - x_y - n_m.wav"
     );
 }
 

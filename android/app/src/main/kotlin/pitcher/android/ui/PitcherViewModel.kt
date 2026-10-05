@@ -311,7 +311,14 @@ class PitcherViewModel(app: Application) : AndroidViewModel(app) {
             try {
                 val outFile = withContext(Dispatchers.IO) {
                     val dir = File(getApplication<Application>().cacheDir, "exports").apply { mkdirs() }
-                    val fileName = Notes.downloadFilename(track.title, name, cents, format.extension)
+                    val fileName = Notes.downloadFilename(
+                        track.title,
+                        track.artist,
+                        track.sourcePath,
+                        name,
+                        cents,
+                        format.extension,
+                    )
                     val target = File(dir, fileName)
                     AudioRenderer.render(
                         sourcePath = track.sourcePath,
