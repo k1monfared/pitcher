@@ -35,6 +35,8 @@ fun WaveformView(
     positionMs: Long,
     durationMs: Long,
     bookmarks: List<Bookmark>,
+    loopStartMs: Long? = null,
+    loopEndMs: Long? = null,
     onSeekMs: (Long) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -106,6 +108,18 @@ fun WaveformView(
                 val mid = size.height / 2f
                 val w = window ?: WaveView.Window(0.0, 1.0)
                 val span = (w.end - w.start).coerceAtLeast(1e-6)
+
+                if (durationMs > 0 && loopStartMs != null && loopEndMs != null) {
+                    val f0 = (loopStartMs.toDouble() / durationMs).coerceIn(0.0, 1.0)
+                    val f1 = (loopEndMs.toDouble() / durationMs).coerceIn(0.0, 1.0)
+                    val x0 = (((f0 - w.start) / span).toFloat() * size.width).coerceIn(0f, size.width)
+                    val x1 = (((f1 - w.start) / span).toFloat() * size.width).coerceIn(0f, size.width)
+                    drawRect(
+                        color = Color(0x336AA9FF),
+                        topLeft = Offset(minOf(x0, x1), 0f),
+                        size = Size(kotlin.math.abs(x1 - x0), size.height),
+                    )
+                }
 
                 if (peaks.isEmpty()) {
                     drawLine(barColor, Offset(0f, mid), Offset(size.width, mid), strokeWidth = 2f)

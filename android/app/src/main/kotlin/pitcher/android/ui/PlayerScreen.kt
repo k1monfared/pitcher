@@ -1,5 +1,6 @@
 package pitcher.android.ui
 
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -8,7 +9,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.Button
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -27,6 +31,11 @@ import pitcher.android.data.Bookmark
 import pitcher.android.data.Track
 import pitcher.core.Waveform
 
+private val SPEEDS = listOf(
+    0.5f, 0.6f, 0.7f, 0.8f, 0.9f, 1f, 1.1f, 1.2f, 1.3f, 1.4f, 1.5f, 1.75f, 2f,
+)
+
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PlayerScreen(
     track: Track?,
@@ -35,10 +44,19 @@ fun PlayerScreen(
     durationMs: Long,
     isPlaying: Boolean,
     bookmarks: List<Bookmark>,
+    tempo: Float,
+    loopStartMs: Long?,
+    loopEndMs: Long?,
+    loopEnabled: Boolean,
     onTogglePlay: () -> Unit,
     onSeekMs: (Long) -> Unit,
     onAddBookmark: (String?) -> Unit,
     onDeleteBookmark: (Long) -> Unit,
+    onTempo: (Float) -> Unit,
+    onSetLoopStart: () -> Unit,
+    onSetLoopEnd: () -> Unit,
+    onToggleLoop: () -> Unit,
+    onClearLoop: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     if (track == null) {
@@ -67,6 +85,8 @@ fun PlayerScreen(
             positionMs = positionMs,
             durationMs = durationMs,
             bookmarks = bookmarks,
+            loopStartMs = loopStartMs,
+            loopEndMs = loopEndMs,
             onSeekMs = onSeekMs,
             modifier = Modifier.padding(horizontal = 8.dp),
         )
@@ -101,6 +121,49 @@ fun PlayerScreen(
             onValueChange = { f -> onSeekMs((f * durationMs).toLong()) },
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
         )
+
+        Text(
+            "speed",
+            modifier = Modifier.padding(horizontal = 16.dp),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState())
+                .padding(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            SPEEDS.forEach { s ->
+                FilterChip(
+                    selected = tempo == s,
+                    onClick = { onTempo(s) },
+                    label = { Text(if (s == s.toInt().toFloat()) "${s.toInt()}x" else "${s}x") },
+                )
+            }
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            TextButton(onClick = onSetLoopStart) { Text("Set A") }
+            TextButton(onClick = onSetLoopEnd) { Text("Set B") }
+            TextButton(onClick = onToggleLoop, enabled = loopStartMs != null && loopEndMs != null) {
+                Text(if (loopEnabled) "Loop on" else "Loop off")
+            }
+            if (loopStartMs != null && loopEndMs != null) {
+                Text(
+                    "${Waveform.formatClock(loopStartMs / 1000.0)}-" +
+                        Waveform.formatClock(loopEndMs / 1000.0),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            TextButton(onClick = onClearLoop) { Text("Clear") }
+        }
 
         HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
         Text(

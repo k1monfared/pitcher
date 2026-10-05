@@ -64,6 +64,12 @@ class PitcherViewModel(app: Application) : AndroidViewModel(app) {
         private set
     var selectedVariantId by mutableStateOf<Long?>(null)
         private set
+    var loopStartMs by mutableStateOf<Long?>(null)
+        private set
+    var loopEndMs by mutableStateOf<Long?>(null)
+        private set
+    var loopEnabled by mutableStateOf(false)
+        private set
 
     private var controller: MediaController? = null
 
@@ -87,7 +93,16 @@ class PitcherViewModel(app: Application) : AndroidViewModel(app) {
         connectController()
         viewModelScope.launch {
             while (isActive) {
-                if (isPlaying) positionMs = controller?.currentPosition ?: 0L
+                if (isPlaying) {
+                    val pos = controller?.currentPosition ?: 0L
+                    positionMs = pos
+                    val end = loopEndMs
+                    val start = loopStartMs
+                    if (loopEnabled && end != null && start != null && pos >= end) {
+                        controller?.seekTo(start)
+                        positionMs = start
+                    }
+                }
                 delay(50)
             }
         }
@@ -213,6 +228,42 @@ class PitcherViewModel(app: Application) : AndroidViewModel(app) {
     fun selectOriginal() {
         selectedVariantId = null
         setPitchCents(0)
+    }
+
+    fun setLoopStart() {
+        loopStartMs = controller?.currentPosition ?: positionMs
+        normalizeLoop()
+    }
+
+    fun setLoopEnd() {
+        loopEndMs = controller?.currentPosition ?: positionMs
+        normalizeLoop()
+    }
+
+    private fun normalizeLoop() {
+        val a = loopStartMs
+        val b = loopEndMs
+        if (a != null && b != null && b < a) {
+            loopStartMs = b
+            loopEndMs = a
+        }
+    }
+
+    fun toggleLoop() {
+        loopEnabled = !loopEnabled && loopStartMs != null && loopEndMs != null
+        if (loopEnabled) {
+            val start = loopStartMs
+            if (start != null) {
+                controller?.seekTo(start)
+                positionMs = start
+            }
+        }
+    }
+
+    fun clearLoop() {
+        loopEnabled = false
+        loopStartMs = null
+        loopEndMs = null
     }
 
     fun detectAtPlayhead() {
