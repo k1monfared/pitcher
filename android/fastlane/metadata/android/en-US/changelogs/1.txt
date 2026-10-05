@@ -1,0 +1,10 @@
+First release.
+
+- Transpose audio by any interval, tempo preserved, with live preview.
+- Touch scrub fader with fine/coarse zones and double-tap reset.
+- Monophonic YIN tuner and manual note/Hz entry.
+- Kept pitch shelf, sorted by shift; playback position preserved across switches.
+- A/B section loop and 0.5x to 2x speed.
+- Zoomable waveform, precise seeking, and bookmarks.
+- Export and share as WAV, MP3, M4A, or Opus, including loop-only export.
+- Offline: no network permission, no bundled downloader.
