@@ -18,7 +18,9 @@ decisions. Summary of the chosen stack:
 - **Live audition:** `soundtouchjs` in the browser (pitch + tempo preview).
   Kept files are always rendered server-side with Rubber Band.
 - **Importer:** `yt-dlp` for YouTube/SoundCloud. See [docs/LEGALITY.md](docs/LEGALITY.md).
-- torchcrepe, Basic Pitch, and Android are deferred past v1.
+- torchcrepe and Basic Pitch are deferred past v1.
+- The Android app is planned separately in [docs/ANDROID_PLAN.md](docs/ANDROID_PLAN.md):
+  native Kotlin + Compose, TarsosDSP, offline-only, no downloaders.
 
 ## Layout
 
@@ -28,6 +30,7 @@ crates/pitcher-cli/    the `pitcher` binary
 server/                axum REST server over pitcher-core
 web/                   Svelte 5 + Vite + TS frontend + rubberband wasm worklet
 docs/PLAN.md           the plan
+docs/ANDROID_PLAN.md   the Android app plan
 docs/LEGALITY.md       source/ToS notes
 data/                  sqlite db + rendered variants (gitignored)
 ```
