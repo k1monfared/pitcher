@@ -30,7 +30,8 @@ clean multi-screen UI. Fully offline, fully FOSS, F-Droid friendly.
 | Language/UI | Kotlin + Jetpack Compose (Material 3) | Native, no bridge, best gesture support |
 | Tuner | Kotlin port of the desktop YIN (`core/Tuner.kt`) | Exact parity with the Rust `tuner.rs`, tested against the same vectors, no extra dependency. TarsosDSP was the original choice but is not on Maven Central (only third-party forks), so a port is safer |
 | Live pitch/tempo | Media3 ExoPlayer `PlaybackParameters(speed, pitch)` (Sonic) | Real-time pitch at fixed tempo and tempo at fixed pitch, no extra dependency, no render |
-| Offline render | In-app WSOLA + resample (`core/PitchShifter.kt`) | Dependency-free, tested with the YIN tuner, used for kept/exported WAVs |
+| Offline render | In-app WSOLA + resample (`core/PitchShifter.kt`) | Dependency-free, tested with the YIN tuner, used for exported files |
+| Export formats | WAV, MP3 (jump3r/LAME), M4A (MediaCodec AAC), Opus (MediaCodec OGG) | WAV is lossless; FLAC is not offered because there is no usable pure-JVM encoder and MediaMuxer cannot container raw FLAC |
 | Playback | Media3 ExoPlayer + `MediaSessionService` | Background play and lock-screen controls; controller in the ViewModel |
 | Storage | Hand-rolled SQLite (`ShelfRepository`) | Same tables as the server; avoids a KSP annotation processor and mirrors the server SQL directly |
 | Video sources | MediaExtractor + MediaMuxer | Import extracts the audio track to an audio-only file, no re-encode, no video kept |
@@ -116,7 +117,8 @@ same pitch + settings returns the existing row. Filenames follow the same rule:
 5. Speed selector, A/B loop, export/share (offline WSOLA WAV). Done.
 6. Polish: settings/storage screen, track rename, share-sheet intake, release
    signing + GitHub Releases workflow. Done.
-7. Follow-ups: stereo and multi-format export, per-section render, screenshots.
+7. Export formats (WAV/MP3/M4A/Opus) and loop-only export. Done.
+8. Follow-ups: stereo export (currently mono), FLAC, screenshots/store metadata.
 
 ## Decisions (resolved)
 

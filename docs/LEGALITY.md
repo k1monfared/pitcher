@@ -26,8 +26,14 @@ resolves metadata only. The audio still has to come from a source you are allowe
 
 The web UI uses `soundtouchjs` (LGPL-2.1, compatible with this repo's GPL-3.0-or-later)
 for live pitch and tempo preview in the browser. Files you keep are always rendered
-server-side with the Rubber Band Library (GPL). No proprietary or closed-source audio
-code is used anywhere.
+server-side with the Rubber Band Library (GPL).
+
+The Android app uses `jump3r` (LGPL, a Java port of LAME) for MP3 encoding, Android's
+own `MediaCodec`/`MediaMuxer` for AAC and Opus encoding, and its own Kotlin WSOLA
+implementation for pitch shifting. All are free and open source and compatible with
+this repo's GPL-3.0-or-later license.
+
+No proprietary or closed-source audio code is used anywhere.
 
 ## No warranty
 
