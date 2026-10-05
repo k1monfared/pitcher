@@ -20,10 +20,8 @@ jobs:
           distribution: temurin
           java-version: "21"
 
-      - uses: android-actions/setup-android@v3
-
-      - name: Install SDK packages
-        run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
+      # The ubuntu runner image already provides ANDROID_HOME with platform
+      # android-36 and build-tools 36.0.0, so no SDK setup step is needed.
 
       - name: Prepare signing key
         env:
