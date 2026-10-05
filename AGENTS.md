@@ -28,7 +28,8 @@ decisions. Summary of the chosen stack:
 crates/pitcher-core/   engine, tuner, note math, sqlite shelf, import, model
 crates/pitcher-cli/    the `pitcher` binary
 server/                axum REST server over pitcher-core
-web/                   Svelte 5 + Vite + TS frontend + rubberband wasm worklet
+web/                   Svelte 5 + Vite + TS frontend (live preview via soundtouchjs)
+site/                  static project site (GitHub Pages): landing + web UI guide
 docs/PLAN.md           the plan
 docs/ANDROID_PLAN.md   the Android app plan
 docs/LEGALITY.md       source/ToS notes

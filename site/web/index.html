@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>pitcher web UI - run it locally</title>
+    <meta
+      name="description"
+      content="The pitcher web UI is a local browser interface for pitch shifting, with a waveform, a vertical fader, a tuner, and a variants shelf. It runs next to a small Rust server on your own machine."
+    />
+    <link rel="icon" href="../assets/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="../assets/site.css" />
+  </head>
+  <body>
+    <header class="site">
+      <div class="wrap">
+        <a class="brand" href="../">
+          <svg width="24" height="24" viewBox="0 0 108 108" aria-hidden="true">
+            <rect x="46" y="28" width="16" height="52" rx="4" fill="#1B1B1F" />
+            <circle cx="54" cy="44" r="11" fill="#6AA9FF" />
+          </svg>
+          pitcher
+        </a>
+        <nav class="site">
+          <a href="../#desktop">Desktop</a>
+          <a href="./">Web UI</a>
+          <a href="../#android">Android</a>
+          <a href="../#install">Install</a>
+          <a href="https://github.com/k1monfared/pitcher">GitHub</a>
+        </nav>
+      </div>
+    </header>
+
+    <main>
+      <section class="hero wrap">
+        <h1>The pitcher web UI</h1>
+        <p class="lede">
+          A browser interface with a zoomable waveform, a vertical pitch fader, a
+          single-note tuner, and a shelf of pitch variants. It is the same engine as
+          the CLI, with a friendlier surface for trying pitches by ear.
+        </p>
+      </section>
+
+      <section class="wrap">
+        <div class="notice">
+          <strong>This one runs on your computer, not on a website.</strong>
+          The web UI is a front end to a small Rust server that uses ffmpeg, the Rubber
+          Band Library, aubio, and yt-dlp, and stores your audio in a local SQLite
+          database. That cannot run in a static host like GitHub Pages, which only
+          serves files and cannot run the server, the command line tools, or Python.
+          So there is no hosted demo here. Instead, run it locally with the commands
+          below and your audio never leaves your machine.
+        </div>
+
+        <figure>
+          <img src="../assets/web/web-ui.png" alt="The pitcher web UI: shelf, waveform, pitch fader, tuner, and variants" />
+          <figcaption>
+            The web UI running locally: track shelf, waveform with loop and bookmarks,
+            the pitch fader, the tuner, and the variants shelf.
+          </figcaption>
+        </figure>
+      </section>
+
+      <section class="wrap">
+        <h2>What it does</h2>
+        <ul class="features">
+          <li>Import local files, or fetch from YouTube and SoundCloud with yt-dlp</li>
+          <li>Vertical pitch fader with live preview and fine or coarse drag</li>
+          <li>Zoom, pan, and loop on the waveform</li>
+          <li>Detect the note at the playhead, or type a note or frequency</li>
+          <li>Keep pitch variants and switch between them without moving the playhead</li>
+          <li>Export as Opus, FLAC, MP3, Ogg, or M4A</li>
+          <li>Playback speed from 0.5x to 2x</li>
+          <li>Runs on your machine; nothing is uploaded</li>
+        </ul>
+      </section>
+
+      <section class="wrap">
+        <h2>Run it locally</h2>
+        <p class="muted">
+          Requires Rust, Node.js, and the system audio tools.
+        </p>
+        <pre><code>git clone https://github.com/k1monfared/pitcher
+cd pitcher
+
+# system dependencies (Debian/Ubuntu)
+sudo apt install rubberband-cli librubberband-dev aubio-tools libaubio-dev ffmpeg yt-dlp
+
+# build the frontend if needed, build the server, pick a free port,
+# and open the browser
+./scripts/pitcher-web.sh</code></pre>
+        <p class="muted">
+          The launcher starts on port 7373, scans upward if it is busy, and prints the
+          local and LAN URLs. To do it by hand:
+        </p>
+        <pre><code>cd web &amp;&amp; npm install &amp;&amp; npm run build &amp;&amp; cd ..
+cargo build --release -p pitcher-server
+PITCHER_WEB=web/dist PITCHER_DATA=data ./target/release/pitcher-server</code></pre>
+      </section>
+
+      <section class="wrap">
+        <h2>Requirements</h2>
+        <table>
+          <thead>
+            <tr><th>Component</th><th>Package</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Pitch shifting</td><td><code>rubberband-cli</code>, <code>librubberband-dev</code></td></tr>
+            <tr><td>Tuner</td><td><code>aubio-tools</code>, <code>libaubio-dev</code></td></tr>
+            <tr><td>Audio decode and encode</td><td><code>ffmpeg</code></td></tr>
+            <tr><td>Online import</td><td><code>yt-dlp</code></td></tr>
+            <tr><td>Build</td><td>Rust, Node.js</td></tr>
+          </tbody>
+        </table>
+        <p class="muted" style="margin-top: 16px">
+          All free and open source. The desktop and web front ends are GPL-3.0-or-later.
+        </p>
+      </section>
+    </main>
+
+    <footer class="site">
+      <div class="wrap">
+        <span>pitcher, GPL-3.0-or-later. Free and open source software.</span>
+        <span>
+          <a href="https://github.com/k1monfared/pitcher">Source</a> &middot;
+          <a href="https://github.com/k1monfared/pitcher/releases">Releases</a> &middot;
+          <a href="../">Home</a>
+        </span>
+      </div>
+    </footer>
+  </body>
+</html>

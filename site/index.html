@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>pitcher - transpose audio by any interval</title>
+    <meta
+      name="description"
+      content="pitcher is a free and open source toolkit that transposes audio by any pitch interval while keeping tempo. Linux CLI, local web UI, and an offline Android app."
+    />
+    <link rel="icon" href="assets/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="assets/site.css" />
+  </head>
+  <body>
+    <header class="site">
+      <div class="wrap">
+        <a class="brand" href="./">
+          <svg width="24" height="24" viewBox="0 0 108 108" aria-hidden="true">
+            <rect x="46" y="28" width="16" height="52" rx="4" fill="#1B1B1F" />
+            <circle cx="54" cy="44" r="11" fill="#6AA9FF" />
+          </svg>
+          pitcher
+        </a>
+        <nav class="site">
+          <a href="#desktop">Desktop</a>
+          <a href="web/">Web UI</a>
+          <a href="#android">Android</a>
+          <a href="#install">Install</a>
+          <a href="https://github.com/k1monfared/pitcher">GitHub</a>
+        </nav>
+      </div>
+    </header>
+
+    <main>
+      <section class="hero wrap">
+        <h1>Transpose audio by any interval, without changing the tempo.</h1>
+        <p class="lede">
+          Move a piece up or down by semitones, cents, or a fraction of a semitone,
+          keep the formants so voices still sound natural, detect the exact note at a
+          point in the track, and keep a shelf of pitch variants per source. Free and
+          open source, no accounts, no tracking.
+        </p>
+        <div class="cta">
+          <a class="btn primary" href="https://github.com/k1monfared/pitcher/releases">
+            Get the Android app
+          </a>
+          <a class="btn" href="#desktop">Run it on your computer</a>
+        </div>
+      </section>
+
+      <section class="wrap" id="desktop">
+        <h2>Three ways to use it</h2>
+        <p class="muted">Same engine, same note math, three front ends.</p>
+        <div class="grid cols-3">
+          <div class="card">
+            <h3>Desktop CLI</h3>
+            <p>
+              A single Rust binary. Shift files, detect notes, keep a shelf of
+              variants, and export, all from the terminal. Works on local files and
+              on audio fetched with yt-dlp.
+            </p>
+            <a class="link" href="#install">Build and run &rarr;</a>
+          </div>
+          <div class="card">
+            <h3>Local web UI</h3>
+            <p>
+              A browser interface with a waveform, a vertical pitch fader, a tuner,
+              and a variants shelf. It runs on your machine next to a small Rust
+              server, so your audio never leaves the computer.
+            </p>
+            <a class="link" href="web/">See the web UI &rarr;</a>
+          </div>
+          <div class="card">
+            <h3>Android app</h3>
+            <p>
+              Fully offline. Import audio or video (only the audio is kept), or share
+              a file in from another app. Precise touch seeking, live pitch preview,
+              and export to WAV, MP3, M4A, or Opus.
+            </p>
+            <a class="link" href="#android">See the app &rarr;</a>
+          </div>
+        </div>
+      </section>
+
+      <section class="wrap" id="features">
+        <h2>Features</h2>
+        <ul class="features">
+          <li>Shift by cents or semitones, including fractional amounts</li>
+          <li>Formant preservation so vocals stay natural</li>
+          <li>Monophonic tuner: find the exact note at a point</li>
+          <li>Manual note and frequency entry, with target note or Hz</li>
+          <li>Keep every pitch you like, sorted by how far it shifted</li>
+          <li>Live preview: pitch moves while tempo stays fixed</li>
+          <li>Section loop and playback speed from 0.5x to 2x</li>
+          <li>Bookmarks on the waveform</li>
+          <li>Export to WAV, FLAC, MP3, Ogg, or M4A</li>
+          <li>Runs offline, no accounts, no telemetry</li>
+        </ul>
+      </section>
+
+      <section class="wrap" id="android">
+        <h2>Android app</h2>
+        <p class="muted">
+          Native Kotlin and Jetpack Compose. It requests no network permission and
+          bundles no downloader, so it is offline by design. Download it from the
+          releases page and sideload the APK.
+        </p>
+        <div class="shots">
+          <figure>
+            <img src="assets/android/01-library.png" alt="Library screen with a track list" />
+            <figcaption>Library: import, rename, delete</figcaption>
+          </figure>
+          <figure>
+            <img src="assets/android/02-player.png" alt="Player screen with waveform, speed, loop, and bookmarks" />
+            <figcaption>Player: waveform, speed, loop, bookmarks</figcaption>
+          </figure>
+          <figure>
+            <img src="assets/android/03-pitch-lab.png" alt="Pitch Lab screen with the vertical fader and format chips" />
+            <figcaption>Pitch Lab: fader, presets, export</figcaption>
+          </figure>
+          <figure>
+            <img src="assets/android/04-tuner.png" alt="Tuner screen with detected note and target" />
+            <figcaption>Tuner: detect, or type a note or Hz</figcaption>
+          </figure>
+          <figure>
+            <img src="assets/android/05-pitches.png" alt="Pitches shelf with the original and variants" />
+            <figcaption>Pitches: original plus every kept pitch</figcaption>
+          </figure>
+        </div>
+        <div class="cta" style="margin-top: 24px">
+          <a class="btn primary" href="https://github.com/k1monfared/pitcher/releases">
+            Download the APK
+          </a>
+        </div>
+      </section>
+
+      <section class="wrap" id="install">
+        <h2>Install</h2>
+
+        <h3>Android</h3>
+        <p class="muted">
+          Download <code>pitcher-android-*.apk</code> from the
+          <a href="https://github.com/k1monfared/pitcher/releases">releases page</a>
+          and open it on your device. Android will ask you to allow installing from
+          this source. Requires Android 10 or newer.
+        </p>
+
+        <h3>Desktop (CLI and web UI)</h3>
+        <p class="muted">Requires Rust, Node, and the audio tools below.</p>
+        <pre><code># system dependencies (Debian/Ubuntu)
+sudo apt install rubberband-cli librubberband-dev aubio-tools libaubio-dev ffmpeg yt-dlp
+
+# build the CLI and server
+cargo build --release
+
+# the pitcher binary
+./target/release/pitcher pitch in.wav out.wav --cents -100 --formant
+./target/release/pitcher detect in.wav --at 12.3
+./target/release/pitcher add in.wav --title "My Track"
+
+# the web UI (builds the frontend, picks a free port, opens the browser)
+./scripts/pitcher-web.sh</code></pre>
+
+        <h3>Web UI</h3>
+        <p class="muted">
+          The web UI is a local app: it needs the Rust server and ffmpeg, Rubber Band,
+          aubio, and yt-dlp on the same machine. See the
+          <a href="web/">web UI page</a> for details and screenshots.
+        </p>
+      </section>
+
+      <section class="wrap" id="about">
+        <h2>About</h2>
+        <p class="muted">
+          pitcher is free software under the GPL-3.0-or-later license. The shift engine
+          is the Rubber Band Library, the tuner is YIN, and the whole thing is built to
+          run offline. Downloading audio from streaming services is subject to those
+          services' terms; use it only for audio you have the right to process.
+        </p>
+      </section>
+    </main>
+
+    <footer class="site">
+      <div class="wrap">
+        <span>pitcher, GPL-3.0-or-later. Free and open source software.</span>
+        <span>
+          <a href="https://github.com/k1monfared/pitcher">Source</a> &middot;
+          <a href="https://github.com/k1monfared/pitcher/releases">Releases</a> &middot;
+          <a href="web/">Web UI</a>
+        </span>
+      </div>
+    </footer>
+  </body>
+</html>
