@@ -4,7 +4,7 @@ FOSS audio pitch-shifting toolkit. Transpose audio by any interval while preserv
 optionally preserve formants, detect the exact note at a point in a track, and keep a shelf
 of pitch variants per source. Linux CLI plus a local web UI, and a separate offline Android app.
 
-Project site: <https://k1monfared.github.io/pitcher/> (web UI guide: <https://k1monfared.github.io/pitcher/web/>)
+Project site: <https://k1monfared.com/pitcher/> (web UI guide: <https://k1monfared.com/pitcher/web/>)
 
 ## What it does
 
