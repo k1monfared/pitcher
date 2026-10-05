@@ -7,9 +7,8 @@ clean multi-screen UI. Fully offline, fully FOSS, F-Droid friendly.
 
 ## Goals
 
-- Open audio/video from storage or the Android share sheet. Video works by
-  extracting its audio track; export can optionally mux the shifted audio back
-  with the original video.
+- Open audio or video from storage or the Android share sheet. Video is never
+  kept: the audio track is extracted on import and the video bytes are dropped.
 - Everything the web app does: transpose by cents/semitones with tempo preserved,
   single-note tuner plus manual note/Hz entry, variant shelf (sorted, named,
   keep-all), bookmarks, section loop, playback speed, per-file and bulk export.
@@ -33,7 +32,7 @@ clean multi-screen UI. Fully offline, fully FOSS, F-Droid friendly.
 
 | Playback | Media3 (ExoPlayer) for plain play; TarsosDSP pipeline for shifted/speed preview | Media3 for the exact-file path, DSP chain only when pitch or tempo differs |
 | Storage | Room (SQLite) + app-private files | Same tables as the server: tracks, variants, bookmarks; keep-all semantics |
-| Video | MediaExtractor (audio out), MediaMuxer (shifted audio back in) | Audio-only export by default, video-preserving export as an option |
+| Video sources | MediaExtractor + MediaMuxer | Import extracts the audio track to an audio-only file, no re-encode, no video kept |
 | Waveform | Custom Compose Canvas | Full control of zoom/pan/markers, no chart dependency |
 | Background | Foreground service + Media3 notification (optional toggle) | Playback survives screen-off when the user wants it |
 | Screen-on | `setKeepScreenOn(true)` on player screens | Explicit requirement, one line per screen |
@@ -113,7 +112,7 @@ same pitch + settings returns the existing row. Filenames follow the same rule:
 2. Import + plain playback + waveform + gestures + screen-on (no DSP yet).
 3. TarsosDSP tuner + note math parity with the Rust core.
 4. Pitch Lab with live preview + keep/render pipeline + variants UI.
-5. Bookmarks, loop, speed, export/share, video mux-back option.
+5. Bookmarks, loop, speed, export/share.
 6. Polish: storage screen, background play toggle, F-Droid metadata, screenshots.
 
 ## Open questions
