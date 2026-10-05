@@ -5,9 +5,11 @@ import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
@@ -42,7 +44,10 @@ import pitcher.core.FaderMath
 
 private val PRESETS = listOf(-1200, -700, -500, -200, -100, 100, 200, 500, 700, 1200)
 
-@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@OptIn(
+    androidx.compose.material3.ExperimentalMaterial3Api::class,
+    ExperimentalLayoutApi::class,
+)
 @Composable
 fun PitchLabScreen(
     track: Track?,
@@ -80,11 +85,11 @@ fun PitchLabScreen(
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Row(
-            modifier = Modifier.fillMaxSize().weight(1f, fill = false),
+            modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(16.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            PitchFader(cents = cents, onCents = onCents, modifier = Modifier.size(56.dp, 320.dp))
+            PitchFader(cents = cents, onCents = onCents, modifier = Modifier.size(56.dp, 300.dp))
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -113,20 +118,18 @@ fun PitchLabScreen(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
 
-        Row(
-            modifier = Modifier.fillMaxSize(),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        FlowRow(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            maxItemsInEachRow = 5,
         ) {
-            PRESETS.chunked(5).forEach { row ->
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    row.forEach { p ->
-                        FilterChip(
-                            selected = cents == p,
-                            onClick = { onCents(p) },
-                            label = { Text(if (p > 0) "+${p / 100}" else "${p / 100}") },
-                        )
-                    }
-                }
+            PRESETS.forEach { p ->
+                FilterChip(
+                    selected = cents == p,
+                    onClick = { onCents(p) },
+                    label = { Text(if (p > 0) "+${p / 100}" else "${p / 100}") },
+                )
             }
         }
 
@@ -135,14 +138,14 @@ fun PitchLabScreen(
             onValueChange = { name = it },
             label = { Text("Name this pitch (optional)") },
             singleLine = true,
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier.fillMaxWidth(),
         )
         Button(
             onClick = {
                 onKeep(name.trim().ifEmpty { null })
                 name = ""
             },
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier.fillMaxWidth(),
         ) {
             Text(if (matching != null) "Update this pitch" else "Keep this pitch as variant")
         }
@@ -157,7 +160,11 @@ fun PitchLabScreen(
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        FlowRow(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
             ExportFormat.entries.forEach { fmt ->
                 FilterChip(
                     selected = exportFormat == fmt,
@@ -183,7 +190,7 @@ fun PitchLabScreen(
         }
         Button(
             onClick = { onExport(cents, name.trim().ifEmpty { null }) },
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier.fillMaxWidth(),
         ) {
             Text("Export & share this pitch (${exportFormat.id})")
         }
