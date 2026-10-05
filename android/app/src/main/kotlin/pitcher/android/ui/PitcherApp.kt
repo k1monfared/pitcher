@@ -35,11 +35,20 @@ enum class Destination(val label: String) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun PitcherApp(vm: PitcherViewModel = viewModel()) {
+fun PitcherApp(
+    vm: PitcherViewModel = viewModel(),
+    incomingUri: android.net.Uri? = null,
+    onIncomingConsumed: () -> Unit = {},
+) {
     var current by remember { mutableStateOf(Destination.Library) }
     var showSettings by remember { mutableStateOf(false) }
 
     val context = LocalContext.current
+    LaunchedEffect(incomingUri) {
+        val uri = incomingUri ?: return@LaunchedEffect
+        vm.import(uri) { current = Destination.Library }
+        onIncomingConsumed()
+    }
     LaunchedEffect(showSettings) {
         if (showSettings) vm.refreshStorage()
     }
