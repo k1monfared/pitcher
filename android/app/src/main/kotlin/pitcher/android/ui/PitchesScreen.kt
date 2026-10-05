@@ -31,10 +31,12 @@ fun PitchesScreen(
     track: Track?,
     variants: List<Variant>,
     selectedVariantId: Long?,
+    exportMessage: String?,
     onSelectOriginal: () -> Unit,
     onSelectVariant: (Variant) -> Unit,
     onRenameVariant: (Variant, String) -> Unit,
     onDeleteVariant: (Variant) -> Unit,
+    onExportVariant: (Variant) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     if (track == null) {
@@ -60,13 +62,21 @@ fun PitchesScreen(
             style = MaterialTheme.typography.titleSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+        if (exportMessage != null) {
+            Text(
+                exportMessage,
+                modifier = Modifier.padding(horizontal = 16.dp),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.secondary,
+            )
+        }
         HorizontalDivider()
         LazyColumn(modifier = Modifier.fillMaxSize()) {
             items(below, key = { it.id }) {
                 VariantRow(it, selectedVariantId, editingId, { id -> editingId = id }, { v, n ->
                     onRenameVariant(v, n)
                     editingId = null
-                }, onSelectVariant, onDeleteVariant)
+                }, onSelectVariant, onDeleteVariant, onExportVariant)
             }
             item(key = "original") {
                 Row(
@@ -99,7 +109,7 @@ fun PitchesScreen(
                 VariantRow(it, selectedVariantId, editingId, { id -> editingId = id }, { v, n ->
                     onRenameVariant(v, n)
                     editingId = null
-                }, onSelectVariant, onDeleteVariant)
+                }, onSelectVariant, onDeleteVariant, onExportVariant)
             }
         }
     }
@@ -114,6 +124,7 @@ private fun VariantRow(
     onCommit: (Variant, String) -> Unit,
     onSelect: (Variant) -> Unit,
     onDelete: (Variant) -> Unit,
+    onExport: (Variant) -> Unit,
 ) {
     var text by remember(editingId, v.name) {
         mutableStateOf(if (editingId == v.id) (v.name ?: "") else "")
@@ -141,6 +152,7 @@ private fun VariantRow(
                 }
             }
             TextButton(onClick = { onStartEdit(v.id) }) { Text("name") }
+            TextButton(onClick = { onExport(v) }) { Text("share") }
             TextButton(onClick = { onDelete(v) }) { Text("delete") }
             if (selectedVariantId == v.id) {
                 Text(

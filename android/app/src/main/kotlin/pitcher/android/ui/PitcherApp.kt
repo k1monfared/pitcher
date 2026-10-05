@@ -110,6 +110,7 @@ fun PitcherApp(
                         current = Destination.Player
                     },
                     onDelete = { vm.deleteTrack(it) },
+                    onRename = { track, title, artist -> vm.renameTrack(track, title, artist) },
                     modifier = modifier,
                 )
                 Destination.Player -> PlayerScreen(
@@ -159,10 +160,12 @@ fun PitcherApp(
                     track = vm.current,
                     variants = vm.variants,
                     selectedVariantId = vm.selectedVariantId,
+                    exportMessage = vm.exportMessage,
                     onSelectOriginal = { vm.selectOriginal() },
                     onSelectVariant = { vm.selectVariant(it) },
                     onRenameVariant = { v, n -> vm.renameVariant(v, n) },
                     onDeleteVariant = { vm.deleteVariant(it) },
+                    onExportVariant = { vm.exportAndShare(it.cents, it.name) },
                     modifier = modifier,
                 )
             }

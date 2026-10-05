@@ -14,9 +14,14 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
@@ -30,6 +35,7 @@ fun LibraryScreen(
     onImport: (android.net.Uri) -> Unit,
     onOpen: (Track) -> Unit,
     onDelete: (Track) -> Unit,
+    onRename: (Track, String, String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val launcher = rememberLauncherForActivityResult(
@@ -65,7 +71,12 @@ fun LibraryScreen(
         } else {
             LazyColumn(modifier = Modifier.fillMaxSize()) {
                 items(tracks, key = { it.id }) { track ->
-                    TrackRow(track, onOpen = { onOpen(track) }, onDelete = { onDelete(track) })
+                    TrackRow(
+                        track = track,
+                        onOpen = { onOpen(track) },
+                        onDelete = { onDelete(track) },
+                        onRename = { title, artist -> onRename(track, title, artist) },
+                    )
                     HorizontalDivider()
                 }
             }
@@ -74,7 +85,47 @@ fun LibraryScreen(
 }
 
 @Composable
-private fun TrackRow(track: Track, onOpen: () -> Unit, onDelete: () -> Unit) {
+private fun TrackRow(
+    track: Track,
+    onOpen: () -> Unit,
+    onDelete: () -> Unit,
+    onRename: (String, String) -> Unit,
+) {
+    var editing by remember { mutableStateOf(false) }
+    var title by remember(track.title) { mutableStateOf(track.title) }
+    var artist by remember(track.artist) { mutableStateOf(track.artist ?: "") }
+
+    if (editing) {
+        Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+            OutlinedTextField(
+                value = title,
+                onValueChange = { title = it },
+                label = { Text("Title") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            OutlinedTextField(
+                value = artist,
+                onValueChange = { artist = it },
+                label = { Text("Artist") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(onClick = {
+                    onRename(title, artist)
+                    editing = false
+                }) { Text("Save") }
+                TextButton(onClick = {
+                    title = track.title
+                    artist = track.artist ?: ""
+                    editing = false
+                }) { Text("Cancel") }
+            }
+        }
+        return
+    }
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -105,6 +156,7 @@ private fun TrackRow(track: Track, onOpen: () -> Unit, onDelete: () -> Unit) {
                 )
             }
         }
+        TextButton(onClick = { editing = true }) { Text("Rename") }
         TextButton(onClick = onDelete) { Text("Delete") }
     }
 }
