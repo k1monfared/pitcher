@@ -40,6 +40,9 @@ fun PitcherApp(vm: PitcherViewModel = viewModel()) {
     var showSettings by remember { mutableStateOf(false) }
 
     val context = LocalContext.current
+    LaunchedEffect(showSettings) {
+        if (showSettings) vm.refreshStorage()
+    }
     LaunchedEffect(vm.shareUri) {
         val uri = vm.shareUri ?: return@LaunchedEffect
         val send = Intent(Intent.ACTION_SEND).apply {
@@ -79,7 +82,14 @@ fun PitcherApp(vm: PitcherViewModel = viewModel()) {
     ) { padding ->
         val modifier = Modifier.fillMaxSize().padding(padding)
         if (showSettings) {
-            SettingsScreen(modifier)
+            SettingsScreenContent(
+                importsBytes = vm.storageImportsBytes,
+                exportsBytes = vm.storageExportsBytes,
+                keepScreenOn = vm.keepScreenOn,
+                onKeepScreenOn = { vm.changeKeepScreenOn(it) },
+                onClearExports = { vm.clearExports() },
+                modifier = modifier,
+            )
         } else {
             when (current) {
                 Destination.Library -> LibraryScreen(
@@ -104,6 +114,7 @@ fun PitcherApp(vm: PitcherViewModel = viewModel()) {
                     loopStartMs = vm.loopStartMs,
                     loopEndMs = vm.loopEndMs,
                     loopEnabled = vm.loopEnabled,
+                    keepScreenOn = vm.keepScreenOn,
                     onTogglePlay = { vm.togglePlay() },
                     onSeekMs = { vm.seekTo(it) },
                     onAddBookmark = { vm.addBookmark(it) },
@@ -166,17 +177,4 @@ private fun PlaceholderScreen(title: String, subtitle: String, modifier: Modifie
     }
 }
 
-@Composable
-private fun SettingsScreen(modifier: Modifier = Modifier) {
-    Column(
-        modifier = modifier.padding(24.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        Text("Settings", style = MaterialTheme.typography.headlineSmall)
-        Text(
-            "Engine quality, default formats, keep-screen-on, background playback, storage.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    }
-}
+

@@ -79,6 +79,12 @@ class PitcherViewModel(app: Application) : AndroidViewModel(app) {
         private set
     var exportMessage by mutableStateOf<String?>(null)
         private set
+    var keepScreenOn by mutableStateOf(true)
+        private set
+    var storageImportsBytes by mutableStateOf(0L)
+        private set
+    var storageExportsBytes by mutableStateOf(0L)
+        private set
 
     private var controller: MediaController? = null
 
@@ -310,6 +316,34 @@ class PitcherViewModel(app: Application) : AndroidViewModel(app) {
     fun consumeShareUri() {
         shareUri = null
     }
+
+    fun changeKeepScreenOn(value: Boolean) {
+        keepScreenOn = value
+    }
+
+    fun refreshStorage() {
+        viewModelScope.launch {
+            storageImportsBytes = withContext(Dispatchers.IO) {
+                dirSize(MediaImporter.importsDir(getApplication()))
+            }
+            storageExportsBytes = withContext(Dispatchers.IO) { dirSize(exportsDir()) }
+        }
+    }
+
+    fun clearExports() {
+        viewModelScope.launch {
+            storageExportsBytes = withContext(Dispatchers.IO) {
+                exportsDir().listFiles()?.forEach { runCatching { it.delete() } }
+                dirSize(exportsDir())
+            }
+        }
+    }
+
+    private fun exportsDir(): File =
+        File(getApplication<Application>().cacheDir, "exports").apply { mkdirs() }
+
+    private fun dirSize(dir: File): Long =
+        dir.walkTopDown().filter { it.isFile }.sumOf { it.length() }
 
     fun detectAtPlayhead() {
         val track = current ?: return
