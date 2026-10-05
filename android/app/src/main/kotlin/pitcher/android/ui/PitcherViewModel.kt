@@ -11,6 +11,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
+import androidx.core.content.FileProvider
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import com.google.common.util.concurrent.MoreExecutors
@@ -26,10 +27,14 @@ import pitcher.android.data.Track
 import pitcher.android.data.Variant
 import pitcher.android.data.VariantSpec
 import pitcher.android.media.MediaImporter
+import pitcher.android.media.PcmDecoder
 import pitcher.android.media.PlaybackService
 import pitcher.android.media.TunerDecoder
 import pitcher.android.media.WaveformDecoder
+import pitcher.core.Notes
+import pitcher.core.PitchShifter
 import pitcher.core.Tuner
+import pitcher.core.WavWriter
 import pitcher.core.Waveform
 
 class PitcherViewModel(app: Application) : AndroidViewModel(app) {
@@ -69,6 +74,10 @@ class PitcherViewModel(app: Application) : AndroidViewModel(app) {
     var loopEndMs by mutableStateOf<Long?>(null)
         private set
     var loopEnabled by mutableStateOf(false)
+        private set
+    var shareUri by mutableStateOf<Uri?>(null)
+        private set
+    var exportMessage by mutableStateOf<String?>(null)
         private set
 
     private var controller: MediaController? = null
@@ -264,6 +273,42 @@ class PitcherViewModel(app: Application) : AndroidViewModel(app) {
         loopEnabled = false
         loopStartMs = null
         loopEndMs = null
+    }
+
+    fun exportAndShare(cents: Int, name: String?) {
+        val track = current ?: return
+        viewModelScope.launch {
+            exportMessage = "rendering..."
+            try {
+                val outFile = withContext(Dispatchers.IO) {
+                    val dir = File(getApplication<Application>().cacheDir, "exports").apply { mkdirs() }
+                    val fileName = Notes.downloadFilename(track.title, name, cents, "wav")
+                    val target = File(dir, fileName)
+                    if (cents == 0) {
+                        File(track.sourcePath).copyTo(target, overwrite = true)
+                    } else {
+                        val pcm = PcmDecoder.decodeMono(track.sourcePath)
+                            ?: error("cannot decode audio")
+                        val shifted = PitchShifter.shift(pcm.samples, pcm.sampleRate, cents)
+                        WavWriter.write(target, arrayOf(shifted), pcm.sampleRate)
+                    }
+                    target
+                }
+                val app = getApplication<Application>()
+                shareUri = FileProvider.getUriForFile(
+                    app,
+                    "${app.packageName}.fileprovider",
+                    outFile,
+                )
+                exportMessage = "ready to share"
+            } catch (e: Exception) {
+                exportMessage = "export failed: ${e.message}"
+            }
+        }
+    }
+
+    fun consumeShareUri() {
+        shareUri = null
     }
 
     fun detectAtPlayhead() {

@@ -47,8 +47,10 @@ fun PitchLabScreen(
     variants: List<Variant>,
     cents: Int,
     selectedVariantId: Long?,
+    exportMessage: String?,
     onCents: (Int) -> Unit,
     onKeep: (String?) -> Unit,
+    onExport: (Int, String?) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     if (track == null) {
@@ -143,6 +145,19 @@ fun PitchLabScreen(
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+        Button(
+            onClick = { onExport(cents, name.trim().ifEmpty { null }) },
+            modifier = Modifier.fillMaxSize(),
+        ) {
+            Text("Export & share this pitch (WAV)")
+        }
+        if (exportMessage != null) {
+            Text(
+                exportMessage,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.secondary,
+            )
+        }
     }
 }
 

@@ -11,13 +11,16 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import android.content.Intent
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -35,6 +38,18 @@ enum class Destination(val label: String) {
 fun PitcherApp(vm: PitcherViewModel = viewModel()) {
     var current by remember { mutableStateOf(Destination.Library) }
     var showSettings by remember { mutableStateOf(false) }
+
+    val context = LocalContext.current
+    LaunchedEffect(vm.shareUri) {
+        val uri = vm.shareUri ?: return@LaunchedEffect
+        val send = Intent(Intent.ACTION_SEND).apply {
+            type = "audio/wav"
+            putExtra(Intent.EXTRA_STREAM, uri)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        context.startActivity(Intent.createChooser(send, "Share pitched audio"))
+        vm.consumeShareUri()
+    }
 
     Scaffold(
         topBar = {
@@ -105,8 +120,10 @@ fun PitcherApp(vm: PitcherViewModel = viewModel()) {
                     variants = vm.variants,
                     cents = vm.faderCents,
                     selectedVariantId = vm.selectedVariantId,
+                    exportMessage = vm.exportMessage,
                     onCents = { vm.setPitchCents(it) },
                     onKeep = { vm.keepCurrent(it) },
+                    onExport = { cents, name -> vm.exportAndShare(cents, name) },
                     modifier = modifier,
                 )
                 Destination.Tuner -> TunerScreen(
