@@ -85,31 +85,22 @@ fun PitchLabScreen(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            PitchFader(cents = cents, onCents = onCents, modifier = Modifier.size(56.dp, 300.dp))
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                Text(
-                    (if (cents >= 0) "+$cents" else "$cents") + " cents",
-                    style = MaterialTheme.typography.headlineSmall,
-                )
-                Text(
-                    "semitones: " + String.format("%.2f", cents / 100.0),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    listOf(-10, -1, 1, 10).forEach { d ->
-                        TextButton(onClick = { onCents((cents + d).coerceIn(-1200, 1200)) }) {
-                            Text(if (d > 0) "+$d" else "$d")
-                        }
-                    }
+        // The fader sits centered so there is screen space on both sides to
+        // slide: left tunes finely, right moves fast.
+        PitchFader(cents = cents, onCents = onCents, modifier = Modifier.size(64.dp, 320.dp))
+        Text(
+            (if (cents >= 0) "+$cents" else "$cents") + " cents",
+            style = MaterialTheme.typography.headlineSmall,
+        )
+        Text(
+            "semitones: " + String.format("%.2f", cents / 100.0),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            listOf(-10, -1, 1, 10).forEach { d ->
+                TextButton(onClick = { onCents((cents + d).coerceIn(-1200, 1200)) }) {
+                    Text(if (d > 0) "+$d" else "$d")
                 }
             }
         }
