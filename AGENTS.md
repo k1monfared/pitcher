@@ -71,7 +71,13 @@ cd web && npm install && npm run build   # frontend
 cd web && npm test               # frontend tests
 cd android && ./gradlew :core:test        # Android core note-math tests
 cd android && ./gradlew :app:assembleDebug  # build debug APK
+cd android && ./gradlew :app:assembleRelease # minified release APK
 ```
+
+Android release signing reads `PITCHER_KEYSTORE`, `PITCHER_KEYSTORE_PASSWORD`,
+`PITCHER_KEY_ALIAS`, `PITCHER_KEY_PASSWORD`; without them it falls back to the
+debug key. `.github/workflows/android-release.yml` builds and attaches the APK
+to a GitHub Release on `v*` tags.
 
 Android builds need `android/local.properties` with `sdk.dir=/path/to/Android/Sdk`
 (gitignored). Java 17+ and the Android SDK (platform 36, build-tools) are required.

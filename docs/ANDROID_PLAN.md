@@ -109,15 +109,19 @@ same pitch + settings returns the existing row. Filenames follow the same rule:
 
 ## Milestones
 
-1. Shell: nav, theme, Room schema + DAOs matching the server (tests first).
-2. Import + plain playback + waveform + gestures + screen-on (no DSP yet).
-3. TarsosDSP tuner + note math parity with the Rust core.
-4. Pitch Lab with live preview + keep/render pipeline + variants UI.
-5. Bookmarks, loop, speed, export/share.
-6. Polish: storage screen, background play toggle, F-Droid metadata, screenshots.
+1. Shell: nav, theme, note math, SQLite shelf. Done.
+2. Import (audio only), playback, waveform, gestures, screen-on, background play. Done.
+3. YIN tuner (Kotlin port) + note math parity with the Rust core. Done.
+4. Pitch Lab with live Sonic preview, keep/dedupe, variants shelf, touch scrub fader. Done.
+5. Speed selector, A/B loop, export/share (offline WSOLA WAV). Done.
+6. Polish: settings/storage screen, track rename, share-sheet intake, release
+   signing + GitHub Releases workflow. Done.
+7. Follow-ups: stereo and multi-format export, per-section render, screenshots.
 
-## Open questions
+## Decisions (resolved)
 
-- Min SDK 26 vs 29 (media APIs are nicer on 29+; recommend 29, ~95%+ of devices).
-- Whether background play defaults on or off.
-- F-Droid vs Play release first (recommend F-Droid; no proprietary SDKs either way).
+- Min SDK 29, target/compile 36.
+- Background playback on by default (MediaSessionService).
+- Release channel: GitHub Releases, sideloaded APK.
+- Online sources: share-sheet intake only; no bundled downloader, no network
+  permission.
