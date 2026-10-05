@@ -97,10 +97,14 @@ fun PitcherApp(vm: PitcherViewModel = viewModel()) {
                         "The fader always reads total cents from the original.",
                     modifier,
                 )
-                Destination.Tuner -> PlaceholderScreen(
-                    "Tuner",
-                    "Detect the note at the playhead, or type a note or a frequency.",
-                    modifier,
+                Destination.Tuner -> TunerScreen(
+                    track = vm.current,
+                    detectedHz = vm.detectedHz,
+                    detectMessage = vm.detectMessage,
+                    pendingShiftCents = vm.pendingShiftCents,
+                    onDetect = { vm.detectAtPlayhead() },
+                    onApply = { vm.applyShiftCents(it) },
+                    modifier = modifier,
                 )
                 Destination.Pitches -> PlaceholderScreen(
                     "Pitches",

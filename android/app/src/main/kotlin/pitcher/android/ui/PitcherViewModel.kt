@@ -25,7 +25,10 @@ import pitcher.android.data.Track
 import pitcher.android.data.Variant
 import pitcher.android.media.MediaImporter
 import pitcher.android.media.PlaybackService
+import pitcher.android.media.TunerDecoder
 import pitcher.android.media.WaveformDecoder
+import pitcher.core.Tuner
+import pitcher.core.Waveform
 
 class PitcherViewModel(app: Application) : AndroidViewModel(app) {
 
@@ -48,6 +51,12 @@ class PitcherViewModel(app: Application) : AndroidViewModel(app) {
     var isPlaying by mutableStateOf(false)
         private set
     var message by mutableStateOf<String?>(null)
+        private set
+    var detectedHz by mutableStateOf<Double?>(null)
+        private set
+    var detectMessage by mutableStateOf<String?>(null)
+        private set
+    var pendingShiftCents by mutableStateOf<Int?>(null)
         private set
 
     private var controller: MediaController? = null
@@ -127,6 +136,8 @@ class PitcherViewModel(app: Application) : AndroidViewModel(app) {
         variants = repo.listVariants(track.id)
         bookmarks = repo.listBookmarks(track.id)
         peaks = FloatArray(0)
+        detectedHz = null
+        detectMessage = null
         positionMs = 0
         durationMs = (track.durationS * 1000).toLong()
         controller?.apply {
@@ -192,6 +203,38 @@ class PitcherViewModel(app: Application) : AndroidViewModel(app) {
 
     fun selectOriginal() {
         current?.let { variants = repo.listVariants(it.id) }
+    }
+
+    fun detectAtPlayhead() {
+        val track = current ?: return
+        val atMs = controller?.currentPosition ?: positionMs
+        viewModelScope.launch {
+            detectMessage = "detecting..."
+            detectedHz = null
+            val window = withContext(Dispatchers.IO) {
+                TunerDecoder.decodeWindow(track.sourcePath, atMs)
+            }
+            if (window == null) {
+                detectMessage = "cannot read audio here"
+                return@launch
+            }
+            val reading = Tuner.detect(window.samples, window.sampleRate)
+            if (reading == null) {
+                detectMessage = "no clear pitch at ${Waveform.formatClock(atMs / 1000.0)}"
+            } else {
+                detectedHz = reading.hz
+                detectMessage = null
+            }
+        }
+    }
+
+    fun clearDetection() {
+        detectedHz = null
+        detectMessage = null
+    }
+
+    fun applyShiftCents(cents: Int) {
+        pendingShiftCents = cents
     }
 
     override fun onCleared() {

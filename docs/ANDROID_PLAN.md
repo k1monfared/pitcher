@@ -28,8 +28,9 @@ clean multi-screen UI. Fully offline, fully FOSS, F-Droid friendly.
 | Piece | Choice | Why |
 |---|---|---|
 | Language/UI | Kotlin + Jetpack Compose (Material 3) | Native, no bridge, best gesture support |
-| DSP | TarsosDSP (pure JVM) | YIN/FastYin tuner plus WSOLA+resample pitch shifter, Android audio I/O included, zero NDK, maintained (releases through 2025) |
-| DSP upgrade path | SoundTouch via JNI (later) | Better quality, proven realtime, but NDK/CMake/ABI matrix; hidden behind a `PitchEngine` interface so v1 ships without it |
+| Tuner | Kotlin port of the desktop YIN (`core/Tuner.kt`) | Exact parity with the Rust `tuner.rs`, tested against the same vectors, no extra dependency. TarsosDSP was the original choice but is not on Maven Central (only third-party forks), so a port is safer |
+| Pitch shift (m4) | TBD: SoundTouch via JNI, a ported WSOLA/phase-vocoder, or a Maven-available lib | Needs a real quality evaluation; hidden behind a `PitchEngine` interface |
+
 | Playback | Media3 (ExoPlayer) for plain play; TarsosDSP pipeline for shifted/speed preview | Media3 for the exact-file path, DSP chain only when pitch or tempo differs |
 | Storage | Room (SQLite) + app-private files | Same tables as the server: tracks, variants, bookmarks; keep-all semantics |
 | Video | MediaExtractor (audio out), MediaMuxer (shifted audio back in) | Audio-only export by default, video-preserving export as an option |
