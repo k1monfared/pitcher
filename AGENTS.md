@@ -72,6 +72,7 @@ cd web && npm test               # frontend tests
 cd android && ./gradlew :core:test        # Android core note-math tests
 cd android && ./gradlew :app:assembleDebug  # build debug APK
 cd android && ./gradlew :app:assembleRelease # minified release APK
+cd android && ./gradlew :app:testDebugUnitTest -Proborazzi.test.record=true --tests "*ScreenshotTest"  # render screenshots
 ```
 
 Android release signing reads `PITCHER_KEYSTORE`, `PITCHER_KEYSTORE_PASSWORD`,

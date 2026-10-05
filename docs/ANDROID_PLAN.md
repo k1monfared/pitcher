@@ -117,8 +117,12 @@ same pitch + settings returns the existing row. Filenames follow the same rule:
 5. Speed selector, A/B loop, export/share (offline WSOLA WAV). Done.
 6. Polish: settings/storage screen, track rename, share-sheet intake, release
    signing + GitHub Releases workflow. Done.
-7. Export formats (WAV/MP3/M4A/Opus) and loop-only export. Done.
-8. Follow-ups: stereo export (currently mono), FLAC, screenshots/store metadata.
+7. Export formats (WAV/MP3/M4A/Opus), loop-only export, stereo with mono
+   fallback. Done.
+8. Release prep: adaptive icon, Roborazzi screenshots, fastlane metadata,
+   changelog, version 1.0.0, GitHub Releases workflow. Done.
+9. Follow-ups: FLAC (blocked on a container-capable encoder), screenshots in
+   more languages.
 
 ## Decisions (resolved)
 
