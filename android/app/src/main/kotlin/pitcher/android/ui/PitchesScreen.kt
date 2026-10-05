@@ -25,6 +25,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import pitcher.android.data.Track
 import pitcher.android.data.Variant
+import pitcher.android.media.RenderedStore
 
 @Composable
 fun PitchesScreen(
@@ -56,12 +57,18 @@ fun PitchesScreen(
     val atOrAbove = variants.filter { it.cents >= 0 }
 
     Column(modifier = modifier.fillMaxSize()) {
-        Text(
-            "pitches (${variants.size + 1})",
-            modifier = Modifier.padding(16.dp),
-            style = MaterialTheme.typography.titleSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                "pitches (${variants.size + 1})",
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                "rendered files are saved to ${RenderedStore.FOLDER}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
         if (exportMessage != null) {
             Text(
                 exportMessage,
@@ -146,6 +153,14 @@ private fun VariantRow(
                 if (v.name != null) {
                     Text(
                         (if (v.cents >= 0) "+${v.cents}c" else "${v.cents}c"),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                val fmt = v.outputFormat
+                if (fmt != null && fmt != "live") {
+                    Text(
+                        if (RenderedStore.exists(v.outputPath)) "saved as $fmt" else fmt,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )

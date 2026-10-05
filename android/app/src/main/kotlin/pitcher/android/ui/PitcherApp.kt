@@ -43,6 +43,8 @@ fun PitcherApp(
     var current by remember { mutableStateOf(Destination.Library) }
     var showSettings by remember { mutableStateOf(false) }
 
+    KeepScreenOn(vm.keepScreenOn)
+
     val context = LocalContext.current
     LaunchedEffect(incomingUri) {
         val uri = incomingUri ?: return@LaunchedEffect
@@ -124,7 +126,6 @@ fun PitcherApp(
                     loopStartMs = vm.loopStartMs,
                     loopEndMs = vm.loopEndMs,
                     loopEnabled = vm.loopEnabled,
-                    keepScreenOn = vm.keepScreenOn,
                     onTogglePlay = { vm.togglePlay() },
                     onSeekMs = { vm.seekTo(it) },
                     onAddBookmark = { vm.addBookmark(it) },
@@ -147,8 +148,8 @@ fun PitcherApp(
                     exportLoopOnly = vm.exportLoopOnly,
                     loopAvailable = vm.loopStartMs != null && vm.loopEndMs != null,
                     onCents = { vm.setPitchCents(it) },
-                    onKeep = { vm.keepCurrent(it) },
-                    onExport = { cents, name -> vm.exportAndShare(cents, name) },
+                    onRender = { vm.renderAndKeep(it) },
+                    onExport = { vm.exportCurrent(it) },
                     onFormat = { vm.changeExportFormat(it) },
                     onLoopOnly = { vm.changeExportLoopOnly(it) },
                     modifier = modifier,
@@ -171,7 +172,7 @@ fun PitcherApp(
                     onSelectVariant = { vm.selectVariant(it) },
                     onRenameVariant = { v, n -> vm.renameVariant(v, n) },
                     onDeleteVariant = { vm.deleteVariant(it) },
-                    onExportVariant = { vm.exportAndShare(it.cents, it.name) },
+                    onExportVariant = { vm.shareVariant(it) },
                     modifier = modifier,
                 )
             }

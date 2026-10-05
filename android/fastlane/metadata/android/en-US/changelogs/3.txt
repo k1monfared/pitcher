@@ -1,3 +1,7 @@
-- Exported file names are now "song - artist - pitch", skipping the artist when
-  there is none. An unnamed pitch uses its shift (for example -600), and a
-  missing song title falls back to the original file name.
+- Rendered pitches are saved to Music/pitcher and kept in the library, so a slow
+  render is not lost. The Pitches screen lists every pitch per song.
+- Render and export are now separate: "Render & keep" saves the pitch, and
+  "Export / share" opens the share sheet.
+- The pitch fader is centered so there is room to slide left (fine) and right
+  (fast).
+- Exported file names are now "song - artist - pitch".

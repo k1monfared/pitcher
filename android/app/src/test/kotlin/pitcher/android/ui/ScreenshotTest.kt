@@ -86,7 +86,6 @@ class ScreenshotTest {
                     loopStartMs = 30_000,
                     loopEndMs = 60_000,
                     loopEnabled = true,
-                    keepScreenOn = true,
                     onTogglePlay = {},
                     onSeekMs = {},
                     onAddBookmark = {},
@@ -103,6 +102,7 @@ class ScreenshotTest {
     }
 
     @Test
+    @Config(qualifiers = "w411dp-h1400dp-xxhdpi")
     fun pitchLab() {
         compose.setContent {
             PitcherTheme {
@@ -117,8 +117,8 @@ class ScreenshotTest {
                     exportLoopOnly = false,
                     loopAvailable = true,
                     onCents = {},
-                    onKeep = {},
-                    onExport = { _, _ -> },
+                    onRender = {},
+                    onExport = {},
                     onFormat = {},
                     onLoopOnly = {},
                 )

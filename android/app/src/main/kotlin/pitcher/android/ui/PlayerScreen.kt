@@ -48,7 +48,6 @@ fun PlayerScreen(
     loopStartMs: Long?,
     loopEndMs: Long?,
     loopEnabled: Boolean,
-    keepScreenOn: Boolean,
     onTogglePlay: () -> Unit,
     onSeekMs: (Long) -> Unit,
     onAddBookmark: (String?) -> Unit,
@@ -70,8 +69,6 @@ fun PlayerScreen(
         }
         return
     }
-
-    KeepScreenOn(keepScreenOn)
 
     var bookmarkName by remember { mutableStateOf("") }
 

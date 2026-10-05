@@ -162,6 +162,20 @@ class ShelfRepository(
         db().update("variants", values, "id = ?", arrayOf(id.toString()))
     }
 
+    fun updateVariantFile(
+        id: Long,
+        outputPath: String,
+        outputFormat: String,
+        name: String?,
+    ) {
+        val values = ContentValues().apply {
+            put("output_path", outputPath)
+            put("output_format", outputFormat)
+            put("name", name?.trim()?.takeIf { it.isNotEmpty() })
+        }
+        db().update("variants", values, "id = ?", arrayOf(id.toString()))
+    }
+
     fun setFavorite(id: Long, favorite: Boolean) {
         val values = ContentValues().apply { put("favorite", if (favorite) 1 else 0) }
         db().update("variants", values, "id = ?", arrayOf(id.toString()))

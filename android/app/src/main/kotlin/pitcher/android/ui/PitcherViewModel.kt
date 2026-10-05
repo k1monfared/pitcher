@@ -11,7 +11,6 @@ import androidx.lifecycle.viewModelScope
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
-import androidx.core.content.FileProvider
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import com.google.common.util.concurrent.MoreExecutors
@@ -29,6 +28,7 @@ import pitcher.android.data.VariantSpec
 import pitcher.android.media.AudioRenderer
 import pitcher.android.media.MediaImporter
 import pitcher.android.media.PlaybackService
+import pitcher.android.media.RenderedStore
 import pitcher.android.media.TunerDecoder
 import pitcher.android.media.WaveformDecoder
 import pitcher.core.ExportFormat
@@ -296,58 +296,135 @@ class PitcherViewModel(app: Application) : AndroidViewModel(app) {
         exportLoopOnly = value
     }
 
-    fun exportAndShare(cents: Int, name: String?) {
-        val track = current ?: return
-        if (exporting) return
-        exporting = true
-        val format = exportFormat
-        val section = if (exportLoopOnly && loopStartMs != null && loopEndMs != null) {
-            loopStartMs!! to loopEndMs!!
+    /** The A/B loop as a section in seconds, or null for the whole track. */
+    private fun currentSection(): Pair<Double, Double>? =
+        if (exportLoopOnly && loopStartMs != null && loopEndMs != null) {
+            (loopStartMs!! / 1000.0) to (loopEndMs!! / 1000.0)
         } else {
             null
         }
+
+    /**
+     * Renders the current pitch into the library folder (Music/pitcher) and
+     * keeps it. Renders are slow, so the file is saved right away and is not
+     * lost if it is never shared.
+     */
+    fun renderAndKeep(name: String?) {
+        if (exporting || current == null) return
+        exporting = true
         viewModelScope.launch {
-            exportMessage = "rendering ${format.id}..."
+            exportMessage = "rendering ${exportFormat.id}..."
             try {
-                val outFile = withContext(Dispatchers.IO) {
-                    val dir = File(getApplication<Application>().cacheDir, "exports").apply { mkdirs() }
-                    val fileName = Notes.downloadFilename(
-                        track.title,
-                        track.artist,
-                        track.sourcePath,
-                        name,
-                        cents,
-                        format.extension,
-                    )
-                    val target = File(dir, fileName)
-                    AudioRenderer.render(
-                        sourcePath = track.sourcePath,
-                        target = target,
-                        format = format,
-                        cents = cents,
-                        startMs = section?.first ?: 0L,
-                        endMs = section?.second ?: -1L,
-                    )
-                    target
-                }
-                val app = getApplication<Application>()
-                shareUri = FileProvider.getUriForFile(
-                    app,
-                    "${app.packageName}.fileprovider",
-                    outFile,
-                )
-                exportMime = format.mime
-                exportMessage = "ready to share"
+                renderToLibrary(faderCents, name)
+                current?.let { variants = repo.listVariants(it.id) }
+                exportMessage = "saved to ${RenderedStore.FOLDER}"
             } catch (e: Throwable) {
-                val reason = when (e) {
-                    is OutOfMemoryError -> "not enough memory for this track; try a shorter track or a smaller section"
-                    else -> e.message ?: e.toString()
-                }
-                exportMessage = "export failed: $reason"
+                exportMessage = "render failed: ${reasonOf(e)}"
             } finally {
                 exporting = false
             }
         }
+    }
+
+    /** Ensures the current pitch is rendered, then opens the share sheet. */
+    fun exportCurrent(name: String?) {
+        if (exporting || current == null) return
+        exporting = true
+        viewModelScope.launch {
+            exportMessage = "preparing..."
+            try {
+                val track = current!!
+                val format = exportFormat
+                val section = currentSection()
+                val existing = repo.findVariant(track.id, faderCents, true, section, format.id)
+                val variant = if (existing != null && RenderedStore.exists(existing.outputPath)) {
+                    existing
+                } else {
+                    renderToLibrary(faderCents, name)
+                }
+                current?.let { variants = repo.listVariants(it.id) }
+                if (variant != null) {
+                    shareUri = Uri.parse(variant.outputPath)
+                    exportMime = format.mime
+                    exportMessage = "ready to share"
+                } else {
+                    exportMessage = "render failed"
+                }
+            } catch (e: Throwable) {
+                exportMessage = "export failed: ${reasonOf(e)}"
+            } finally {
+                exporting = false
+            }
+        }
+    }
+
+    fun shareVariant(variant: Variant) {
+        if (RenderedStore.exists(variant.outputPath)) {
+            shareUri = Uri.parse(variant.outputPath)
+            exportMime = ExportFormat.parse(variant.outputFormat ?: "")?.mime ?: "audio/*"
+            exportMessage = "ready to share"
+        } else {
+            setPitchCents(variant.cents)
+            exportCurrent(variant.name)
+        }
+    }
+
+    private suspend fun renderToLibrary(cents: Int, name: String?): Variant? {
+        val track = current ?: return null
+        val format = exportFormat
+        val section = currentSection()
+        val app = getApplication<Application>()
+        return withContext(Dispatchers.IO) {
+            val tmpDir = File(app.cacheDir, "renders").apply { mkdirs() }
+            val ext = format.extension
+            val tmp = File(tmpDir, "render-${System.nanoTime()}.$ext")
+            try {
+                AudioRenderer.render(
+                    sourcePath = track.sourcePath,
+                    target = tmp,
+                    format = format,
+                    cents = cents,
+                    startMs = section?.let { (it.first * 1000).toLong() } ?: 0L,
+                    endMs = section?.let { (it.second * 1000).toLong() } ?: -1L,
+                )
+                val displayName = Notes.downloadFilename(
+                    track.title,
+                    track.artist,
+                    track.sourcePath,
+                    name,
+                    cents,
+                    ext,
+                )
+                val uri = RenderedStore.save(app, displayName, format.mime, tmp)
+                val existing = repo.findVariant(track.id, cents, true, section, format.id)
+                if (existing != null) {
+                    repo.updateVariantFile(existing.id, uri, format.id, name)
+                    repo.getVariant(existing.id)
+                } else {
+                    val id = repo.addVariantFull(
+                        track.id,
+                        VariantSpec(
+                            cents = cents,
+                            formant = true,
+                            engine = "sonic",
+                            pitchQuality = "quality",
+                            section = section,
+                            outputPath = uri,
+                            outputFormat = format.id,
+                            targetNote = name?.takeIf { it.isNotBlank() },
+                        ),
+                    )
+                    repo.getVariant(id)
+                }
+            } finally {
+                tmp.delete()
+            }
+        }
+    }
+
+    private fun reasonOf(e: Throwable): String = when (e) {
+        is OutOfMemoryError -> "not enough memory; try a shorter track or a smaller section"
+        else -> e.message ?: e.toString()
     }
 
     fun consumeShareUri() {
@@ -430,38 +507,15 @@ class PitcherViewModel(app: Application) : AndroidViewModel(app) {
         setPitchCents(variant.cents)
     }
 
-    fun keepCurrent(name: String?) {
-        val track = current ?: return
-        val existing = repo.findVariant(track.id, faderCents, true, null, "live")
-        if (existing != null) {
-            if (!name.isNullOrBlank()) repo.renameVariant(existing.id, name)
-            variants = repo.listVariants(track.id)
-            selectedVariantId = existing.id
-            return
-        }
-        val id = repo.addVariantFull(
-            track.id,
-            VariantSpec(
-                cents = faderCents,
-                formant = true,
-                engine = "sonic",
-                pitchQuality = "quality",
-                section = null,
-                outputPath = "",
-                outputFormat = "live",
-                targetNote = name?.takeIf { it.isNotBlank() },
-            ),
-        )
-        variants = repo.listVariants(track.id)
-        selectedVariantId = id
-    }
-
     fun renameVariant(variant: Variant, name: String) {
         repo.renameVariant(variant.id, name)
         current?.let { variants = repo.listVariants(it.id) }
     }
 
     fun deleteVariant(variant: Variant) {
+        if (RenderedStore.exists(variant.outputPath)) {
+            RenderedStore.delete(getApplication(), variant.outputPath)
+        }
         repo.deleteVariant(variant.id)
         variants = variants.filterNot { it.id == variant.id }
         if (selectedVariantId == variant.id) selectOriginal()

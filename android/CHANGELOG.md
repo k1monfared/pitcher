@@ -2,6 +2,14 @@
 
 ## 1.0.2
 
+- Rendered pitches are now saved into `Music/pitcher` and kept in the library,
+  so a slow render is not lost if you forget to share it. The Pitches screen
+  lists every pitch per song and marks which are saved.
+- Render and export are separate actions: "Render & keep" saves the pitch to
+  the library, and "Export / share" opens the share sheet (rendering first if
+  needed). Each saved pitch can be shared or deleted from the Pitches screen.
+- The pitch fader is centered so there is room to slide left for fine tuning
+  and right to move fast.
 - Exported file names are now `song - artist - pitch`, skipping the artist when
   there is none. An unnamed pitch uses its shift (for example `-600`), and a
   missing song title falls back to the original file name.

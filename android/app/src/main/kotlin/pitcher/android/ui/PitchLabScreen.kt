@@ -18,6 +18,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -39,6 +40,7 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.dp
 import pitcher.android.data.Track
 import pitcher.android.data.Variant
+import pitcher.android.media.RenderedStore
 import pitcher.core.ExportFormat
 import pitcher.core.FaderMath
 
@@ -60,8 +62,8 @@ fun PitchLabScreen(
     exportLoopOnly: Boolean,
     loopAvailable: Boolean,
     onCents: (Int) -> Unit,
-    onKeep: (String?) -> Unit,
-    onExport: (Int, String?) -> Unit,
+    onRender: (String?) -> Unit,
+    onExport: (String?) -> Unit,
     onFormat: (ExportFormat) -> Unit,
     onLoopOnly: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
@@ -132,18 +134,9 @@ fun PitchLabScreen(
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
         )
-        Button(
-            onClick = {
-                onKeep(name.trim().ifEmpty { null })
-                name = ""
-            },
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            Text(if (matching != null) "Update this pitch" else "Keep this pitch as variant")
-        }
         Text(
             "shift ${if (cents >= 0) "+$cents" else "$cents"}c · live preview · " +
-                if (matching != null) "already kept" else "not kept yet",
+                if (matching != null) "rendered" else "not rendered yet",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -181,14 +174,27 @@ fun PitchLabScreen(
             )
         }
         Button(
-            onClick = { onExport(cents, name.trim().ifEmpty { null }) },
+            onClick = { onRender(name.trim().ifEmpty { null }) },
             enabled = !exporting,
             modifier = Modifier.fillMaxWidth(),
         ) {
             Text(
-                if (exporting) "Rendering..." else "Export & share this pitch (${exportFormat.id})",
+                if (exporting) "Rendering..." else "Render & keep (${exportFormat.id})",
             )
         }
+        OutlinedButton(
+            onClick = { onExport(name.trim().ifEmpty { null }) },
+            enabled = !exporting,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Text("Export / share (${exportFormat.id})")
+        }
+        Text(
+            "Rendered pitches are saved to ${RenderedStore.FOLDER} and stay in the " +
+                "library even if you do not share them.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
         if (exportMessage != null) {
             Text(
                 exportMessage,
