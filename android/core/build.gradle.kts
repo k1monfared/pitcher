@@ -7,5 +7,6 @@ kotlin {
 }
 
 dependencies {
+    implementation(libs.jump3r)
     testImplementation(libs.junit)
 }
