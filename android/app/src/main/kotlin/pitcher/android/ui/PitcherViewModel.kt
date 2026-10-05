@@ -26,15 +26,14 @@ import pitcher.android.data.ShelfRepository
 import pitcher.android.data.Track
 import pitcher.android.data.Variant
 import pitcher.android.data.VariantSpec
+import pitcher.android.media.AudioRenderer
 import pitcher.android.media.MediaImporter
-import pitcher.android.media.PcmDecoder
 import pitcher.android.media.PlaybackService
 import pitcher.android.media.TunerDecoder
 import pitcher.android.media.WaveformDecoder
+import pitcher.core.ExportFormat
 import pitcher.core.Notes
-import pitcher.core.PitchShifter
 import pitcher.core.Tuner
-import pitcher.core.WavWriter
 import pitcher.core.Waveform
 
 class PitcherViewModel(app: Application) : AndroidViewModel(app) {
@@ -78,6 +77,12 @@ class PitcherViewModel(app: Application) : AndroidViewModel(app) {
     var shareUri by mutableStateOf<Uri?>(null)
         private set
     var exportMessage by mutableStateOf<String?>(null)
+        private set
+    var exportFormat by mutableStateOf(ExportFormat.M4a)
+        private set
+    var exportLoopOnly by mutableStateOf(false)
+        private set
+    var exportMime by mutableStateOf(ExportFormat.M4a.mime)
         private set
     var keepScreenOn by mutableStateOf(true)
         private set
@@ -281,23 +286,37 @@ class PitcherViewModel(app: Application) : AndroidViewModel(app) {
         loopEndMs = null
     }
 
+    fun changeExportFormat(format: ExportFormat) {
+        exportFormat = format
+    }
+
+    fun changeExportLoopOnly(value: Boolean) {
+        exportLoopOnly = value
+    }
+
     fun exportAndShare(cents: Int, name: String?) {
         val track = current ?: return
+        val format = exportFormat
+        val section = if (exportLoopOnly && loopStartMs != null && loopEndMs != null) {
+            loopStartMs!! to loopEndMs!!
+        } else {
+            null
+        }
         viewModelScope.launch {
-            exportMessage = "rendering..."
+            exportMessage = "rendering ${format.id}..."
             try {
                 val outFile = withContext(Dispatchers.IO) {
                     val dir = File(getApplication<Application>().cacheDir, "exports").apply { mkdirs() }
-                    val fileName = Notes.downloadFilename(track.title, name, cents, "wav")
+                    val fileName = Notes.downloadFilename(track.title, name, cents, format.extension)
                     val target = File(dir, fileName)
-                    if (cents == 0) {
-                        File(track.sourcePath).copyTo(target, overwrite = true)
-                    } else {
-                        val pcm = PcmDecoder.decodeMono(track.sourcePath)
-                            ?: error("cannot decode audio")
-                        val shifted = PitchShifter.shift(pcm.samples, pcm.sampleRate, cents)
-                        WavWriter.write(target, arrayOf(shifted), pcm.sampleRate)
-                    }
+                    AudioRenderer.render(
+                        sourcePath = track.sourcePath,
+                        target = target,
+                        format = format,
+                        cents = cents,
+                        startMs = section?.first ?: 0L,
+                        endMs = section?.second ?: -1L,
+                    )
                     target
                 }
                 val app = getApplication<Application>()
@@ -306,6 +325,7 @@ class PitcherViewModel(app: Application) : AndroidViewModel(app) {
                     "${app.packageName}.fileprovider",
                     outFile,
                 )
+                exportMime = format.mime
                 exportMessage = "ready to share"
             } catch (e: Exception) {
                 exportMessage = "export failed: ${e.message}"

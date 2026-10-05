@@ -55,7 +55,7 @@ fun PitcherApp(
     LaunchedEffect(vm.shareUri) {
         val uri = vm.shareUri ?: return@LaunchedEffect
         val send = Intent(Intent.ACTION_SEND).apply {
-            type = "audio/wav"
+            type = vm.exportMime
             putExtra(Intent.EXTRA_STREAM, uri)
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
@@ -142,9 +142,14 @@ fun PitcherApp(
                     cents = vm.faderCents,
                     selectedVariantId = vm.selectedVariantId,
                     exportMessage = vm.exportMessage,
+                    exportFormat = vm.exportFormat,
+                    exportLoopOnly = vm.exportLoopOnly,
+                    loopAvailable = vm.loopStartMs != null && vm.loopEndMs != null,
                     onCents = { vm.setPitchCents(it) },
                     onKeep = { vm.keepCurrent(it) },
                     onExport = { cents, name -> vm.exportAndShare(cents, name) },
+                    onFormat = { vm.changeExportFormat(it) },
+                    onLoopOnly = { vm.changeExportLoopOnly(it) },
                     modifier = modifier,
                 )
                 Destination.Tuner -> TunerScreen(

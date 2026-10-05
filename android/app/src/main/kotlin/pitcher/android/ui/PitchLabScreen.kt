@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -36,6 +37,7 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.dp
 import pitcher.android.data.Track
 import pitcher.android.data.Variant
+import pitcher.core.ExportFormat
 import pitcher.core.FaderMath
 
 private val PRESETS = listOf(-1200, -700, -500, -200, -100, 100, 200, 500, 700, 1200)
@@ -48,9 +50,14 @@ fun PitchLabScreen(
     cents: Int,
     selectedVariantId: Long?,
     exportMessage: String?,
+    exportFormat: ExportFormat,
+    exportLoopOnly: Boolean,
+    loopAvailable: Boolean,
     onCents: (Int) -> Unit,
     onKeep: (String?) -> Unit,
     onExport: (Int, String?) -> Unit,
+    onFormat: (ExportFormat) -> Unit,
+    onLoopOnly: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     if (track == null) {
@@ -145,11 +152,40 @@ fun PitchLabScreen(
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+        Text(
+            "export format",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            ExportFormat.entries.forEach { fmt ->
+                FilterChip(
+                    selected = exportFormat == fmt,
+                    onClick = { onFormat(fmt) },
+                    label = { Text(fmt.id) },
+                )
+            }
+        }
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Checkbox(
+                checked = exportLoopOnly,
+                onCheckedChange = onLoopOnly,
+                enabled = loopAvailable,
+            )
+            Text(
+                if (loopAvailable) "Export only the A/B loop" else "Export only the A/B loop (set A/B first)",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
         Button(
             onClick = { onExport(cents, name.trim().ifEmpty { null }) },
             modifier = Modifier.fillMaxSize(),
         ) {
-            Text("Export & share this pitch (WAV)")
+            Text("Export & share this pitch (${exportFormat.id})")
         }
         if (exportMessage != null) {
             Text(

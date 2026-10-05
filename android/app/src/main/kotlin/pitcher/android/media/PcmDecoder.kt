@@ -13,13 +13,16 @@ import java.nio.ByteOrder
  */
 object PcmDecoder {
 
-    fun decodeMono(path: String): WindowedAudio? {
+    fun decodeMono(path: String, startMs: Long = 0L, endMs: Long = -1L): WindowedAudio? {
         val extractor = MediaExtractor()
         var codec: MediaCodec? = null
         return try {
             extractor.setDataSource(path)
             val trackIndex = firstAudioTrack(extractor) ?: return null
             extractor.selectTrack(trackIndex)
+            val startUs = startMs.coerceAtLeast(0) * 1000
+            val endUs = if (endMs > startMs) endMs * 1000 else Long.MAX_VALUE
+            if (startUs > 0) extractor.seekTo(startUs, MediaExtractor.SEEK_TO_PREVIOUS_SYNC)
             val inputFormat = extractor.getTrackFormat(trackIndex)
             val mime = inputFormat.getString(MediaFormat.KEY_MIME) ?: return null
             val sampleRate = if (inputFormat.containsKey(MediaFormat.KEY_SAMPLE_RATE)) {
@@ -89,14 +92,23 @@ object PcmDecoder {
                             val shortCount = buffer.remaining() / 2
                             if (shorts.size < shortCount) shorts = ShortArray(shortCount)
                             for (i in 0 until shortCount) shorts[i] = buffer.getShort()
+                            val bufStartUs = info.presentationTimeUs
+                            var frame = 0
                             var i = 0
                             while (i < shortCount) {
-                                var sum = 0f
-                                for (c in 0 until ch) {
-                                    if (i + c < shortCount) sum += shorts[i + c] / 32768f
+                                val frameUs = bufStartUs + frame * 1_000_000L / sampleRate
+                                if (frameUs >= startUs && frameUs < endUs) {
+                                    var sum = 0f
+                                    for (c in 0 until ch) {
+                                        if (i + c < shortCount) sum += shorts[i + c] / 32768f
+                                    }
+                                    out.add(sum / ch)
                                 }
-                                out.add(sum / ch)
+                                frame++
                                 i += ch
+                            }
+                            if (bufStartUs + frame * 1_000_000L / sampleRate >= endUs) {
+                                outputDone = true
                             }
                         }
                         codec.releaseOutputBuffer(outIndex, false)
