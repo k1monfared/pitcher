@@ -7,13 +7,18 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 
 /**
- * Decodes a whole media file's audio track to mono float samples for offline
- * rendering. Mono keeps memory bounded on phones; stereo rendering is a
- * follow-up.
+ * Decodes a media file's audio track to float PCM, optionally limited to a
+ * time range and a maximum channel count. Callers can ask for stereo and fall
+ * back to mono if memory is tight.
  */
 object PcmDecoder {
 
-    fun decodeMono(path: String, startMs: Long = 0L, endMs: Long = -1L): WindowedAudio? {
+    fun decodeChannels(
+        path: String,
+        startMs: Long = 0L,
+        endMs: Long = -1L,
+        maxChannels: Int = 2,
+    ): WindowedAudioChannels? {
         val extractor = MediaExtractor()
         var codec: MediaCodec? = null
         return try {
@@ -23,6 +28,7 @@ object PcmDecoder {
             val startUs = startMs.coerceAtLeast(0) * 1000
             val endUs = if (endMs > startMs) endMs * 1000 else Long.MAX_VALUE
             if (startUs > 0) extractor.seekTo(startUs, MediaExtractor.SEEK_TO_PREVIOUS_SYNC)
+
             val inputFormat = extractor.getTrackFormat(trackIndex)
             val mime = inputFormat.getString(MediaFormat.KEY_MIME) ?: return null
             val sampleRate = if (inputFormat.containsKey(MediaFormat.KEY_SAMPLE_RATE)) {
@@ -30,27 +36,19 @@ object PcmDecoder {
             } else {
                 44100
             }
-            val durationUs = if (inputFormat.containsKey(MediaFormat.KEY_DURATION)) {
-                inputFormat.getLong(MediaFormat.KEY_DURATION)
+            val sourceChannels = if (inputFormat.containsKey(MediaFormat.KEY_CHANNEL_COUNT)) {
+                inputFormat.getInteger(MediaFormat.KEY_CHANNEL_COUNT)
             } else {
-                0L
+                2
             }
-            val estimatedFrames = if (durationUs > 0) {
-                (durationUs / 1_000_000.0 * sampleRate).toInt() + sampleRate
-            } else {
-                sampleRate * 60
-            }
+            val outChannels = sourceChannels.coerceIn(1, maxChannels.coerceAtLeast(1))
 
             codec = MediaCodec.createDecoderByType(mime)
             codec.configure(inputFormat, null, null, 0)
             codec.start()
 
-            val out = ArrayList<Float>(estimatedFrames.coerceAtMost(60 * sampleRate))
-            var channels = if (inputFormat.containsKey(MediaFormat.KEY_CHANNEL_COUNT)) {
-                inputFormat.getInteger(MediaFormat.KEY_CHANNEL_COUNT)
-            } else {
-                2
-            }
+            val builders = Array(outChannels) { FloatBuilder() }
+            var channels = sourceChannels
             var shorts = ShortArray(0)
             val info = MediaCodec.BufferInfo()
             var inputDone = false
@@ -98,11 +96,19 @@ object PcmDecoder {
                             while (i < shortCount) {
                                 val frameUs = bufStartUs + frame * 1_000_000L / sampleRate
                                 if (frameUs >= startUs && frameUs < endUs) {
-                                    var sum = 0f
-                                    for (c in 0 until ch) {
-                                        if (i + c < shortCount) sum += shorts[i + c] / 32768f
+                                    if (outChannels == 1) {
+                                        var sum = 0f
+                                        for (c in 0 until ch) {
+                                            if (i + c < shortCount) sum += shorts[i + c] / 32768f
+                                        }
+                                        builders[0].add(sum / ch)
+                                    } else {
+                                        for (c in 0 until outChannels) {
+                                            builders[c].add(
+                                                if (i + c < shortCount) shorts[i + c] / 32768f else 0f,
+                                            )
+                                        }
                                     }
-                                    out.add(sum / ch)
                                 }
                                 frame++
                                 i += ch
@@ -119,7 +125,8 @@ object PcmDecoder {
                 }
             }
 
-            if (out.isEmpty()) null else WindowedAudio(out.toFloatArray(), sampleRate)
+            val arrays = Array(outChannels) { builders[it].toArray() }
+            if (arrays[0].isEmpty()) null else WindowedAudioChannels(arrays, sampleRate)
         } catch (_: Exception) {
             null
         } finally {
@@ -129,6 +136,11 @@ object PcmDecoder {
         }
     }
 
+    fun decodeMono(path: String, startMs: Long = 0L, endMs: Long = -1L): WindowedAudio? {
+        val decoded = decodeChannels(path, startMs, endMs, maxChannels = 1) ?: return null
+        return WindowedAudio(decoded.channels[0], decoded.sampleRate)
+    }
+
     private fun firstAudioTrack(extractor: MediaExtractor): Int? {
         for (i in 0 until extractor.trackCount) {
             val mime = extractor.getTrackFormat(i).getString(MediaFormat.KEY_MIME) ?: continue
@@ -136,4 +148,21 @@ object PcmDecoder {
         }
         return null
     }
+
+    private class FloatBuilder(capacity: Int = 1 shl 16) {
+        private var data = FloatArray(capacity)
+        private var size = 0
+
+        fun add(value: Float) {
+            if (size == data.size) data = data.copyOf(data.size * 2)
+            data[size++] = value
+        }
+
+        fun toArray(): FloatArray = data.copyOf(size)
+    }
 }
+
+data class WindowedAudioChannels(
+    val channels: Array<FloatArray>,
+    val sampleRate: Int,
+)
