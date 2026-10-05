@@ -20,6 +20,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
 
 enum class Destination(val label: String) {
     Library("Library"),
@@ -31,7 +32,7 @@ enum class Destination(val label: String) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun PitcherApp() {
+fun PitcherApp(vm: PitcherViewModel = viewModel()) {
     var current by remember { mutableStateOf(Destination.Library) }
     var showSettings by remember { mutableStateOf(false) }
 
@@ -66,17 +67,29 @@ fun PitcherApp() {
             SettingsScreen(modifier)
         } else {
             when (current) {
-                Destination.Library -> PlaceholderScreen(
-                    "Library",
-                    "Import an audio or video file, then rename or delete tracks. " +
-                        "Files you imported stay yours; only pitcher's own renders are removed.",
-                    modifier,
+                Destination.Library -> LibraryScreen(
+                    tracks = vm.tracks,
+                    message = vm.message,
+                    onImport = { uri -> vm.import(uri) {} },
+                    onOpen = { track ->
+                        vm.openTrack(track)
+                        current = Destination.Player
+                    },
+                    onDelete = { vm.deleteTrack(it) },
+                    modifier = modifier,
                 )
-                Destination.Player -> PlaceholderScreen(
-                    "Player",
-                    "Zoomable waveform with precise gesture seeking, loop, speed, and bookmarks. " +
-                        "Screen stays on while this is open.",
-                    modifier,
+                Destination.Player -> PlayerScreen(
+                    track = vm.current,
+                    peaks = vm.peaks,
+                    positionMs = vm.positionMs,
+                    durationMs = vm.durationMs,
+                    isPlaying = vm.isPlaying,
+                    bookmarks = vm.bookmarks,
+                    onTogglePlay = { vm.togglePlay() },
+                    onSeekMs = { vm.seekTo(it) },
+                    onAddBookmark = { vm.addBookmark(it) },
+                    onDeleteBookmark = { vm.deleteBookmark(it) },
+                    modifier = modifier,
                 )
                 Destination.Pitch -> PlaceholderScreen(
                     "Pitch Lab",
@@ -86,8 +99,7 @@ fun PitcherApp() {
                 )
                 Destination.Tuner -> PlaceholderScreen(
                     "Tuner",
-                    "Detect the note at the playhead, or type a note or a frequency. " +
-                        "Target note and target Hz fill each other in.",
+                    "Detect the note at the playhead, or type a note or a frequency.",
                     modifier,
                 )
                 Destination.Pitches -> PlaceholderScreen(
