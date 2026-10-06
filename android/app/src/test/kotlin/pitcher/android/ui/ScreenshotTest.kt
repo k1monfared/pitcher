@@ -12,6 +12,13 @@ import org.robolectric.annotation.GraphicsMode
 import pitcher.android.data.Bookmark
 import pitcher.android.data.Track
 import pitcher.android.data.Variant
+import pitcher.android.ui.classic.LibraryScreen
+import pitcher.android.ui.classic.PitchesScreen
+import pitcher.android.ui.classic.PitchLabScreen
+import pitcher.android.ui.classic.PlayerScreen
+import pitcher.android.ui.classic.TunerScreen
+import pitcher.android.ui.modern.StudioContent
+import pitcher.android.ui.theme.ModernTheme
 import pitcher.android.ui.theme.PitcherTheme
 import pitcher.core.ExportFormat
 import kotlin.math.abs
@@ -99,6 +106,47 @@ class ScreenshotTest {
             }
         }
         compose.onRoot().captureRoboImage("build/screenshots/02-player.png")
+    }
+
+    @Test
+    @Config(qualifiers = "w411dp-h891dp-xxhdpi")
+    fun modernStudio() {
+        compose.setContent {
+            ModernTheme {
+                StudioContent(
+                    title = "Nava Sol Darya",
+                    artist = "Tasnife Yad Bad",
+                    cents = -600,
+                    snap = false,
+                    peaks = peaks,
+                    positionMs = 48_000,
+                    durationMs = 210_000,
+                    loopStartMs = 30_000,
+                    loopEndMs = 60_000,
+                    playing = true,
+                    tempo = 1f,
+                    loopEnabled = true,
+                    variants = variants,
+                    selectedVariantId = 1,
+                    onCents = {},
+                    onSnapToggle = {},
+                    onSeekMs = {},
+                    onSetLoop = { _, _ -> },
+                    onPlayPause = {},
+                    onSkip = {},
+                    onTempo = {},
+                    onLoopToggle = {},
+                    onSelectOriginal = {},
+                    onSelectVariant = {},
+                    onSaveCurrent = {},
+                    onOpenLibrary = {},
+                    onOpenPitches = {},
+                    onOpenExport = {},
+                    onOpenSettings = {},
+                )
+            }
+        }
+        compose.onRoot().captureRoboImage("build/screenshots/10-modern-studio.png")
     }
 
     @Test

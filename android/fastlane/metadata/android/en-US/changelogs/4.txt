@@ -1,0 +1,9 @@
+- New touch-first Studio interface with a full-screen pitch gesture: drag up or
+  down to shift, slide left or right of your touch to change the speed of the
+  change, from coarse to fine.
+- Giant live cents readout, a HUD with a semitone scale, and haptics.
+- SoundCloud-style waveform with draggable A/B loop handles.
+- Per-song pitch carousel, and a speed chip you drag or tap.
+- Render and export are separate: renders save to Music/pitcher and stay in the
+  library.
+- Switch between the new and classic interfaces in Settings.

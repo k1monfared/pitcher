@@ -1,4 +1,4 @@
-package pitcher.android.ui
+package pitcher.android.ui.classic
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectDragGestures

@@ -1,4 +1,4 @@
-package pitcher.android.ui
+package pitcher.android.ui.classic
 
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts

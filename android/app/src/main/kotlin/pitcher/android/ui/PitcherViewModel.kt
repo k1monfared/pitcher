@@ -88,6 +88,8 @@ class PitcherViewModel(app: Application) : AndroidViewModel(app) {
         private set
     var keepScreenOn by mutableStateOf(true)
         private set
+    var uiStyle by mutableStateOf(UiStyle.MODERN)
+        private set
     var storageImportsBytes by mutableStateOf(0L)
         private set
     var storageExportsBytes by mutableStateOf(0L)
@@ -110,7 +112,17 @@ class PitcherViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    private val prefs by lazy {
+        getApplication<Application>().getSharedPreferences("pitcher", Application.MODE_PRIVATE)
+    }
+
     init {
+        uiStyle = if (prefs.getString("ui_style", "modern") == "classic") {
+            UiStyle.CLASSIC
+        } else {
+            UiStyle.MODERN
+        }
+        keepScreenOn = prefs.getBoolean("keep_screen_on", true)
         refreshTracks()
         connectController()
         viewModelScope.launch {
@@ -282,6 +294,14 @@ class PitcherViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    fun setLoop(startMs: Long, endMs: Long) {
+        loopStartMs = minOf(startMs, endMs)
+        loopEndMs = maxOf(startMs, endMs)
+        loopEnabled = true
+        controller?.seekTo(loopStartMs!!)
+        positionMs = loopStartMs!!
+    }
+
     fun clearLoop() {
         loopEnabled = false
         loopStartMs = null
@@ -433,6 +453,14 @@ class PitcherViewModel(app: Application) : AndroidViewModel(app) {
 
     fun changeKeepScreenOn(value: Boolean) {
         keepScreenOn = value
+        prefs.edit().putBoolean("keep_screen_on", value).apply()
+    }
+
+    fun changeUiStyle(style: UiStyle) {
+        uiStyle = style
+        prefs.edit()
+            .putString("ui_style", if (style == UiStyle.CLASSIC) "classic" else "modern")
+            .apply()
     }
 
     fun refreshStorage() {

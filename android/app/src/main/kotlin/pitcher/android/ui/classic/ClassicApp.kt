@@ -1,4 +1,4 @@
-package pitcher.android.ui
+package pitcher.android.ui.classic
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -24,6 +24,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import pitcher.android.ui.KeepScreenOn
+import pitcher.android.ui.PitcherViewModel
+import pitcher.android.ui.SettingsContent
 
 enum class Destination(val label: String) {
     Library("Library"),
@@ -35,7 +38,7 @@ enum class Destination(val label: String) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun PitcherApp(
+fun ClassicApp(
     vm: PitcherViewModel = viewModel(),
     incomingUri: android.net.Uri? = null,
     onIncomingConsumed: () -> Unit = {},
@@ -93,14 +96,7 @@ fun PitcherApp(
     ) { padding ->
         val modifier = Modifier.fillMaxSize().padding(padding)
         if (showSettings) {
-            SettingsScreenContent(
-                importsBytes = vm.storageImportsBytes,
-                exportsBytes = vm.storageExportsBytes,
-                keepScreenOn = vm.keepScreenOn,
-                onKeepScreenOn = { vm.changeKeepScreenOn(it) },
-                onClearExports = { vm.clearExports() },
-                modifier = modifier,
-            )
+            SettingsContent(vm = vm, modifier = modifier)
         } else {
             when (current) {
                 Destination.Library -> LibraryScreen(

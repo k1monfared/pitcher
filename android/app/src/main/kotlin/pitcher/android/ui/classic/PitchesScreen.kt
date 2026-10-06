@@ -1,4 +1,4 @@
-package pitcher.android.ui
+package pitcher.android.ui.classic
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement

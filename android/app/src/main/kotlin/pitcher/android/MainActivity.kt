@@ -12,8 +12,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.mutableStateOf
 import androidx.core.content.ContextCompat
 import androidx.core.content.IntentCompat
-import pitcher.android.ui.PitcherApp
-import pitcher.android.ui.theme.PitcherTheme
+import pitcher.android.ui.AppRoot
 
 class MainActivity : ComponentActivity() {
     private val incoming = mutableStateOf<Uri?>(null)
@@ -24,12 +23,10 @@ class MainActivity : ComponentActivity() {
         requestNotificationPermissionIfNeeded()
         incoming.value = extractUri(intent)
         setContent {
-            PitcherTheme {
-                PitcherApp(
-                    incomingUri = incoming.value,
-                    onIncomingConsumed = { incoming.value = null },
-                )
-            }
+            AppRoot(
+                incomingUri = incoming.value,
+                onIncomingConsumed = { incoming.value = null },
+            )
         }
     }
 

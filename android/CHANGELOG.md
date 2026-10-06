@@ -1,5 +1,23 @@
 # Changelog
 
+## 2.0.0
+
+A new touch-first interface, with the classic one kept as a fallback.
+
+- New Studio home: a full-screen pitch gesture. Drag vertically to shift the
+  pitch; slide left or right of where you touched to change how fast it moves,
+  from coarse to fine, continuously. A HUD shows the value, a semitone scale,
+  and the current gear, with haptics at each semitone.
+- Giant live cents readout with the interval in words, and an ambient glow that
+  shifts color with the pitch.
+- SoundCloud-style waveform with draggable A/B loop handles.
+- Speed chip: drag to change, tap to cycle presets.
+- Per-song pitch carousel; the Library and the sheets move off the home screen.
+- Render and export are separate: renders save to Music/pitcher and stay in the
+  library; export opens the share sheet.
+- Interface style is switchable in Settings (Modern or Classic). Both share the
+  same engine, library, and playback.
+
 ## 1.0.2
 
 - Rendered pitches are now saved into `Music/pitcher` and kept in the library,
