@@ -2,17 +2,23 @@ package pitcher.android.ui.modern
 
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -25,9 +31,9 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -47,6 +53,8 @@ fun PitchPad(
     var dragging by remember { mutableStateOf(false) }
     var mode by remember { mutableStateOf(PitchGesture.Mode.NORMAL) }
     var lastSemitone by remember { mutableIntStateOf(0) }
+    var lastTapMs by remember { mutableLongStateOf(0L) }
+    var showExact by remember { mutableStateOf(false) }
     val haptics = LocalHapticFeedback.current
 
     Box(
@@ -57,6 +65,7 @@ fun PitchPad(
                     val startX = down.position.x
                     var lastY = down.position.y
                     var c = currentCents
+                    var moved = false
                     dragging = true
                     lastSemitone = (c / 100.0).roundToInt()
                     while (true) {
@@ -66,28 +75,41 @@ fun PitchPad(
                         val pos = change.position
                         val dy = lastY - pos.y
                         val offsetX = pos.x - startX
-                        c = PitchGesture.step(
-                            currentCents = c,
-                            dyPx = dy,
-                            offsetPx = offsetX,
-                            widthPx = size.width.toFloat(),
-                            snapCents = if (snap) 100 else 0,
-                        )
-                        onCents(c)
-                        val m = PitchGesture.mode(offsetX, size.width.toFloat())
-                        if (m != mode) {
-                            mode = m
-                            haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                        }
-                        val semi = (c / 100.0).roundToInt()
-                        if (semi != lastSemitone) {
-                            lastSemitone = semi
-                            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                        if (abs(offsetX) > 8f || abs(dy) > 8f) moved = true
+                        if (moved) {
+                            c = PitchGesture.step(
+                                currentCents = c,
+                                dyPx = dy,
+                                offsetPx = offsetX,
+                                widthPx = size.width.toFloat(),
+                                snapCents = if (snap) 100 else 0,
+                            )
+                            onCents(c)
+                            val m = PitchGesture.mode(offsetX, size.width.toFloat())
+                            if (m != mode) {
+                                mode = m
+                                haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            }
+                            val semi = (c / 100.0).roundToInt()
+                            if (semi != lastSemitone) {
+                                lastSemitone = semi
+                                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                            }
                         }
                         lastY = pos.y
                         change.consume()
                     }
                     dragging = false
+                    if (!moved) {
+                        val now = System.currentTimeMillis()
+                        if (now - lastTapMs < 350L) {
+                            onCents(0)
+                            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                            lastTapMs = 0L
+                        } else {
+                            lastTapMs = now
+                        }
+                    }
                 }
             },
         contentAlignment = Alignment.Center,
@@ -99,6 +121,7 @@ fun PitchPad(
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onBackground,
                 textAlign = TextAlign.Center,
+                modifier = Modifier.clickable { showExact = true },
             )
             Text(
                 "cents",
@@ -127,6 +150,48 @@ fun PitchPad(
             modifier = Modifier.align(Alignment.CenterEnd).padding(end = 8.dp),
         )
     }
+
+    if (showExact) {
+        ExactEntryDialog(
+            initial = cents,
+            onConfirm = {
+                onCents(it)
+                showExact = false
+            },
+            onDismiss = { showExact = false },
+        )
+    }
+}
+
+@Composable
+private fun ExactEntryDialog(
+    initial: Int,
+    onConfirm: (Int) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var text by remember { mutableStateOf(initial.toString()) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Exact pitch (cents)") },
+        text = {
+            OutlinedTextField(
+                value = text,
+                onValueChange = { text = it },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                label = { Text("-1200 to 1200") },
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = {
+                val v = text.toIntOrNull()?.coerceIn(-1200, 1200) ?: initial
+                onConfirm(v)
+            }) { Text("Set") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+        },
+    )
 }
 
 @Composable
@@ -148,7 +213,6 @@ private fun PitchHud(
             size = Size(6f, h),
             cornerRadius = CornerRadius(3f, 3f),
         )
-        // semitone ticks
         for (semi in -12..12) {
             val frac = (range - semi * 100f) / (2f * range)
             val y = frac * h
