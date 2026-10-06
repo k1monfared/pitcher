@@ -20,7 +20,9 @@ decisions. Summary of the chosen stack:
 - **Importer:** `yt-dlp` for YouTube/SoundCloud. See [docs/LEGALITY.md](docs/LEGALITY.md).
 - torchcrepe and Basic Pitch are deferred past v1.
 - The Android app is planned separately in [docs/ANDROID_PLAN.md](docs/ANDROID_PLAN.md):
-  native Kotlin + Compose, TarsosDSP, offline-only, no downloaders.
+  native Kotlin + Compose, offline-only, no downloaders.
+- The Android v2 redesign (touch-first, Material 3 Expressive, full-screen pitch
+  gesture) is planned in [docs/ANDROID_V2_PLAN.md](docs/ANDROID_V2_PLAN.md).
 
 ## Layout
 
@@ -32,6 +34,7 @@ web/                   Svelte 5 + Vite + TS frontend (live preview via soundtouc
 site/                  static project site (GitHub Pages): landing + web UI guide
 docs/PLAN.md           the plan
 docs/ANDROID_PLAN.md   the Android app plan
+docs/ANDROID_V2_PLAN.md  the Android v2 redesign plan
 docs/LEGALITY.md       source/ToS notes
 data/                  sqlite db + rendered variants (gitignored)
 android/core/          pure-Kotlin note math (ported from notes.rs), tested on JVM
