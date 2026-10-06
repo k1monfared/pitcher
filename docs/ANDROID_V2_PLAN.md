@@ -92,25 +92,31 @@ sets the sensitivity.
 **Surface**: the whole pitch pad, and it keeps receiving events even as the
 finger moves off it, so the full screen is usable.
 
-**Axes**:
+**Axes** (sensitivity is relative to where the touch begins):
 - Vertical movement changes the pitch. Up raises, down lowers.
-- Horizontal position sets sensitivity, continuously. Left is coarse and fast,
-  right is fine, and everything between is a smooth blend.
+- Horizontal offset from the touch-down point sets sensitivity, continuously.
+  Moving right of the start is fine, moving left is coarse, and everything
+  between is a smooth blend. Starting anywhere works, so there is no edge to
+  reach for.
 
-Let $t = x / W$ be the finger's horizontal fraction, $0$ at the left edge and
-$1$ at the right. Sensitivity in cents per pixel is
+Let $d = x - x_0$ be the horizontal offset from the touch-down point, and let
+$D$ be the half-travel that spans the full gear range (for example $0.5W$).
+Define $u = \operatorname{clamp}(d / D, -1, 1)$ with a small dead zone around
+$u = 0$ for normal sensitivity. Sensitivity in cents per pixel is
 
-$$ s(t) = s_\text{coarse} \left( \frac{s_\text{fine}}{s_\text{coarse}} \right)^{t} $$
+$$ s(u) = s_\text{coarse} \left( \frac{s_\text{fine}}{s_\text{coarse}} \right)^{\frac{u + 1}{2}} $$
 
-with, for example, $s_\text{coarse} = 8$ cents/px at the left and
-$s_\text{fine} = 0.15$ cents/px at the right. The exponential blend feels even
-across the range. The cents delta for a vertical move $\Delta y$ is
+with, for example, $s_\text{coarse} = 8$ cents/px when the finger is far left
+of the start and $s_\text{fine} = 0.15$ cents/px when it is far right. The
+exponential blend feels even across the range. The cents delta for a vertical
+move $\Delta y$ is
 
-$$ \Delta c = \Delta y \cdot s(t) $$
+$$ \Delta c = \Delta y \cdot s(u) $$
 
 Consequences on a roughly 1000 px wide, 800 px tall screen:
-- Dragging on the far left covers about two octaves over the screen height.
-- Dragging on the far right covers tens of cents, so a single cent is easy.
+- Moving the finger left of the start and dragging vertically covers about two
+  octaves over the screen height.
+- Moving it right of the start covers tens of cents, so a single cent is easy.
 - The user can start a drag, then slide left to go fast or right to fine-tune
   mid-gesture, without lifting the finger. This is the key move.
 
@@ -119,7 +125,8 @@ Consequences on a roughly 1000 px wide, 800 px tall screen:
 - a scale in semitones (+12, 0, -12) with a highlighted zero,
 - the exact value in large type (for example `-600 c`),
 - a small label of the current gear (`fine`, `normal`, `coarse`) that updates as
-  the finger moves horizontally.
+  the finger moves left or right of the touch-down point, so the gear is
+  discoverable.
 
 It fades in fast and out about 600 ms after release, using the expressive motion
 spec, so it never lingers.
@@ -260,16 +267,19 @@ The "modern stack of objects", each a small composable:
 6. Polish: expressive motion, shared-element transitions, accessibility,
    screenshots, and on-device tuning of the sensitivity curve.
 
+## Decisions (resolved)
+
+- Sensitivity axis: **horizontal offset from the touch-down point**, not
+  absolute screen position. Start anywhere; move right of the start for fine,
+  left for coarse.
+- Snap: **off by default**, with a toggle near the readout.
+- Library access: **top-left button plus a left-edge swipe**.
+- Background: **blurred album art when present, else a generative gradient**.
+
 ## Open questions
 
-- Sensitivity constants: the exact $s_\text{coarse}$ and $s_\text{fine}$ need
-  on-device tuning; the plan's values are a starting point.
-- Horizontal axis: absolute screen position (as specified) versus offset from
-  where the touch began. Absolute matches "left side / right side"; offset
-  avoids re-gripping. Recommendation: absolute, with a short grace so a touch
-  that starts near an edge does not jump.
-- Snap default: on or off.
-- Background art: use blurred album art when a file has it, else the generative
-  gradient.
-- Library access: top-left button with a left-edge swipe, versus a drawer. Both
-  are easy; recommendation is the button plus swipe.
+- Sensitivity constants: the exact $s_\text{coarse}$, $s_\text{fine}$, the
+  half-travel $D$, and the dead-zone width need on-device tuning; the plan's
+  values are a starting point.
+- Whether the gear label should also nudge the pad visually (for example a
+  subtle scale or tint change) as the user crosses into fine or coarse.
