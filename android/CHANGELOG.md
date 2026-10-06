@@ -11,7 +11,10 @@ A new touch-first interface, with the classic one kept as a fallback.
 - Giant live cents readout with the interval in words, and an ambient glow that
   shifts color with the pitch.
 - SoundCloud-style waveform with draggable A/B loop handles.
-- Speed chip: drag to change, tap to cycle presets.
+- Speed chip: drag to change, tap to cycle presets, or hold to audition
+  slower and spring back on release.
+- Double-tap the pitch pad to reset to zero, or tap the cents readout to type
+  an exact value.
 - Per-song pitch carousel; the Library and the sheets move off the home screen.
 - Render and export are separate: renders save to Music/pitcher and stay in the
   library; export opens the share sheet.

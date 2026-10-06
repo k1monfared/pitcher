@@ -2,8 +2,10 @@
   down to shift, slide left or right of your touch to change the speed of the
   change, from coarse to fine.
 - Giant live cents readout, a HUD with a semitone scale, and haptics.
+- Double-tap the pad to reset, or tap the readout to type an exact value.
 - SoundCloud-style waveform with draggable A/B loop handles.
-- Per-song pitch carousel, and a speed chip you drag or tap.
+- Speed chip: drag to change, tap to cycle, or hold to audition slower.
+- Per-song pitch carousel.
 - Render and export are separate: renders save to Music/pitcher and stay in the
   library.
 - Switch between the new and classic interfaces in Settings.
