@@ -21,8 +21,10 @@ decisions. Summary of the chosen stack:
 - torchcrepe and Basic Pitch are deferred past v1.
 - The Android app is planned separately in [docs/ANDROID_PLAN.md](docs/ANDROID_PLAN.md):
   native Kotlin + Compose, offline-only, no downloaders.
-- The Android v2 redesign (touch-first, Material 3 Expressive, full-screen pitch
-  gesture) is planned in [docs/ANDROID_V2_PLAN.md](docs/ANDROID_V2_PLAN.md).
+- The Android v2 redesign (touch-first, full-screen pitch gesture) is planned in
+  [docs/ANDROID_V2_PLAN.md](docs/ANDROID_V2_PLAN.md) and built in `ui/modern/`.
+  The v1 screens live in `ui/classic/` and are kept as a fallback; a UiStyle
+  preference switches between them and both share the view model and engine.
 
 ## Layout
 
