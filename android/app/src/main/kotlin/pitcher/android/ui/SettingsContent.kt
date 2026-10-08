@@ -84,7 +84,19 @@ fun SettingsContent(vm: PitcherViewModel, modifier: Modifier = Modifier) {
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
 
-        Text("pitcher for Android 2.0.0", style = MaterialTheme.typography.bodySmall)
+        if (vm.uiStyle == UiStyle.MODERN) {
+            HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+
+            Text("Guided tour", style = MaterialTheme.typography.titleMedium)
+            Text(
+                "A short tour points out the pitch gesture, the A/B loop, the play speed, and export.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Button(onClick = { vm.startOnboarding() }) { Text("Replay the tour") }
+        }
+
+        Text("pitcher for Android 2.0.1", style = MaterialTheme.typography.bodySmall)
         Text(
             "Offline only. This app requests no network permission.",
             style = MaterialTheme.typography.bodySmall,

@@ -1,0 +1,11 @@
+- First run now shows a short guided tour of the pitch gesture, snap, waveform,
+  loop, play speed, saving, and export. Skip it or replay it from Settings.
+- Cancel a render, export, or share while it is running.
+- Fixed keep-screen-on in the new interface.
+- Pitch pad: adjustable grain for 1-cent fine control, working snap to
+  semitones, and +1 / +10 / +100 step buttons.
+- Waveform: pinch to zoom, drag to pan, tap to seek or jump to a bookmark, and
+  time stamps. Drag the lane above it to set an A/B loop.
+- Play speed is a hold-and-slide preset picker; tap to reset to 1x.
+- Add bookmarks, and long-press a saved pitch to rename, export, share, or
+  delete it.

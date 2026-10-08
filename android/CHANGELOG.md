@@ -1,5 +1,30 @@
 # Changelog
 
+## 2.0.1
+
+A guided tour, cancellable renders, and a round of gesture and control fixes.
+
+- A short guided tour appears the first time you open a song: it points at the
+  pitch gesture, the readout, snap, the waveform, the loop lane, the play-speed
+  chip, saving a pitch, and export. It can be skipped, and replayed any time
+  from Settings.
+- Renders, exports, and shares can now be cancelled from the Export sheet, the
+  studio, or the classic Pitch Lab.
+- Fixed keep-screen-on in the new interface; it was only applied in the classic
+  one.
+- The pitch pad has adjustable grain: hold left for coarse steps, right for
+  1-cent fine. Snap to semitones works while dragging, and the readout shows the
+  current gear. Plus and minus buttons step by 1, 10, or 100 cents.
+- The waveform zooms with a pinch, pans on a drag, seeks on a tap (snapping to a
+  nearby bookmark), and shows time stamps. Drag the thin lane above it to set an
+  A/B loop.
+- The play-speed control is a hold-and-slide preset picker; tap it to return to
+  1x. A HUD shows the preset list while you drag.
+- Add bookmarks from the studio, and long-press a saved pitch to rename, export,
+  share, or delete it.
+- A spinner shows while a pitch is being saved, and the Library shows a
+  placeholder for missing titles.
+
 ## 2.0.0
 
 A new touch-first interface, with the classic one kept as a fallback.
