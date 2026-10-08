@@ -27,6 +27,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -41,11 +42,10 @@ fun PitchShelf(
     selectedVariantId: Long?,
     faderCents: Int,
     accent: Color,
-    onSelectOriginal: () -> Unit,
-    onSelectVariant: (Variant) -> Unit,
-    onSaveCurrent: () -> Unit,
+    onOpenPitch: (Variant?) -> Unit,
+    onRenderCurrent: () -> Unit,
+    onRenderVariant: (Variant) -> Unit,
     onRenameVariant: (Variant, String) -> Unit,
-    onExportVariant: (Variant) -> Unit,
     onShareVariant: (Variant) -> Unit,
     onDeleteVariant: (Variant) -> Unit,
     saving: Boolean = false,
@@ -66,11 +66,8 @@ fun PitchShelf(
                 selected = selectedVariantId == null,
                 saved = true,
                 accent = accent,
-                onClick = onSelectOriginal,
-                onRename = null,
-                onExport = null,
-                onShare = null,
-                onDelete = null,
+                onClick = { onOpenPitch(null) },
+                menuItems = emptyList(),
             )
         }
         items(variants, key = { it.id }) { v ->
@@ -85,11 +82,13 @@ fun PitchShelf(
                 selected = v.id == selectedVariantId,
                 saved = RenderedStore.exists(v.outputPath),
                 accent = accent,
-                onClick = { onSelectVariant(v) },
-                onRename = { renaming = v },
-                onExport = { onExportVariant(v) },
-                onShare = { onShareVariant(v) },
-                onDelete = { onDeleteVariant(v) },
+                onClick = { onOpenPitch(v) },
+                menuItems = listOf(
+                    "+ render" to { onRenderVariant(v) },
+                    "rename" to { renaming = v },
+                    "share" to { onShareVariant(v) },
+                    "delete" to { onDeleteVariant(v) },
+                ),
             )
         }
         item {
@@ -101,11 +100,8 @@ fun PitchShelf(
                     saved = false,
                     saving = saving,
                     accent = accent,
-                    onClick = { if (!saving) onSaveCurrent() },
-                    onRename = null,
-                    onExport = null,
-                    onShare = null,
-                    onDelete = null,
+                    onClick = { onOpenPitch(null) },
+                    menuItems = listOf("+ render" to onRenderCurrent),
                 )
             }
         }
@@ -133,13 +129,9 @@ private fun PitchCard(
     saving: Boolean = false,
     accent: Color,
     onClick: () -> Unit,
-    onRename: (() -> Unit)?,
-    onExport: (() -> Unit)?,
-    onShare: (() -> Unit)?,
-    onDelete: (() -> Unit)?,
+    menuItems: List<Pair<String, () -> Unit>>,
 ) {
     var menu by remember { mutableStateOf(false) }
-    val hasMenu = onRename != null || onExport != null || onShare != null || onDelete != null
 
     Box {
         Surface(
@@ -149,13 +141,13 @@ private fun PitchCard(
                 .width(104.dp)
                 .combinedClickable(
                     onClick = onClick,
-                    onLongClick = { if (hasMenu) menu = true },
+                    onLongClick = { if (menuItems.isNotEmpty()) menu = true },
                 ),
         ) {
             Column(modifier = Modifier.padding(12.dp)) {
                 if (saving) {
                     Row(
-                        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+                        verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
                     ) {
                         CircularProgressIndicator(
@@ -164,9 +156,11 @@ private fun PitchCard(
                             color = accent,
                         )
                         Text(
-                            "saving",
-                            style = MaterialTheme.typography.titleSmall,
+                            "rendering",
+                            style = MaterialTheme.typography.labelSmall,
                             color = accent,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
                         )
                     }
                 } else {
@@ -196,9 +190,15 @@ private fun PitchCard(
             }
         }
         DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-            onRename?.let { DropdownMenuItem(text = { Text("Rename") }, onClick = { menu = false; it() }) }
-            onShare?.let { DropdownMenuItem(text = { Text("Share") }, onClick = { menu = false; it() }) }
-            onDelete?.let { DropdownMenuItem(text = { Text("Delete") }, onClick = { menu = false; it() }) }
+            menuItems.forEach { (text, action) ->
+                DropdownMenuItem(
+                    text = { Text(text) },
+                    onClick = {
+                        menu = false
+                        action()
+                    },
+                )
+            }
         }
     }
 }
@@ -208,7 +208,7 @@ private fun RenameDialog(initial: String, onConfirm: (String) -> Unit, onDismiss
     var text by remember { mutableStateOf(initial) }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Rename pitch") },
+        title = { Text("Name this pitch") },
         text = {
             OutlinedTextField(
                 value = text,

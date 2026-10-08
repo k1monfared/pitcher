@@ -31,6 +31,7 @@ import pitcher.android.data.Variant
 import pitcher.android.data.VariantSpec
 import pitcher.android.media.AudioRenderer
 import pitcher.android.media.MediaImporter
+import pitcher.android.media.Notifications
 import pitcher.android.media.PlaybackService
 import pitcher.android.media.RenderedStore
 import pitcher.android.media.TunerDecoder
@@ -419,7 +420,7 @@ class PitcherViewModel(app: Application) : AndroidViewModel(app) {
     /** Renders the current pitch using an explicit full file base name. */
     fun renderAs(baseName: String?) {
         startRender {
-            renderToLibrary(faderCents, baseName, fullName = true)
+            renderToLibrary(faderCents, baseName, fullName = true, notify = false)
             current?.let { variants = repo.listVariants(it.id) }
             exportMessage = "saved"
         }
@@ -428,7 +429,7 @@ class PitcherViewModel(app: Application) : AndroidViewModel(app) {
     /** Renders (if needed) with an explicit full base name, then shares it. */
     fun shareAs(baseName: String?) {
         startRender {
-            val variant = renderToLibrary(faderCents, baseName, fullName = true)
+            val variant = renderToLibrary(faderCents, baseName, fullName = true, notify = false)
             current?.let { variants = repo.listVariants(it.id) }
             if (variant != null) {
                 shareUri = Uri.parse(variant.outputPath)
@@ -454,7 +455,7 @@ class PitcherViewModel(app: Application) : AndroidViewModel(app) {
             val variant = if (existing != null && RenderedStore.exists(existing.outputPath)) {
                 existing
             } else {
-                renderToLibrary(faderCents, name)
+                renderToLibrary(faderCents, name, notify = false)
             }
             current?.let { variants = repo.listVariants(it.id) }
             if (variant != null) {
@@ -510,7 +511,12 @@ class PitcherViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    private suspend fun renderToLibrary(cents: Int, name: String?, fullName: Boolean = false): Variant? {
+    private suspend fun renderToLibrary(
+        cents: Int,
+        name: String?,
+        fullName: Boolean = false,
+        notify: Boolean = true,
+    ): Variant? {
         val track = current ?: return null
         val format = exportFormat
         val segments = renderSegments()
@@ -544,11 +550,15 @@ class PitcherViewModel(app: Application) : AndroidViewModel(app) {
                     )
                 }
                 val uri = RenderedStore.save(app, folder, displayName, format.mime, tmp)
-                val existing = if (segments == null) {
-                    repo.findVariant(track.id, cents, true, null, format.id)
-                } else {
-                    null
+                if (notify) {
+                    Notifications.saved(
+                        app,
+                        (System.nanoTime() and 0x7FFFFFFF).toInt(),
+                        "Saved $displayName",
+                        RenderedStore.openIntent(app, uri, folder),
+                    )
                 }
+                val existing = repo.findVariantByCents(track.id, cents)
                 if (existing != null) {
                     repo.updateVariantFile(existing.id, uri, format.id, name)
                     repo.getVariant(existing.id)

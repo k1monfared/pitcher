@@ -50,6 +50,7 @@ fun ModernApp(
     var showTuner by remember { mutableStateOf(false) }
     var showTimeline by remember { mutableStateOf(false) }
     var libraryIntroDone by remember { mutableStateOf(false) }
+    var onboardingStep by remember { mutableStateOf<String?>(null) }
     val onboarding = rememberOnboardingTargets()
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -70,6 +71,7 @@ fun ModernApp(
                 onOpenSettings = { showSettings = true },
                 onOpenTuner = { showTuner = true },
                 onOpenTimeline = { showTimeline = true },
+                forceSpeedHud = vm.onboardingActive && onboardingStep == "speed",
                 onboarding = onboarding,
             )
         }
@@ -82,10 +84,12 @@ fun ModernApp(
                     finalLabel = "Next",
                     onFinish = { libraryIntroDone = true },
                     onSkip = { vm.finishOnboarding() },
+                    onStep = { onboardingStep = it.targetKey },
                 )
                 !showLibrary && vm.current != null -> OnboardingOverlay(
                     targets = onboarding,
                     onFinish = { vm.finishOnboarding() },
+                    onStep = { onboardingStep = it.targetKey },
                 )
             }
         }

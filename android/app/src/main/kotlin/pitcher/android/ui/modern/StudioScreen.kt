@@ -48,6 +48,7 @@ fun StudioScreen(
     onOpenSettings: () -> Unit,
     onOpenTuner: () -> Unit = {},
     onOpenTimeline: () -> Unit = {},
+    forceSpeedHud: Boolean = false,
     onboarding: OnboardingTargets? = null,
 ) {
     val track = vm.current
@@ -86,11 +87,13 @@ fun StudioScreen(
         onSkip = { delta -> vm.seekTo(vm.positionMs + delta) },
         onTempo = { vm.changeTempo(it) },
         onAddBookmark = { vm.addBookmark(null) },
-        onSelectOriginal = { vm.selectOriginal() },
-        onSelectVariant = { vm.selectVariant(it) },
-        onSaveCurrent = { onOpenExport() },
+        onOpenPitch = { variant ->
+            if (variant != null) vm.selectVariant(variant)
+            onOpenExport()
+        },
+        onRenderCurrent = { vm.renderAndKeep(null) },
+        onRenderVariant = { vm.renderAndKeepVariant(it) },
         onRenameVariant = { v, name -> vm.renameVariant(v, name) },
-        onExportVariant = { vm.renderAndKeepVariant(it) },
         onShareVariant = { vm.shareVariant(it) },
         onDeleteVariant = { vm.deleteVariant(it) },
         onOpenLibrary = onOpenLibrary,
@@ -100,6 +103,7 @@ fun StudioScreen(
         onOpenTimeline = onOpenTimeline,
         onCancelRender = { vm.cancelExport() },
         hapticsEnabled = vm.hapticsEnabled,
+        forceSpeedHud = forceSpeedHud,
         onboarding = onboarding,
     )
 }
@@ -135,11 +139,10 @@ fun StudioContent(
     onSkip: (Long) -> Unit,
     onTempo: (Float) -> Unit,
     onAddBookmark: () -> Unit,
-    onSelectOriginal: () -> Unit,
-    onSelectVariant: (Variant) -> Unit,
-    onSaveCurrent: () -> Unit,
+    onOpenPitch: (Variant?) -> Unit,
+    onRenderCurrent: () -> Unit,
+    onRenderVariant: (Variant) -> Unit,
     onRenameVariant: (Variant, String) -> Unit,
-    onExportVariant: (Variant) -> Unit,
     onShareVariant: (Variant) -> Unit,
     onDeleteVariant: (Variant) -> Unit,
     onOpenLibrary: () -> Unit,
@@ -149,6 +152,7 @@ fun StudioContent(
     onOpenTuner: () -> Unit = {},
     onOpenTimeline: () -> Unit = {},
     hapticsEnabled: Boolean = true,
+    forceSpeedHud: Boolean = false,
     onboarding: OnboardingTargets? = null,
 ) {
     val accent by animateColorAsState(targetValue = PitchHues.forCents(cents), label = "accent")
@@ -244,11 +248,10 @@ fun StudioContent(
                 selectedVariantId = selectedVariantId,
                 faderCents = cents,
                 accent = accent,
-                onSelectOriginal = onSelectOriginal,
-                onSelectVariant = onSelectVariant,
-                onSaveCurrent = onSaveCurrent,
+                onOpenPitch = onOpenPitch,
+                onRenderCurrent = onRenderCurrent,
+                onRenderVariant = onRenderVariant,
                 onRenameVariant = onRenameVariant,
-                onExportVariant = onExportVariant,
                 onShareVariant = onShareVariant,
                 onDeleteVariant = onDeleteVariant,
                 saving = saving,
@@ -287,7 +290,7 @@ fun StudioContent(
             }
         }
 
-        if (speedDragging) {
+        if (speedDragging || forceSpeedHud) {
             SpeedHud(
                 tempo = tempo,
                 accent = accent,

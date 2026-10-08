@@ -150,6 +150,14 @@ class ShelfRepository(
         }
     }
 
+    fun findVariantByCents(trackId: Long, cents: Int): Variant? {
+        val sql =
+            "SELECT $VARIANT_COLUMNS FROM variants WHERE track_id = ? AND cents = ? ORDER BY id LIMIT 1"
+        return db().rawQuery(sql, arrayOf(trackId.toString(), cents.toString())).use { c ->
+            if (c.moveToFirst()) readVariant(c) else null
+        }
+    }
+
     fun getVariant(id: Long): Variant? {
         val sql = "SELECT $VARIANT_COLUMNS FROM variants WHERE id = ?"
         return db().rawQuery(sql, arrayOf(id.toString())).use { c ->

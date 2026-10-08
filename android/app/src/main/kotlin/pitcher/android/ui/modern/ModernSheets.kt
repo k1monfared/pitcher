@@ -45,6 +45,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import kotlin.math.roundToInt
 import pitcher.android.media.RenderedStore
+import pitcher.android.data.Variant
 import pitcher.android.ui.PitcherViewModel
 import pitcher.core.ExportFormat
 import pitcher.core.Notes
@@ -70,6 +71,7 @@ fun ExportSheet(vm: PitcherViewModel, onDismiss: () -> Unit, onOpenTimeline: () 
         }
     }
     var baseName by remember(track?.id) { mutableStateOf(initialBase) }
+    var renamingPitch by remember { mutableStateOf<Variant?>(null) }
 
     val folderPicker = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocumentTree(),
@@ -95,6 +97,17 @@ fun ExportSheet(vm: PitcherViewModel, onDismiss: () -> Unit, onOpenTimeline: () 
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Text("Render", style = MaterialTheme.typography.headlineSmall)
+
+            val selectedVariant = vm.variants.firstOrNull { it.id == vm.selectedVariantId }
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                TextButton(onClick = { vm.renderAndKeep(null) }, enabled = !vm.exporting) {
+                    Text("+ render")
+                }
+                if (selectedVariant != null) {
+                    TextButton(onClick = { renamingPitch = selectedVariant }) { Text("rename pitch") }
+                    TextButton(onClick = { vm.deleteVariant(selectedVariant) }) { Text("delete") }
+                }
+            }
 
             val folder = vm.effectiveFolder()
             Text(
@@ -198,6 +211,31 @@ fun ExportSheet(vm: PitcherViewModel, onDismiss: () -> Unit, onOpenTimeline: () 
                 )
             }
         }
+    }
+
+    renamingPitch?.let { variant ->
+        var text by remember(variant.id) { mutableStateOf(variant.name ?: "") }
+        AlertDialog(
+            onDismissRequest = { renamingPitch = null },
+            title = { Text("Name this pitch") },
+            text = {
+                OutlinedTextField(
+                    value = text,
+                    onValueChange = { text = it },
+                    singleLine = true,
+                    label = { Text("Name") },
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    vm.renameVariant(variant, text)
+                    renamingPitch = null
+                }) { Text("Save") }
+            },
+            dismissButton = {
+                TextButton(onClick = { renamingPitch = null }) { Text("Cancel") }
+            },
+        )
     }
 }
 

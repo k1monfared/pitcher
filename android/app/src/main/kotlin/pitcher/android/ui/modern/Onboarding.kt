@@ -141,6 +141,7 @@ fun OnboardingOverlay(
     skippable: Boolean = true,
     onSkip: () -> Unit = onFinish,
     finalLabel: String = "Done",
+    onStep: (OnboardingStep) -> Unit = {},
 ) {
     var index by remember { mutableStateOf(0) }
     val step = steps.getOrNull(index)
@@ -148,6 +149,7 @@ fun OnboardingOverlay(
         LaunchedEffect(Unit) { onFinish() }
         return
     }
+    LaunchedEffect(index) { onStep(step) }
 
     val density = LocalDensity.current
     val accent = MaterialTheme.colorScheme.primary

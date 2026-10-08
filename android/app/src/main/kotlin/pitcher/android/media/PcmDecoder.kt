@@ -5,6 +5,7 @@ import android.media.MediaExtractor
 import android.media.MediaFormat
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
+import kotlin.coroutines.cancellation.CancellationException
 
 /**
  * Decodes a media file's audio track to float PCM, optionally limited to a
@@ -18,6 +19,7 @@ object PcmDecoder {
         startMs: Long = 0L,
         endMs: Long = -1L,
         maxChannels: Int = 2,
+        cancelled: () -> Boolean = { false },
     ): WindowedAudioChannels? {
         val extractor = MediaExtractor()
         var codec: MediaCodec? = null
@@ -69,6 +71,7 @@ object PcmDecoder {
             var outputDone = false
 
             while (!outputDone) {
+                if (cancelled()) throw CancellationException("cancelled")
                 if (!inputDone) {
                     val inIndex = codec.dequeueInputBuffer(10_000)
                     if (inIndex >= 0) {
@@ -141,6 +144,8 @@ object PcmDecoder {
 
             val arrays = Array(outChannels) { builders[it].toArray() }
             if (arrays[0].isEmpty()) null else WindowedAudioChannels(arrays, sampleRate)
+        } catch (e: CancellationException) {
+            throw e
         } catch (_: Exception) {
             null
         } finally {

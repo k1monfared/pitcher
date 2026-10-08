@@ -2,6 +2,7 @@ package pitcher.android.media
 
 import android.content.ContentValues
 import android.content.Context
+import android.content.Intent
 import android.net.Uri
 import android.provider.DocumentsContract
 import android.provider.MediaStore
@@ -75,6 +76,25 @@ object RenderedStore {
 
     fun delete(context: Context, uriString: String) {
         runCatching { context.contentResolver.delete(Uri.parse(uriString), null, null) }
+    }
+
+    /**
+     * An intent to show the saved file: the chosen SAF folder when set, otherwise
+     * the file itself (the default Music/pitcher collection has no folder URI).
+     */
+    fun openIntent(context: Context, fileUri: String, folderTreeUri: String?): Intent? {
+        if (!folderTreeUri.isNullOrBlank()) {
+            val treeUri = Uri.parse(folderTreeUri)
+            return Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(treeUri, DocumentsContract.Document.MIME_TYPE_DIR)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+        }
+        val file = Uri.parse(fileUri)
+        return Intent(Intent.ACTION_VIEW).apply {
+            setDataAndType(file, "audio/*")
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
     }
 
     fun exists(uriString: String): Boolean =

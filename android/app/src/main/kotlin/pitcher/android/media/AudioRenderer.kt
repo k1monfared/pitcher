@@ -75,7 +75,7 @@ object AudioRenderer {
         cancelled: () -> Boolean,
     ) {
         if (cancelled()) throw CancellationException("cancelled")
-        val decoded = PcmDecoder.decodeChannels(sourcePath, startMs, endMs, maxChannels)
+        val decoded = PcmDecoder.decodeChannels(sourcePath, startMs, endMs, maxChannels, cancelled)
             ?: error("cannot decode audio")
         val shifted = shiftChannels(decoded, cents, cancelled)
         if (cancelled()) throw CancellationException("cancelled")
@@ -95,7 +95,7 @@ object AudioRenderer {
         var sampleRate = 44100
         for ((startMs, endMs) in segments) {
             if (cancelled()) throw CancellationException("cancelled")
-            val decoded = PcmDecoder.decodeChannels(sourcePath, startMs, endMs, maxChannels)
+            val decoded = PcmDecoder.decodeChannels(sourcePath, startMs, endMs, maxChannels, cancelled)
                 ?: error("cannot decode audio")
             sampleRate = decoded.sampleRate
             parts.add(shiftChannels(decoded, cents, cancelled))
