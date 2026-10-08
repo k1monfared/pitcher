@@ -48,6 +48,7 @@ fun ModernApp(
     var showExport by remember { mutableStateOf(false) }
     var showSettings by remember { mutableStateOf(false) }
     var showTuner by remember { mutableStateOf(false) }
+    var showTimeline by remember { mutableStateOf(false) }
     var libraryIntroDone by remember { mutableStateOf(false) }
     val onboarding = rememberOnboardingTargets()
 
@@ -68,6 +69,7 @@ fun ModernApp(
                 onOpenExport = { showExport = true },
                 onOpenSettings = { showSettings = true },
                 onOpenTuner = { showTuner = true },
+                onOpenTimeline = { showTimeline = true },
                 onboarding = onboarding,
             )
         }
@@ -97,5 +99,8 @@ fun ModernApp(
     }
     if (showTuner) {
         TunerModal(vm = vm, onDismiss = { showTuner = false })
+    }
+    if (showTimeline) {
+        TimelineSheet(vm = vm, onDismiss = { showTimeline = false })
     }
 }

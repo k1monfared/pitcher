@@ -95,7 +95,7 @@ fun PitchShelf(
         item {
             Box(modifier = Modifier.onboardingTarget(onboarding, "save")) {
                 PitchCard(
-                    label = "+ save",
+                    label = "+ render",
                     sub = (if (faderCents >= 0) "+${faderCents}c" else "${faderCents}c"),
                     selected = false,
                     saved = false,

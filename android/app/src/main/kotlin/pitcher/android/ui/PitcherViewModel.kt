@@ -401,6 +401,30 @@ class PitcherViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** Renders the current pitch using an explicit full file base name. */
+    fun renderAs(baseName: String?) {
+        startRender {
+            renderToLibrary(faderCents, baseName, fullName = true)
+            current?.let { variants = repo.listVariants(it.id) }
+            exportMessage = "saved"
+        }
+    }
+
+    /** Renders (if needed) with an explicit full base name, then shares it. */
+    fun shareAs(baseName: String?) {
+        startRender {
+            val variant = renderToLibrary(faderCents, baseName, fullName = true)
+            current?.let { variants = repo.listVariants(it.id) }
+            if (variant != null) {
+                shareUri = Uri.parse(variant.outputPath)
+                exportMime = exportFormat.mime
+                exportMessage = "ready to share"
+            } else {
+                exportMessage = "render failed"
+            }
+        }
+    }
+
     /** Ensures the current pitch is rendered, then opens the share sheet. */
     fun exportCurrent(name: String?) {
         startRender {
@@ -471,13 +495,14 @@ class PitcherViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    private suspend fun renderToLibrary(cents: Int, name: String?): Variant? {
+    private suspend fun renderToLibrary(cents: Int, name: String?, fullName: Boolean = false): Variant? {
         val track = current ?: return null
         val format = exportFormat
         val segments = renderSegments()
         val section = segments?.takeIf { it.size == 1 }?.first()
             ?.let { it.first / 1000.0 to it.second / 1000.0 }
         val app = getApplication<Application>()
+        val folder = effectiveFolder()
         return withContext(Dispatchers.IO) {
             val tmpDir = File(app.cacheDir, "renders").apply { mkdirs() }
             val ext = format.extension
@@ -491,15 +516,19 @@ class PitcherViewModel(app: Application) : AndroidViewModel(app) {
                     segments = segments,
                     cancelled = { renderCancelled },
                 )
-                val displayName = Notes.downloadFilename(
-                    track.title,
-                    track.artist,
-                    track.sourcePath,
-                    name,
-                    cents,
-                    ext,
-                )
-                val uri = RenderedStore.save(app, displayName, format.mime, tmp)
+                val displayName = if (fullName && !name.isNullOrBlank()) {
+                    "${name.trim()}.$ext"
+                } else {
+                    Notes.downloadFilename(
+                        track.title,
+                        track.artist,
+                        track.sourcePath,
+                        name,
+                        cents,
+                        ext,
+                    )
+                }
+                val uri = RenderedStore.save(app, folder, displayName, format.mime, tmp)
                 val existing = if (segments == null) {
                     repo.findVariant(track.id, cents, true, null, format.id)
                 } else {

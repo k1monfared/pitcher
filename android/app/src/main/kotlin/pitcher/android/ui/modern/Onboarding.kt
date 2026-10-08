@@ -108,9 +108,10 @@ val MAIN_TOUR: List<OnboardingStep> = listOf(
             "to rename, export, share, or delete it.",
     ),
     OnboardingStep(
-        "export",
-        "Export settings",
-        "Open Export to choose the format and whether to save only the A/B loop.",
+        "timeline",
+        "Loops and bookmarks",
+        "Drag the lane above the wave to make a loop, and long-press an edge or a " +
+            "bookmark pin to fine-tune it. This list manages them.",
     ),
 )
 

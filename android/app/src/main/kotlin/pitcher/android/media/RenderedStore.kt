@@ -3,20 +3,60 @@ package pitcher.android.media
 import android.content.ContentValues
 import android.content.Context
 import android.net.Uri
+import android.provider.DocumentsContract
 import android.provider.MediaStore
 import java.io.File
 
 /**
- * Publishes rendered files into a user-visible folder (Music/pitcher) via
- * MediaStore, so a render is kept even if it is never shared, and the folder
- * can be browsed from any file manager. Returns a content URI string, which is
- * directly shareable and does not need a FileProvider.
+ * Publishes rendered files. When a folder tree URI is set (SAF), the file is
+ * written there through DocumentsContract. Otherwise it falls back to the
+ * shared Music/pitcher collection via MediaStore. Returns a URI string, which is
+ * directly shareable.
  */
 object RenderedStore {
 
     const val FOLDER = "Music/pitcher"
 
-    fun save(context: Context, displayName: String, mime: String, source: File): String {
+    fun save(
+        context: Context,
+        folderTreeUri: String?,
+        displayName: String,
+        mime: String,
+        source: File,
+    ): String {
+        if (!folderTreeUri.isNullOrBlank()) {
+            runCatching { return saveToTree(context, folderTreeUri, displayName, mime, source) }
+        }
+        return saveToMediaStore(context, displayName, mime, source)
+    }
+
+    private fun saveToTree(
+        context: Context,
+        folderTreeUri: String,
+        displayName: String,
+        mime: String,
+        source: File,
+    ): String {
+        val resolver = context.contentResolver
+        val treeUri = Uri.parse(folderTreeUri)
+        val parent = DocumentsContract.buildDocumentUriUsingTree(
+            treeUri,
+            DocumentsContract.getTreeDocumentId(treeUri),
+        )
+        val doc = DocumentsContract.createDocument(resolver, parent, mime, displayName)
+            ?: error("could not create $displayName in the chosen folder")
+        resolver.openOutputStream(doc)?.use { out ->
+            source.inputStream().use { input -> input.copyTo(out) }
+        } ?: error("could not write $displayName")
+        return doc.toString()
+    }
+
+    private fun saveToMediaStore(
+        context: Context,
+        displayName: String,
+        mime: String,
+        source: File,
+    ): String {
         val resolver = context.contentResolver
         val values = ContentValues().apply {
             put(MediaStore.Audio.Media.DISPLAY_NAME, displayName)
@@ -37,5 +77,6 @@ object RenderedStore {
         runCatching { context.contentResolver.delete(Uri.parse(uriString), null, null) }
     }
 
-    fun exists(uriString: String): Boolean = uriString.startsWith("content://")
+    fun exists(uriString: String): Boolean =
+        uriString.startsWith("content://") || uriString.startsWith("file://")
 }

@@ -1,7 +1,9 @@
 package pitcher.android.ui.modern
 
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -10,7 +12,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -21,6 +26,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -40,6 +46,7 @@ fun StudioScreen(
     onOpenExport: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenTuner: () -> Unit = {},
+    onOpenTimeline: () -> Unit = {},
     onboarding: OnboardingTargets? = null,
 ) {
     val track = vm.current
@@ -80,7 +87,7 @@ fun StudioScreen(
         onAddBookmark = { vm.addBookmark(null) },
         onSelectOriginal = { vm.selectOriginal() },
         onSelectVariant = { vm.selectVariant(it) },
-        onSaveCurrent = { vm.renderAndKeep(null) },
+        onSaveCurrent = { onOpenExport() },
         onRenameVariant = { v, name -> vm.renameVariant(v, name) },
         onExportVariant = { vm.renderAndKeepVariant(it) },
         onShareVariant = { vm.shareVariant(it) },
@@ -89,6 +96,7 @@ fun StudioScreen(
         onOpenExport = onOpenExport,
         onOpenSettings = onOpenSettings,
         onOpenTuner = onOpenTuner,
+        onOpenTimeline = onOpenTimeline,
         onCancelRender = { vm.cancelExport() },
         hapticsEnabled = vm.hapticsEnabled,
         onboarding = onboarding,
@@ -138,6 +146,7 @@ fun StudioContent(
     onOpenSettings: () -> Unit,
     onCancelRender: () -> Unit = {},
     onOpenTuner: () -> Unit = {},
+    onOpenTimeline: () -> Unit = {},
     hapticsEnabled: Boolean = true,
     onboarding: OnboardingTargets? = null,
 ) {
@@ -159,7 +168,12 @@ fun StudioContent(
         Column(
             modifier = Modifier.fillMaxSize().safeDrawingPadding().padding(horizontal = 16.dp),
         ) {
-            StudioTopBar(title = title, artist = artist, onOpenLibrary = onOpenLibrary)
+            StudioTopBar(
+                title = title,
+                artist = artist,
+                onOpenLibrary = onOpenLibrary,
+                onOpenSettings = onOpenSettings,
+            )
 
             PitchPad(
                 cents = cents,
@@ -264,10 +278,9 @@ fun StudioContent(
                 horizontalArrangement = Arrangement.Center,
             ) {
                 TextButton(
-                    onClick = onOpenExport,
-                    modifier = Modifier.onboardingTarget(onboarding, "export"),
-                ) { Text("Export this pitch") }
-                TextButton(onClick = onOpenSettings) { Text("Settings") }
+                    onClick = onOpenTimeline,
+                    modifier = Modifier.onboardingTarget(onboarding, "timeline"),
+                ) { Text("loops & bookmarks") }
             }
         }
 
@@ -286,12 +299,17 @@ private fun StudioTopBar(
     title: String,
     artist: String?,
     onOpenLibrary: () -> Unit,
+    onOpenSettings: () -> Unit,
 ) {
     Box(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
         TextButton(
             onClick = onOpenLibrary,
             modifier = Modifier.align(Alignment.CenterStart),
         ) { Text("Library") }
+        GearButton(
+            onClick = onOpenSettings,
+            modifier = Modifier.align(Alignment.CenterEnd),
+        )
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier.align(Alignment.Center),
@@ -312,6 +330,33 @@ private fun StudioTopBar(
                     overflow = TextOverflow.Ellipsis,
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun GearButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
+    Surface(
+        modifier = modifier.clickable(onClick = onClick),
+        shape = androidx.compose.foundation.shape.CircleShape,
+        color = Color.White.copy(alpha = 0.06f),
+    ) {
+        androidx.compose.foundation.Canvas(modifier = Modifier.padding(9.dp).size(20.dp)) {
+            val w = size.width
+            val cx = w / 2f
+            val cy = w / 2f
+            val teeth = 8
+            val outer = w * 0.46f
+            val inner = w * 0.30f
+            val tint = Color(0xFFEDEDF2)
+            for (i in 0 until teeth) {
+                val a = Math.toRadians(i * 360.0 / teeth)
+                val x = cx + (outer * 0.62f * kotlin.math.cos(a)).toFloat()
+                val y = cy + (outer * 0.62f * kotlin.math.sin(a)).toFloat()
+                drawCircle(color = tint, radius = w * 0.11f, center = Offset(x, y))
+            }
+            drawCircle(color = tint, radius = inner, center = Offset(cx, cy))
+            drawCircle(color = Color(0xFF08080B), radius = inner * 0.42f, center = Offset(cx, cy))
         }
     }
 }

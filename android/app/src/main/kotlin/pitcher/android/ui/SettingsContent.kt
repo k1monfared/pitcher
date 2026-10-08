@@ -1,5 +1,8 @@
 package pitcher.android.ui
 
+import android.content.Intent
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -13,10 +16,26 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 
 @Composable
 fun SettingsContent(vm: PitcherViewModel, modifier: Modifier = Modifier) {
+    val context = LocalContext.current
+    val folderPicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocumentTree(),
+    ) { uri ->
+        if (uri != null) {
+            runCatching {
+                context.contentResolver.takePersistableUriPermission(
+                    uri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
+                )
+            }
+            vm.updateDefaultFolder(uri.toString())
+        }
+    }
+
     Column(
         modifier = modifier.fillMaxWidth().padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -57,6 +76,22 @@ fun SettingsContent(vm: PitcherViewModel, modifier: Modifier = Modifier) {
         )
         Button(onClick = { vm.clearExports() }, enabled = vm.storageExportsBytes > 0) {
             Text("Clear exported renders")
+        }
+
+        HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+
+        Text("Saves", style = MaterialTheme.typography.titleMedium)
+        Text(
+            "Default folder: ${vm.defaultFolder ?: "Music/pitcher"}",
+            style = MaterialTheme.typography.bodyMedium,
+        )
+        Button(onClick = { folderPicker.launch(null) }) { Text("Choose default folder") }
+        if (vm.defaultFolder != null) {
+            Text(
+                "A song can override this from the render sheet.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
 
         HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
