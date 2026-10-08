@@ -19,6 +19,8 @@ fun AppRoot(
     incomingUri: Uri? = null,
     onIncomingConsumed: () -> Unit = {},
 ) {
+    KeepScreenOn(vm.keepScreenOn)
+
     when (vm.uiStyle) {
         UiStyle.CLASSIC -> PitcherTheme {
             ClassicApp(vm, incomingUri, onIncomingConsumed)

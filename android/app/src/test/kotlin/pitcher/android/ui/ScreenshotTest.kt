@@ -1,5 +1,7 @@
 package pitcher.android.ui
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onRoot
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -17,6 +19,10 @@ import pitcher.android.ui.classic.PitchesScreen
 import pitcher.android.ui.classic.PitchLabScreen
 import pitcher.android.ui.classic.PlayerScreen
 import pitcher.android.ui.classic.TunerScreen
+import pitcher.android.ui.modern.LIBRARY_TOUR
+import pitcher.android.ui.modern.LibraryContent
+import pitcher.android.ui.modern.OnboardingOverlay
+import pitcher.android.ui.modern.OnboardingTargets
 import pitcher.android.ui.modern.StudioContent
 import pitcher.android.ui.theme.ModernTheme
 import pitcher.android.ui.theme.PitcherTheme
@@ -110,43 +116,123 @@ class ScreenshotTest {
 
     @Test
     @Config(qualifiers = "w411dp-h891dp-xxhdpi")
-    fun modernStudio() {
+    fun modernLibrary() {
+        val farsi = track.copy(
+            id = 2,
+            title = "سالار عقیلی و سیامک آقایی - کنسرت یاد باد",
+            artist = "Salar Aghili & Siamak Aghaei",
+        )
         compose.setContent {
             ModernTheme {
-                StudioContent(
-                    title = "Nava Sol Darya",
-                    artist = "Tasnife Yad Bad",
-                    cents = -600,
-                    snap = false,
-                    peaks = peaks,
-                    positionMs = 48_000,
-                    durationMs = 210_000,
-                    loopStartMs = 30_000,
-                    loopEndMs = 60_000,
-                    playing = true,
-                    tempo = 1f,
-                    loopEnabled = true,
-                    variants = variants,
-                    selectedVariantId = 1,
-                    onCents = {},
-                    onSnapToggle = {},
-                    onSeekMs = {},
-                    onSetLoop = { _, _ -> },
-                    onPlayPause = {},
-                    onSkip = {},
-                    onTempo = {},
-                    onLoopToggle = {},
-                    onSelectOriginal = {},
-                    onSelectVariant = {},
-                    onSaveCurrent = {},
-                    onOpenLibrary = {},
-                    onOpenPitches = {},
-                    onOpenExport = {},
-                    onOpenSettings = {},
+                LibraryContent(
+                    tracks = listOf(track, farsi),
+                    message = null,
+                    canClose = true,
+                    onImport = {},
+                    onClose = {},
+                    onOpen = {},
+                    onDelete = {},
                 )
             }
         }
+        compose.onRoot().captureRoboImage("build/screenshots/11-modern-library.png")
+    }
+
+    @Test
+    @Config(qualifiers = "w411dp-h891dp-xxhdpi")
+    fun modernStudio() {
+        compose.setContent {
+            ModernTheme { StudioSample() }
+        }
         compose.onRoot().captureRoboImage("build/screenshots/10-modern-studio.png")
+    }
+
+    @Test
+    @Config(qualifiers = "w411dp-h891dp-xxhdpi")
+    fun modernOnboarding() {
+        val targets = OnboardingTargets()
+        compose.setContent {
+            ModernTheme {
+                Box {
+                    StudioSample(onboarding = targets)
+                    OnboardingOverlay(targets = targets, onFinish = {})
+                }
+            }
+        }
+        compose.onRoot().captureRoboImage("build/screenshots/12-modern-onboarding.png")
+    }
+
+    @Test
+    @Config(qualifiers = "w411dp-h891dp-xxhdpi")
+    fun modernLibraryOnboarding() {
+        val targets = OnboardingTargets()
+        compose.setContent {
+            ModernTheme {
+                Box {
+                    LibraryContent(
+                        tracks = listOf(track),
+                        message = null,
+                        canClose = false,
+                        onImport = {},
+                        onClose = {},
+                        onOpen = {},
+                        onDelete = {},
+                        onboarding = targets,
+                    )
+                    OnboardingOverlay(
+                        targets = targets,
+                        steps = LIBRARY_TOUR,
+                        finalLabel = "Next",
+                        onFinish = {},
+                    )
+                }
+            }
+        }
+        compose.onRoot().captureRoboImage("build/screenshots/13-modern-library-tour.png")
+    }
+
+    @Composable
+    private fun StudioSample(onboarding: OnboardingTargets? = null) {
+        StudioContent(
+            title = "Nava Sol Darya",
+            artist = "Tasnife Yad Bad",
+            cents = -600,
+            snap = false,
+            peaks = peaks,
+            positionMs = 48_000,
+            durationMs = 210_000,
+            loopStartMs = 30_000,
+            loopEndMs = 60_000,
+            loopEnabled = true,
+            bookmarks = bookmarks,
+            playing = true,
+            tempo = 1f,
+            variants = variants,
+            selectedVariantId = 1,
+            saving = false,
+            statusMessage = null,
+            onCents = {},
+            onSnapToggle = {},
+            onSeekMs = {},
+            onSetLoop = { _, _ -> },
+            onPlayPause = {},
+            onSkip = {},
+            onTempo = {},
+            onLoopTap = {},
+            onLoopClear = {},
+            onAddBookmark = {},
+            onSelectOriginal = {},
+            onSelectVariant = {},
+            onSaveCurrent = {},
+            onRenameVariant = { _, _ -> },
+            onExportVariant = {},
+            onShareVariant = {},
+            onDeleteVariant = {},
+            onOpenLibrary = {},
+            onOpenExport = {},
+            onOpenSettings = {},
+            onboarding = onboarding,
+        )
     }
 
     @Test

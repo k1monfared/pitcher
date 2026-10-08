@@ -2,12 +2,15 @@ package pitcher.android.ui.modern
 
 import android.content.Intent
 import android.net.Uri
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 import pitcher.android.ui.PitcherViewModel
@@ -43,39 +46,49 @@ fun ModernApp(
 
     var showLibrary by remember { mutableStateOf(vm.current == null) }
     var showExport by remember { mutableStateOf(false) }
-    var showPitches by remember { mutableStateOf(false) }
     var showSettings by remember { mutableStateOf(false) }
+    var libraryIntroDone by remember { mutableStateOf(false) }
+    val onboarding = rememberOnboardingTargets()
 
-    if (showLibrary) {
-        ModernLibraryScreen(
-            vm = vm,
-            onOpen = {
-                showLibrary = false
-            },
-            onClose = { if (vm.current != null) showLibrary = false },
-        )
-    } else {
-        StudioScreen(
-            vm = vm,
-            onOpenLibrary = { showLibrary = true },
-            onOpenPitches = { showPitches = true },
-            onOpenExport = { showExport = true },
-            onOpenSettings = { showSettings = true },
-        )
+    Box(modifier = Modifier.fillMaxSize()) {
+        if (showLibrary) {
+            ModernLibraryScreen(
+                vm = vm,
+                onOpen = {
+                    showLibrary = false
+                },
+                onClose = { if (vm.current != null) showLibrary = false },
+                onboarding = onboarding,
+            )
+        } else {
+            StudioScreen(
+                vm = vm,
+                onOpenLibrary = { showLibrary = true },
+                onOpenExport = { showExport = true },
+                onOpenSettings = { showSettings = true },
+                onboarding = onboarding,
+            )
+        }
+
+        if (vm.onboardingActive) {
+            when {
+                showLibrary && !libraryIntroDone -> OnboardingOverlay(
+                    targets = onboarding,
+                    steps = LIBRARY_TOUR,
+                    finalLabel = "Next",
+                    onFinish = { libraryIntroDone = true },
+                    onSkip = { vm.finishOnboarding() },
+                )
+                !showLibrary && vm.current != null -> OnboardingOverlay(
+                    targets = onboarding,
+                    onFinish = { vm.finishOnboarding() },
+                )
+            }
+        }
     }
 
     if (showExport) {
         ExportSheet(vm = vm, onDismiss = { showExport = false })
-    }
-    if (showPitches) {
-        PitchesSheet(
-            vm = vm,
-            onDismiss = { showPitches = false },
-            onOpenExport = {
-                showPitches = false
-                showExport = true
-            },
-        )
     }
     if (showSettings) {
         SettingsSheet(vm = vm, onDismiss = { showSettings = false })

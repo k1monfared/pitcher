@@ -66,6 +66,7 @@ fun PitchLabScreen(
     onExport: (String?) -> Unit,
     onFormat: (ExportFormat) -> Unit,
     onLoopOnly: (Boolean) -> Unit,
+    onCancel: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     if (track == null) {
@@ -188,6 +189,14 @@ fun PitchLabScreen(
             modifier = Modifier.fillMaxWidth(),
         ) {
             Text("Export / share (${exportFormat.id})")
+        }
+        if (exporting) {
+            OutlinedButton(
+                onClick = onCancel,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text("Cancel render")
+            }
         }
         Text(
             "Rendered pitches are saved to ${RenderedStore.FOLDER} and stay in the " +

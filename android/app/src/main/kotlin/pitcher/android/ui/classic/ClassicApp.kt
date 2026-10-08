@@ -24,7 +24,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import pitcher.android.ui.KeepScreenOn
 import pitcher.android.ui.PitcherViewModel
 import pitcher.android.ui.SettingsContent
 
@@ -45,8 +44,6 @@ fun ClassicApp(
 ) {
     var current by remember { mutableStateOf(Destination.Library) }
     var showSettings by remember { mutableStateOf(false) }
-
-    KeepScreenOn(vm.keepScreenOn)
 
     val context = LocalContext.current
     LaunchedEffect(incomingUri) {
@@ -148,6 +145,7 @@ fun ClassicApp(
                     onExport = { vm.exportCurrent(it) },
                     onFormat = { vm.changeExportFormat(it) },
                     onLoopOnly = { vm.changeExportLoopOnly(it) },
+                    onCancel = { vm.cancelExport() },
                     modifier = modifier,
                 )
                 Destination.Tuner -> TunerScreen(

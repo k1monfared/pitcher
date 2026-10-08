@@ -26,6 +26,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import pitcher.android.data.Bookmark
 import pitcher.android.data.Variant
 import pitcher.android.ui.PitcherViewModel
 import pitcher.android.ui.theme.PitchHues
@@ -34,9 +35,9 @@ import pitcher.android.ui.theme.PitchHues
 fun StudioScreen(
     vm: PitcherViewModel,
     onOpenLibrary: () -> Unit,
-    onOpenPitches: () -> Unit,
     onOpenExport: () -> Unit,
     onOpenSettings: () -> Unit,
+    onboarding: OnboardingTargets? = null,
 ) {
     val track = vm.current
     if (track == null) {
@@ -54,11 +55,14 @@ fun StudioScreen(
         durationMs = vm.durationMs,
         loopStartMs = vm.loopStartMs,
         loopEndMs = vm.loopEndMs,
+        loopEnabled = vm.loopEnabled,
+        bookmarks = vm.bookmarks,
         playing = vm.isPlaying,
         tempo = vm.tempo,
-        loopEnabled = vm.loopEnabled,
         variants = vm.variants,
         selectedVariantId = vm.selectedVariantId,
+        saving = vm.exporting,
+        statusMessage = vm.exportMessage,
         onCents = { vm.setPitchCents(it) },
         onSnapToggle = { snap = !snap },
         onSeekMs = { vm.seekTo(it) },
@@ -66,14 +70,21 @@ fun StudioScreen(
         onPlayPause = { vm.togglePlay() },
         onSkip = { delta -> vm.seekTo(vm.positionMs + delta) },
         onTempo = { vm.changeTempo(it) },
-        onLoopToggle = { vm.toggleLoop() },
+        onLoopTap = { vm.loopChipTap() },
+        onLoopClear = { vm.clearLoop() },
+        onAddBookmark = { vm.addBookmark(null) },
         onSelectOriginal = { vm.selectOriginal() },
         onSelectVariant = { vm.selectVariant(it) },
         onSaveCurrent = { vm.renderAndKeep(null) },
+        onRenameVariant = { v, name -> vm.renameVariant(v, name) },
+        onExportVariant = { vm.renderAndKeepVariant(it) },
+        onShareVariant = { vm.shareVariant(it) },
+        onDeleteVariant = { vm.deleteVariant(it) },
         onOpenLibrary = onOpenLibrary,
-        onOpenPitches = onOpenPitches,
         onOpenExport = onOpenExport,
         onOpenSettings = onOpenSettings,
+        onCancelRender = { vm.cancelExport() },
+        onboarding = onboarding,
     )
 }
 
@@ -88,11 +99,14 @@ fun StudioContent(
     durationMs: Long,
     loopStartMs: Long?,
     loopEndMs: Long?,
+    loopEnabled: Boolean,
+    bookmarks: List<Bookmark>,
     playing: Boolean,
     tempo: Float,
-    loopEnabled: Boolean,
     variants: List<Variant>,
     selectedVariantId: Long?,
+    saving: Boolean,
+    statusMessage: String?,
     onCents: (Int) -> Unit,
     onSnapToggle: () -> Unit,
     onSeekMs: (Long) -> Unit,
@@ -100,16 +114,24 @@ fun StudioContent(
     onPlayPause: () -> Unit,
     onSkip: (Long) -> Unit,
     onTempo: (Float) -> Unit,
-    onLoopToggle: () -> Unit,
+    onLoopTap: () -> Unit,
+    onLoopClear: () -> Unit,
+    onAddBookmark: () -> Unit,
     onSelectOriginal: () -> Unit,
     onSelectVariant: (Variant) -> Unit,
     onSaveCurrent: () -> Unit,
+    onRenameVariant: (Variant, String) -> Unit,
+    onExportVariant: (Variant) -> Unit,
+    onShareVariant: (Variant) -> Unit,
+    onDeleteVariant: (Variant) -> Unit,
     onOpenLibrary: () -> Unit,
-    onOpenPitches: () -> Unit,
     onOpenExport: () -> Unit,
     onOpenSettings: () -> Unit,
+    onCancelRender: () -> Unit = {},
+    onboarding: OnboardingTargets? = null,
 ) {
     val accent by animateColorAsState(targetValue = PitchHues.forCents(cents), label = "accent")
+    var speedDragging by remember { mutableStateOf(false) }
 
     Box(modifier = Modifier.fillMaxSize().background(Color(0xFF08080B))) {
         Box(
@@ -126,23 +148,19 @@ fun StudioContent(
         Column(
             modifier = Modifier.fillMaxSize().safeDrawingPadding().padding(horizontal = 16.dp),
         ) {
-            StudioTopBar(
-                title = title,
-                artist = artist,
-                onOpenLibrary = onOpenLibrary,
-                onOpenPitches = onOpenPitches,
-            )
+            StudioTopBar(title = title, artist = artist, onOpenLibrary = onOpenLibrary)
 
             PitchPad(
                 cents = cents,
                 snap = snap,
                 accent = accent,
                 onCents = onCents,
+                onboarding = onboarding,
                 modifier = Modifier.weight(1f).fillMaxWidth(),
             )
 
             Row(
-                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -151,8 +169,14 @@ fun StudioContent(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                TextButton(onClick = onSnapToggle) {
-                    Text(if (snap) "snap: semitone" else "snap: off")
+                Row {
+                    TextButton(onClick = onAddBookmark) { Text("bookmark") }
+                    TextButton(
+                        onClick = onSnapToggle,
+                        modifier = Modifier.onboardingTarget(onboarding, "snap"),
+                    ) {
+                        Text(if (snap) "snap: on" else "snap: off")
+                    }
                 }
             }
 
@@ -162,21 +186,28 @@ fun StudioContent(
                 durationMs = durationMs,
                 loopStartMs = loopStartMs,
                 loopEndMs = loopEndMs,
+                bookmarks = bookmarks,
                 accent = accent,
                 onSeekMs = onSeekMs,
                 onSetLoop = onSetLoop,
+                onboarding = onboarding,
                 modifier = Modifier.fillMaxWidth(),
             )
 
             TransportBar(
                 playing = playing,
                 tempo = tempo,
+                loopStartMs = loopStartMs,
+                loopEndMs = loopEndMs,
                 loopEnabled = loopEnabled,
                 accent = accent,
                 onPlayPause = onPlayPause,
                 onSkip = onSkip,
                 onTempo = onTempo,
-                onLoopToggle = onLoopToggle,
+                onSpeedDragging = { speedDragging = it },
+                onLoopTap = onLoopTap,
+                onLoopClear = onLoopClear,
+                onboarding = onboarding,
             )
 
             PitchShelf(
@@ -187,17 +218,51 @@ fun StudioContent(
                 onSelectOriginal = onSelectOriginal,
                 onSelectVariant = onSelectVariant,
                 onSaveCurrent = onSaveCurrent,
-                onOpenPitches = onOpenPitches,
+                onRenameVariant = onRenameVariant,
+                onExportVariant = onExportVariant,
+                onShareVariant = onShareVariant,
+                onDeleteVariant = onDeleteVariant,
+                saving = saving,
+                onboarding = onboarding,
                 modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
             )
+
+            if (statusMessage != null || saving) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        statusMessage ?: "rendering...",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.secondary,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                    )
+                    if (saving) {
+                        TextButton(onClick = onCancelRender) { Text("cancel") }
+                    }
+                }
+            }
 
             Row(
                 modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
                 horizontalArrangement = Arrangement.Center,
             ) {
-                TextButton(onClick = onOpenExport) { Text("Export this pitch") }
+                TextButton(
+                    onClick = onOpenExport,
+                    modifier = Modifier.onboardingTarget(onboarding, "export"),
+                ) { Text("Export this pitch") }
                 TextButton(onClick = onOpenSettings) { Text("Settings") }
             }
+        }
+
+        if (speedDragging) {
+            SpeedHud(
+                tempo = tempo,
+                accent = accent,
+                modifier = Modifier.align(Alignment.Center),
+            )
         }
     }
 }
@@ -207,17 +272,15 @@ private fun StudioTopBar(
     title: String,
     artist: String?,
     onOpenLibrary: () -> Unit,
-    onOpenPitches: () -> Unit,
 ) {
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween,
-    ) {
-        TextButton(onClick = onOpenLibrary) { Text("Library") }
+    Box(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+        TextButton(
+            onClick = onOpenLibrary,
+            modifier = Modifier.align(Alignment.CenterStart),
+        ) { Text("Library") }
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.weight(1f),
+            modifier = Modifier.align(Alignment.Center),
         ) {
             Text(
                 title,
@@ -236,7 +299,6 @@ private fun StudioTopBar(
                 )
             }
         }
-        TextButton(onClick = onOpenPitches) { Text("Pitches") }
     }
 }
 

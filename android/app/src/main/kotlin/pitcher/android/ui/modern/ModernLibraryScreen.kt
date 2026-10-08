@@ -31,11 +31,38 @@ fun ModernLibraryScreen(
     vm: PitcherViewModel,
     onOpen: () -> Unit,
     onClose: () -> Unit,
+    onboarding: OnboardingTargets? = null,
 ) {
     val launcher = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocument(),
-    ) { uri -> uri?.let { vm.import(it) {} } }
+    ) { uri -> uri?.let { vm.import(it) { onOpen() } } }
 
+    LibraryContent(
+        tracks = vm.tracks,
+        message = vm.message,
+        canClose = vm.current != null,
+        onImport = { launcher.launch(arrayOf("audio/*", "video/*")) },
+        onClose = onClose,
+        onOpen = { track ->
+            vm.openTrack(track)
+            onOpen()
+        },
+        onDelete = { vm.deleteTrack(it) },
+        onboarding = onboarding,
+    )
+}
+
+@Composable
+fun LibraryContent(
+    tracks: List<Track>,
+    message: String?,
+    canClose: Boolean,
+    onImport: () -> Unit,
+    onClose: () -> Unit,
+    onOpen: (Track) -> Unit,
+    onDelete: (Track) -> Unit,
+    onboarding: OnboardingTargets? = null,
+) {
     Column(modifier = Modifier.fillMaxSize().safeDrawingPadding()) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(16.dp),
@@ -43,24 +70,29 @@ fun ModernLibraryScreen(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column {
-                Text("Library", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
                 Text(
-                    "${vm.tracks.size} songs",
+                    "Library",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Text(
+                    "${tracks.size} songs",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                Button(onClick = { launcher.launch(arrayOf("audio/*", "video/*")) }) {
-                    Text("Import")
-                }
-                if (vm.current != null) {
+                Button(
+                    onClick = onImport,
+                    modifier = Modifier.onboardingTarget(onboarding, "library.import"),
+                ) { Text("Import") }
+                if (canClose) {
                     TextButton(onClick = onClose) { Text("Close") }
                 }
             }
         }
 
-        vm.message?.let {
+        message?.let {
             Text(
                 it,
                 modifier = Modifier.padding(horizontal = 16.dp),
@@ -71,7 +103,7 @@ fun ModernLibraryScreen(
 
         HorizontalDivider()
 
-        if (vm.tracks.isEmpty()) {
+        if (tracks.isEmpty()) {
             Column(
                 modifier = Modifier.fillMaxSize().padding(24.dp),
                 verticalArrangement = Arrangement.Center,
@@ -86,14 +118,11 @@ fun ModernLibraryScreen(
             }
         } else {
             LazyColumn(modifier = Modifier.fillMaxSize()) {
-                items(vm.tracks, key = { it.id }) { track ->
+                items(tracks, key = { it.id }) { track ->
                     SongRow(
                         track = track,
-                        onOpen = {
-                            vm.openTrack(track)
-                            onOpen()
-                        },
-                        onDelete = { vm.deleteTrack(track) },
+                        onOpen = { onOpen(track) },
+                        onDelete = { onDelete(track) },
                     )
                     HorizontalDivider()
                 }
@@ -114,9 +143,9 @@ private fun SongRow(track: Track, onOpen: () -> Unit, onDelete: () -> Unit) {
     ) {
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                track.title,
+                track.title.ifBlank { "(untitled)" },
                 style = MaterialTheme.typography.bodyLarge,
-                maxLines = 1,
+                maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
             val sub = buildString {

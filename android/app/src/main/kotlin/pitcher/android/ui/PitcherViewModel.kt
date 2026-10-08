@@ -16,10 +16,12 @@ import androidx.media3.session.SessionToken
 import com.google.common.util.concurrent.MoreExecutors
 import java.io.File
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlin.coroutines.cancellation.CancellationException
 import pitcher.android.data.Bookmark
 import pitcher.android.data.ShelfRepository
 import pitcher.android.data.Track
@@ -90,12 +92,18 @@ class PitcherViewModel(app: Application) : AndroidViewModel(app) {
         private set
     var uiStyle by mutableStateOf(UiStyle.MODERN)
         private set
+    var onboardingActive by mutableStateOf(false)
+        private set
     var storageImportsBytes by mutableStateOf(0L)
         private set
     var storageExportsBytes by mutableStateOf(0L)
         private set
 
     private var controller: MediaController? = null
+    private var renderJob: Job? = null
+
+    @Volatile
+    private var renderCancelled = false
 
     private val listener = object : Player.Listener {
         override fun onIsPlayingChanged(playing: Boolean) {
@@ -123,6 +131,7 @@ class PitcherViewModel(app: Application) : AndroidViewModel(app) {
             UiStyle.MODERN
         }
         keepScreenOn = prefs.getBoolean("keep_screen_on", true)
+        onboardingActive = !prefs.getBoolean("onboarding_done", false)
         refreshTracks()
         connectController()
         viewModelScope.launch {
@@ -294,6 +303,32 @@ class PitcherViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /**
+     * The loop chip cycles: first tap sets A at the playhead, second tap sets B
+     * and turns the loop on, later taps toggle it. Long-press clears.
+     */
+    fun loopChipTap() {
+        val pos = controller?.currentPosition ?: positionMs
+        when {
+            loopStartMs == null -> {
+                loopStartMs = pos
+                loopEndMs = null
+                loopEnabled = false
+            }
+            loopEndMs == null -> {
+                val a = loopStartMs!!
+                loopStartMs = minOf(a, pos)
+                loopEndMs = maxOf(a, pos)
+                loopEnabled = true
+                controller?.seekTo(loopStartMs!!)
+                positionMs = loopStartMs!!
+            }
+            else -> {
+                loopEnabled = !loopEnabled
+            }
+        }
+    }
+
     fun setLoop(startMs: Long, endMs: Long) {
         loopStartMs = minOf(startMs, endMs)
         loopEndMs = maxOf(startMs, endMs)
@@ -330,52 +365,75 @@ class PitcherViewModel(app: Application) : AndroidViewModel(app) {
      * lost if it is never shared.
      */
     fun renderAndKeep(name: String?) {
-        if (exporting || current == null) return
-        exporting = true
-        viewModelScope.launch {
-            exportMessage = "rendering ${exportFormat.id}..."
-            try {
-                renderToLibrary(faderCents, name)
-                current?.let { variants = repo.listVariants(it.id) }
-                exportMessage = "saved to ${RenderedStore.FOLDER}"
-            } catch (e: Throwable) {
-                exportMessage = "render failed: ${reasonOf(e)}"
-            } finally {
-                exporting = false
-            }
+        startRender {
+            renderToLibrary(faderCents, name)
+            current?.let { variants = repo.listVariants(it.id) }
+            exportMessage = "saved to ${RenderedStore.FOLDER}"
+        }
+    }
+
+    /** Renders a specific saved pitch into the library. */
+    fun renderAndKeepVariant(variant: Variant) {
+        startRender {
+            renderToLibrary(variant.cents, variant.name)
+            current?.let { variants = repo.listVariants(it.id) }
+            exportMessage = "saved to ${RenderedStore.FOLDER}"
         }
     }
 
     /** Ensures the current pitch is rendered, then opens the share sheet. */
     fun exportCurrent(name: String?) {
-        if (exporting || current == null) return
-        exporting = true
-        viewModelScope.launch {
-            exportMessage = "preparing..."
-            try {
-                val track = current!!
-                val format = exportFormat
-                val section = currentSection()
-                val existing = repo.findVariant(track.id, faderCents, true, section, format.id)
-                val variant = if (existing != null && RenderedStore.exists(existing.outputPath)) {
-                    existing
-                } else {
-                    renderToLibrary(faderCents, name)
-                }
-                current?.let { variants = repo.listVariants(it.id) }
-                if (variant != null) {
-                    shareUri = Uri.parse(variant.outputPath)
-                    exportMime = format.mime
-                    exportMessage = "ready to share"
-                } else {
-                    exportMessage = "render failed"
-                }
-            } catch (e: Throwable) {
-                exportMessage = "export failed: ${reasonOf(e)}"
-            } finally {
-                exporting = false
+        startRender {
+            val track = current!!
+            val format = exportFormat
+            val section = currentSection()
+            val existing = repo.findVariant(track.id, faderCents, true, section, format.id)
+            val variant = if (existing != null && RenderedStore.exists(existing.outputPath)) {
+                existing
+            } else {
+                renderToLibrary(faderCents, name)
+            }
+            current?.let { variants = repo.listVariants(it.id) }
+            if (variant != null) {
+                shareUri = Uri.parse(variant.outputPath)
+                exportMime = format.mime
+                exportMessage = "ready to share"
+            } else {
+                exportMessage = "render failed"
             }
         }
+    }
+
+    /**
+     * Runs a render on the view-model scope, tracking the job so [cancelExport]
+     * can abort it. Renders are CPU-bound and do not suspend, so the job is
+     * cancelled together with the [renderCancelled] flag the renderer polls.
+     */
+    private fun startRender(block: suspend () -> Unit) {
+        if (exporting || current == null) return
+        exporting = true
+        renderCancelled = false
+        renderJob = viewModelScope.launch {
+            exportMessage = "rendering ${exportFormat.id}..."
+            try {
+                block()
+            } catch (_: CancellationException) {
+                exportMessage = "cancelled"
+            } catch (e: Throwable) {
+                exportMessage = "render failed: ${reasonOf(e)}"
+            } finally {
+                exporting = false
+                renderJob = null
+            }
+        }
+    }
+
+    /** Aborts an in-flight render or export, if any. */
+    fun cancelExport() {
+        if (!exporting) return
+        renderCancelled = true
+        renderJob?.cancel()
+        exportMessage = "cancelling..."
     }
 
     fun shareVariant(variant: Variant) {
@@ -406,6 +464,7 @@ class PitcherViewModel(app: Application) : AndroidViewModel(app) {
                     cents = cents,
                     startMs = section?.let { (it.first * 1000).toLong() } ?: 0L,
                     endMs = section?.let { (it.second * 1000).toLong() } ?: -1L,
+                    cancelled = { renderCancelled },
                 )
                 val displayName = Notes.downloadFilename(
                     track.title,
@@ -461,6 +520,17 @@ class PitcherViewModel(app: Application) : AndroidViewModel(app) {
         prefs.edit()
             .putString("ui_style", if (style == UiStyle.CLASSIC) "classic" else "modern")
             .apply()
+    }
+
+    /** Reopens the guided tour, e.g. from the settings sheet. */
+    fun startOnboarding() {
+        onboardingActive = true
+    }
+
+    /** The user finished or skipped the tour. It will not auto-open again. */
+    fun finishOnboarding() {
+        onboardingActive = false
+        prefs.edit().putBoolean("onboarding_done", true).apply()
     }
 
     fun refreshStorage() {
