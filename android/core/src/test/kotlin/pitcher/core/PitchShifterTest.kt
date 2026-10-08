@@ -2,7 +2,9 @@ package pitcher.core
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
+import org.junit.Assert.fail
 import org.junit.Test
+import kotlin.coroutines.cancellation.CancellationException
 import kotlin.math.abs
 
 class PitchShifterTest {
@@ -55,5 +57,28 @@ class PitchShifterTest {
     @Test
     fun emptyInputReturnsEmpty() {
         assertEquals(0, PitchShifter.shift(FloatArray(0), 44100, 100).size)
+    }
+
+    @Test
+    fun throwsWhenCancelledBeforeStart() {
+        try {
+            PitchShifter.shift(sine(440.0, secs = 2.0), 44100, -300) { true }
+            fail("expected cancellation")
+        } catch (_: CancellationException) {
+        }
+    }
+
+    @Test
+    fun stopsWhenCancelledPartway() {
+        var checks = 0
+        try {
+            PitchShifter.shift(sine(440.0, secs = 3.0), 44100, -300) {
+                checks++
+                checks > 3
+            }
+            fail("expected cancellation")
+        } catch (_: CancellationException) {
+        }
+        assertTrue("checks=$checks", checks > 3)
     }
 }

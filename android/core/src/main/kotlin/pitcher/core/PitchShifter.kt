@@ -1,5 +1,6 @@
 package pitcher.core
 
+import kotlin.coroutines.cancellation.CancellationException
 import kotlin.math.max
 import kotlin.math.roundToInt
 import kotlin.math.sqrt
@@ -8,6 +9,9 @@ import kotlin.math.sqrt
  * Offline pitch shifter: resample by the pitch ratio, then time-stretch back
  * with WSOLA (waveform-similarity overlap-add) so duration is preserved.
  * Mirrors the desktop approach of shifting pitch while keeping tempo.
+ *
+ * [cancelled] is polled throughout the shift; when it returns true a
+ * [CancellationException] is thrown so long renders can be aborted.
  */
 object PitchShifter {
 
@@ -15,19 +19,25 @@ object PitchShifter {
     private const val SYNTH_HOP = FRAME / 2
     private const val SEARCH = FRAME / 4
 
-    fun shift(samples: FloatArray, sampleRate: Int, cents: Int): FloatArray {
+    fun shift(
+        samples: FloatArray,
+        sampleRate: Int,
+        cents: Int,
+        cancelled: () -> Boolean = { false },
+    ): FloatArray {
         if (samples.isEmpty()) return FloatArray(0)
         if (cents == 0) return samples.copyOf()
         val ratio = Math.pow(2.0, cents / 1200.0)
-        val resampled = resample(samples, ratio)
-        return timeStretch(resampled, ratio)
+        val resampled = resample(samples, ratio, cancelled)
+        return timeStretch(resampled, ratio, cancelled)
     }
 
-    private fun resample(input: FloatArray, ratio: Double): FloatArray {
+    private fun resample(input: FloatArray, ratio: Double, cancelled: () -> Boolean): FloatArray {
         val outLen = max(1, (input.size / ratio).toInt())
         val out = FloatArray(outLen)
         val last = input.size - 1
         for (i in 0 until outLen) {
+            if (i and 0xFFFF == 0 && cancelled()) throw CancellationException("cancelled")
             val src = i * ratio
             val i0 = src.toInt()
             val frac = (src - i0).toFloat()
@@ -38,7 +48,7 @@ object PitchShifter {
         return out
     }
 
-    private fun timeStretch(input: FloatArray, stretch: Double): FloatArray {
+    private fun timeStretch(input: FloatArray, stretch: Double, cancelled: () -> Boolean): FloatArray {
         val n = input.size
         if (n < FRAME) return input.copyOf()
         val analysisHop = max(1, (SYNTH_HOP / stretch).roundToInt())
@@ -53,6 +63,7 @@ object PitchShifter {
 
         var outPos = 0
         for (k in 1 until numFrames) {
+            if (cancelled()) throw CancellationException("cancelled")
             val target = k * analysisHop
             var bestD = 0
             var bestCorr = Double.NEGATIVE_INFINITY
