@@ -73,45 +73,42 @@ val MAIN_TOUR: List<OnboardingStep> = listOf(
     OnboardingStep(
         "pad",
         "Shift the pitch",
-        "Slide your finger up or down anywhere on this pad. The further left you hold, " +
-            "the coarser the step; the far right is 1-cent fine.",
+        "Slide up or down to move the pitch.",
     ),
     OnboardingStep(
         "cents",
-        "Reset or set an exact value",
-        "Double-tap the number to snap back to 0 cents. Tap it to type an exact value.",
+        "Reset or type a value",
+        "Double-tap to reset. Tap the number to type an exact value.",
     ),
     OnboardingStep(
         "snap",
-        "Snap to notes",
-        "Turn on snap to land on the nearest semitone while you drag.",
+        "Snap",
+        "Turn snap on to land on a grid.",
     ),
     OnboardingStep(
         "wave",
-        "Scrub the song",
-        "Tap the wave to seek, drag to pan, and pinch to zoom. Gold lines mark your bookmarks.",
+        "Move around the song",
+        "Tap to jump, drag to pan, and pinch to zoom.",
     ),
     OnboardingStep(
         "loop",
-        "Set an A/B loop",
-        "Drag this thin lane above the wave to set a loop, or tap the loop chip below.",
+        "Make a loop",
+        "Drag the lane above the wave.",
     ),
     OnboardingStep(
         "speed",
         "Change the play speed",
-        "Hold the play-speed chip and slide up or down to pick a speed. Tap it to return to 1x.",
+        "Hold the speed control and slide to pick a speed.",
     ),
     OnboardingStep(
         "save",
         "Keep a pitch",
-        "Tap + save to render this pitch into your music library. Long-press a saved pitch " +
-            "to rename, export, share, or delete it.",
+        "Tap + render to keep the current pitch. Long-press a pitch to rename or share it.",
     ),
     OnboardingStep(
         "timeline",
         "Loops and bookmarks",
-        "Drag the lane above the wave to make a loop, and long-press an edge or a " +
-            "bookmark pin to fine-tune it. This list manages them.",
+        "Manage your loops and bookmarks here.",
     ),
 )
 

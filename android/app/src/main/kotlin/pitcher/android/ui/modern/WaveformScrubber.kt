@@ -1,6 +1,8 @@
 package pitcher.android.ui.modern
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -118,7 +120,7 @@ fun WaveformScrubber(
 
     Box(modifier = modifier) {
         Column {
-            // Loop lane: create, select, and fine-tune edges.
+            // Loop lane: drag to create, hold then drag an edge to fine-tune.
             Canvas(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -127,72 +129,81 @@ fun WaveformScrubber(
                     .onSizeChanged { chartWidth = it.width.toFloat() }
                     .pointerInput(span, durationMs, loops) {
                         val width = size.width.toFloat()
-                        detectTapGestures { off ->
-                            val ms = xToMs(off.x, width)
-                            val hit = loops.minByOrNull { minOf(abs(it.startMs - ms), abs(it.endMs - ms)) }
-                            if (hit != null &&
-                                (abs(hit.startMs - ms) < 20 * density || abs(hit.endMs - ms) < 20 * density)
-                            ) {
-                                onSelectLoop(hit.id)
-                            }
-                        }
-                    }
-                    .pointerInput(span, durationMs, loops) {
-                        val width = size.width.toFloat()
                         val msPer = msPerPx(width)
                         val rampPx = 10f * density
-                        detectDragGesturesAfterLongPress(
-                            onDragStart = { off ->
-                                val ms = xToMs(off.x, width)
-                                val hit = loops.minByOrNull { minOf(abs(it.startMs - ms), abs(it.endMs - ms)) }
-                                if (hit != null) {
-                                    onSelectLoop(hit.id)
-                                    drag.loopId = hit.id
-                                    drag.isStart = abs(hit.startMs - ms) <= abs(hit.endMs - ms)
-                                    drag.base = if (drag.isStart) hit.startMs else hit.endMs
-                                    drag.accum = 0f
-                                    bubbleMs = drag.base
+                        val slopPx = 10f * density
+                        awaitEachGesture {
+                            val down = awaitFirstDown(requireUnconsumed = false)
+                            val startX = down.position.x
+                            val startY = down.position.y
+                            val startMs = xToMs(startX, width)
+                            var mode = 0
+                            var edgeLoopId: Long? = null
+                            var edgeIsStart = false
+                            var edgeBase = 0L
+                            var accum = 0f
+                            var lastX = startX
+                            val startTime = down.uptimeMillis
+                            while (true) {
+                                val event = awaitPointerEvent()
+                                val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                                val pos = change.position
+                                if (mode == 0 &&
+                                    (abs(pos.x - startX) > slopPx || abs(pos.y - startY) > slopPx)
+                                ) {
+                                    val held = change.uptimeMillis - startTime
+                                    val hit = loops.minByOrNull {
+                                        minOf(abs(it.startMs - startMs), abs(it.endMs - startMs))
+                                    }
+                                    val nearEdge = hit != null &&
+                                        minOf(abs(hit.startMs - startMs), abs(hit.endMs - startMs)) < 24 * density
+                                    if (held > 400L && nearEdge) {
+                                        mode = 2
+                                        edgeLoopId = hit!!.id
+                                        edgeIsStart = abs(hit.startMs - startMs) <= abs(hit.endMs - startMs)
+                                        edgeBase = if (edgeIsStart) hit.startMs else hit.endMs
+                                        accum = 0f
+                                        bubbleMs = edgeBase
+                                    } else if (held > 400L) {
+                                        mode = 3
+                                    } else {
+                                        mode = 1
+                                        laneStart = startMs
+                                        laneEnd = startMs
+                                        laneActive = true
+                                        bubbleMs = startMs
+                                    }
                                 }
-                            },
-                            onDragEnd = { drag.loopId = null; bubbleMs = null },
-                            onDragCancel = { drag.loopId = null; bubbleMs = null },
-                        ) { change, amount ->
-                            val id = drag.loopId ?: return@detectDragGesturesAfterLongPress
-                            drag.accum += amount.x
-                            val next = precise(drag.base, drag.accum, rampPx, msPer)
-                            bubbleMs = next
-                            onMoveLoopEdge(id, drag.isStart, next)
-                            change.consume()
-                        }
-                    }
-                    .pointerInput(span, durationMs) {
-                        val width = size.width.toFloat()
-                        detectDragGestures(
-                            onDragStart = { off ->
-                                laneStart = xToMs(off.x, width)
-                                laneEnd = laneStart
-                                laneActive = true
-                                bubbleMs = laneStart
-                            },
-                            onDragEnd = {
-                                if (laneActive && abs(laneEnd - laneStart) >= 200L) {
-                                    onCreateLoop(laneStart, laneEnd)
+                                when (mode) {
+                                    1 -> {
+                                        laneEnd = xToMs(pos.x, width)
+                                        bubbleMs = laneEnd
+                                    }
+                                    2 -> {
+                                        accum += pos.x - lastX
+                                        val next = precise(edgeBase, accum, rampPx, msPer)
+                                        bubbleMs = next
+                                        edgeLoopId?.let { onMoveLoopEdge(it, edgeIsStart, next) }
+                                    }
                                 }
+                                lastX = pos.x
+                                change.consume()
+                                if (!change.pressed) break
+                            }
+                            if (mode == 1) {
+                                if (abs(laneEnd - laneStart) >= 200L) onCreateLoop(laneStart, laneEnd)
                                 laneActive = false
                                 bubbleMs = null
-                            },
-                            onDragCancel = { laneActive = false; bubbleMs = null },
-                        ) { change, _ ->
-                            laneEnd = xToMs(change.position.x, width)
-                            bubbleMs = laneEnd
-                            change.consume()
+                            } else if (mode == 2) {
+                                bubbleMs = null
+                            }
                         }
                     },
             ) {
                 val w = size.width
                 val h = size.height
-                val barTop = h - 16f
-                val barH = 14f
+                val barTop = 6f
+                val barH = h - 12f
                 loops.forEach { loop ->
                     val x0 = msToX(loop.startMs, w)
                     val x1 = msToX(loop.endMs, w)
@@ -205,11 +216,11 @@ fun WaveformScrubber(
                     drawRoundRect(
                         color = color,
                         topLeft = Offset(x0, barTop),
-                        size = Size((x1 - x0).coerceAtLeast(3f), barH),
+                        size = Size((x1 - x0).coerceAtLeast(4f), barH),
                         cornerRadius = CornerRadius(barH / 2f, barH / 2f),
                     )
                     listOf(x0, x1).forEach { x ->
-                        drawCircle(color = color, radius = 7f, center = Offset(x, barTop + barH / 2f))
+                        drawCircle(color = color, radius = 9f, center = Offset(x, barTop + barH / 2f))
                     }
                 }
                 if (laneActive) {
@@ -218,7 +229,7 @@ fun WaveformScrubber(
                     drawRoundRect(
                         color = accent.copy(alpha = 0.4f),
                         topLeft = Offset(x0, barTop),
-                        size = Size((x1 - x0).coerceAtLeast(3f), barH),
+                        size = Size((x1 - x0).coerceAtLeast(4f), barH),
                         cornerRadius = CornerRadius(barH / 2f, barH / 2f),
                     )
                 }
@@ -318,24 +329,17 @@ fun WaveformScrubber(
                     }
                     .pointerInput(span, durationMs) {
                         val width = size.width.toFloat()
-                        val msPer = msPerPx(width)
-                        val rampPx = 10f * density
-                        var base = 0L
                         detectDragGesturesAfterLongPress(
-                            onDragStart = {
-                                base = positionMs
-                                drag.accum = 0f
-                                bubbleMs = positionMs
+                            onDragStart = { off ->
+                                bubbleMs = xToMs(off.x, width)
                             },
                             onDragEnd = {
                                 bubbleMs?.let { onSeekMs(it) }
                                 bubbleMs = null
                             },
                             onDragCancel = { bubbleMs = null },
-                        ) { change, amount ->
-                            drag.accum += amount.x
-                            val next = precise(base, drag.accum, rampPx, msPer)
-                            bubbleMs = next
+                        ) { change, _ ->
+                            bubbleMs = xToMs(change.position.x, width)
                             change.consume()
                         }
                     },

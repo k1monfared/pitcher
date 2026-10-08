@@ -80,7 +80,6 @@ fun PitchPad(
     val lastApplied = remember { mutableIntStateOf(cents) }
     val dragging = remember { mutableStateOf(false) }
     val flinging = remember { mutableStateOf(false) }
-    val gear = remember { mutableIntStateOf(PitchGesture.GRAINS.first()) }
     var showExact by remember { mutableStateOf(false) }
 
     fun apply(rawValue: Double) {
@@ -181,7 +180,6 @@ fun PitchPad(
                                     rampPx = rampPx.toDouble(),
                                 )
                                 raw.value = rawLocal
-                                gear.intValue = PitchGesture.grain(abs(velocity))
                                 apply(rawLocal)
                                 change.consume()
                             }
@@ -225,13 +223,6 @@ fun PitchPad(
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                if (dragging.value) {
-                    Text(
-                        gearLabel(gear.intValue),
-                        style = MaterialTheme.typography.labelLarge,
-                        color = accent,
-                    )
-                }
             }
 
             val hudAlpha by animateFloatAsState(
@@ -260,12 +251,6 @@ fun PitchPad(
             onDismiss = { showExact = false },
         )
     }
-}
-
-private fun gearLabel(grain: Int): String = when {
-    grain <= 1 -> "fine · 1c"
-    grain >= 200 -> "fast · 200c"
-    else -> "grain ${grain}c"
 }
 
 @Composable

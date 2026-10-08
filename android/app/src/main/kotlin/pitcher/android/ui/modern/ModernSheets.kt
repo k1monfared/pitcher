@@ -4,16 +4,20 @@ import android.content.Intent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -23,6 +27,8 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -32,9 +38,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import kotlin.math.roundToInt
 import pitcher.android.media.RenderedStore
 import pitcher.android.ui.PitcherViewModel
 import pitcher.core.ExportFormat
@@ -42,7 +51,7 @@ import pitcher.core.Notes
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ExportSheet(vm: PitcherViewModel, onDismiss: () -> Unit) {
+fun ExportSheet(vm: PitcherViewModel, onDismiss: () -> Unit, onOpenTimeline: () -> Unit = {}) {
     val context = LocalContext.current
     val ext = vm.exportFormat.extension
     val track = vm.current
@@ -80,6 +89,7 @@ fun ExportSheet(vm: PitcherViewModel, onDismiss: () -> Unit) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .navigationBarsPadding()
                 .padding(horizontal = 20.dp)
                 .padding(bottom = 32.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -107,13 +117,7 @@ fun ExportSheet(vm: PitcherViewModel, onDismiss: () -> Unit) {
                     singleLine = true,
                     modifier = Modifier.weight(1f),
                 )
-                Text(
-                    ".$ext",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(start = 6.dp),
-                )
-                FormatStrip(
+                FormatToken(
                     selected = vm.exportFormat,
                     onSelect = { vm.changeExportFormat(it) },
                 )
@@ -121,71 +125,121 @@ fun ExportSheet(vm: PitcherViewModel, onDismiss: () -> Unit) {
 
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth().clickable { vm.changeExportLoopOnly(!vm.exportLoopOnly) },
+                modifier = Modifier.fillMaxWidth(),
             ) {
                 Checkbox(
                     checked = vm.exportLoopOnly,
                     onCheckedChange = { vm.changeExportLoopOnly(it) },
                     enabled = vm.loops.any { it.enabled },
                 )
-                Text("Render only the enabled loops", style = MaterialTheme.typography.bodyMedium)
+                Text(
+                    "Render only the enabled loops",
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.clickable { onOpenTimeline() },
+                )
             }
 
-            Button(
-                onClick = { vm.renderAs(baseName.trim().ifEmpty { null }) },
-                enabled = !vm.exporting,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text(if (vm.exporting) "Rendering..." else "Save file")
-            }
-            OutlinedButton(
-                onClick = { vm.shareAs(baseName.trim().ifEmpty { null }) },
-                enabled = !vm.exporting,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text("Share")
-            }
+            var confirmCancel by remember { mutableStateOf(false) }
             if (vm.exporting) {
-                OutlinedButton(
-                    onClick = { vm.cancelExport() },
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Button(
+                        onClick = {},
+                        enabled = false,
+                        modifier = Modifier.weight(2f),
+                    ) {
+                        Text("Rendering...")
+                    }
+                    OutlinedButton(
+                        onClick = { confirmCancel = true },
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        Text("Cancel")
+                    }
+                }
+            } else {
+                Button(
+                    onClick = { vm.renderAs(baseName.trim().ifEmpty { null }) },
                     modifier = Modifier.fillMaxWidth(),
                 ) {
-                    Text("Cancel render")
+                    Text("Save file")
+                }
+                OutlinedButton(
+                    onClick = { vm.shareAs(baseName.trim().ifEmpty { null }) },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text("Share")
                 }
             }
+            if (confirmCancel) {
+                AlertDialog(
+                    onDismissRequest = { confirmCancel = false },
+                    title = { Text("Cancel render?") },
+                    text = { Text("The file will not be saved.") },
+                    confirmButton = {
+                        TextButton(onClick = {
+                            vm.cancelExport()
+                            confirmCancel = false
+                        }) { Text("Cancel render") }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { confirmCancel = false }) { Text("Keep rendering") }
+                    },
+                )
+            }
             vm.exportMessage?.let {
-                Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
+                Text(
+                    it,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.secondary,
+                    maxLines = 1,
+                )
             }
         }
     }
 }
 
 @Composable
-private fun FormatStrip(selected: ExportFormat, onSelect: (ExportFormat) -> Unit) {
-    Column(modifier = Modifier.width(78.dp).padding(start = 8.dp)) {
-        ExportFormat.entries.forEach { fmt ->
-            val active = fmt == selected
-            Surface(
-                shape = RoundedCornerShape(8.dp),
-                color = if (active) {
-                    MaterialTheme.colorScheme.primary.copy(alpha = 0.25f)
-                } else {
-                    Color.White.copy(alpha = 0.05f)
-                },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 2.dp)
-                    .clickable { onSelect(fmt) },
-            ) {
+private fun FormatToken(selected: ExportFormat, onSelect: (ExportFormat) -> Unit) {
+    val entries = ExportFormat.entries
+    val startIndex = entries.indexOf(selected).coerceAtLeast(0)
+    Surface(
+        shape = RoundedCornerShape(10.dp),
+        color = Color.White.copy(alpha = 0.05f),
+        modifier = Modifier
+            .padding(start = 8.dp)
+            .pointerInput(entries) {
+                val stepPx = 18f * density
+                awaitEachGesture {
+                    val down = awaitFirstDown()
+                    while (true) {
+                        val event = awaitPointerEvent()
+                        val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                        val dy = change.position.y - down.position.y
+                        val delta = -(dy / stepPx).roundToInt()
+                        val idx = (startIndex + delta).coerceIn(0, entries.lastIndex)
+                        if (entries[idx] != selected) onSelect(entries[idx])
+                        change.consume()
+                        if (!change.pressed) break
+                    }
+                }
+            },
+    ) {
+        Column(modifier = Modifier.width(56.dp).padding(vertical = 4.dp)) {
+            entries.forEach { fmt ->
+                val active = fmt == selected
                 Text(
                     fmt.id,
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
-                    style = MaterialTheme.typography.labelLarge,
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
+                    style = MaterialTheme.typography.labelMedium,
                     color = if (active) {
                         MaterialTheme.colorScheme.primary
                     } else {
                         MaterialTheme.colorScheme.onSurfaceVariant
                     },
+                    fontWeight = if (active) FontWeight.Bold else FontWeight.Normal,
                     textAlign = TextAlign.Center,
                 )
             }
@@ -199,7 +253,8 @@ fun SettingsSheet(vm: PitcherViewModel, onDismiss: () -> Unit) {
     LaunchedEffect(vm.onboardingActive) {
         if (vm.onboardingActive) onDismiss()
     }
-    ModalBottomSheet(onDismissRequest = onDismiss) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
         Column(modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
             pitcher.android.ui.SettingsContent(vm = vm)
             Spacer(modifier = Modifier.padding(bottom = 24.dp))

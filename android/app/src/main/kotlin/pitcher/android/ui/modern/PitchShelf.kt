@@ -197,7 +197,6 @@ private fun PitchCard(
         }
         DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
             onRename?.let { DropdownMenuItem(text = { Text("Rename") }, onClick = { menu = false; it() }) }
-            onExport?.let { DropdownMenuItem(text = { Text("Export to library") }, onClick = { menu = false; it() }) }
             onShare?.let { DropdownMenuItem(text = { Text("Share") }, onClick = { menu = false; it() }) }
             onDelete?.let { DropdownMenuItem(text = { Text("Delete") }, onClick = { menu = false; it() }) }
         }

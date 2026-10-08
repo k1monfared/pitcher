@@ -23,16 +23,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import pitcher.android.data.Bookmark
-import pitcher.android.data.LoopSection
 import pitcher.android.ui.PitcherViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TimelineSheet(vm: PitcherViewModel, onDismiss: () -> Unit) {
-    var renamingLoop by remember { mutableStateOf<LoopSection?>(null) }
     var renamingBookmark by remember { mutableStateOf<Bookmark?>(null) }
 
     ModalBottomSheet(onDismissRequest = onDismiss) {
@@ -53,37 +50,29 @@ fun TimelineSheet(vm: PitcherViewModel, onDismiss: () -> Unit) {
             if (vm.loops.isEmpty()) {
                 Text("No loops yet.", style = MaterialTheme.typography.bodyMedium)
             }
-            vm.loops.forEach { loop ->
-                val selected = loop.id == vm.selectedLoopId
+            vm.loops.forEachIndexed { index, loop ->
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            loop.name ?: "${formatTime(loop.startMs)} - ${formatTime(loop.endMs)}",
-                            style = MaterialTheme.typography.bodyLarge,
-                            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-                            color = if (selected) {
-                                MaterialTheme.colorScheme.primary
-                            } else {
-                                MaterialTheme.colorScheme.onSurface
-                            },
-                        )
-                        Text(
-                            "${formatTime(loop.startMs)} - ${formatTime(loop.endMs)}",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
+                    OutlinedTextField(
+                        value = loop.name ?: "",
+                        onValueChange = { vm.renameLoop(loop.id, it) },
+                        placeholder = { Text("loop ${index + 1}") },
+                        singleLine = true,
+                        textStyle = MaterialTheme.typography.bodyLarge,
+                        modifier = Modifier.weight(1f),
+                    )
+                    Text(
+                        "${formatTime(loop.startMs)} - ${formatTime(loop.endMs)}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 8.dp),
+                    )
                     Switch(
                         checked = loop.enabled,
                         onCheckedChange = { vm.setLoopEnabled(loop.id, it) },
                     )
-                    TextButton(onClick = { vm.selectLoop(loop.id) }) {
-                        Text(if (selected) "selected" else "select")
-                    }
-                    TextButton(onClick = { renamingLoop = loop }) { Text("rename") }
                     TextButton(onClick = { vm.deleteLoop(loop.id) }) { Text("delete") }
                 }
             }
@@ -125,17 +114,6 @@ fun TimelineSheet(vm: PitcherViewModel, onDismiss: () -> Unit) {
         }
     }
 
-    renamingLoop?.let { loop ->
-        RenameDialog(
-            title = "Rename loop",
-            initial = loop.name ?: "",
-            onConfirm = {
-                vm.renameLoop(loop.id, it)
-                renamingLoop = null
-            },
-            onDismiss = { renamingLoop = null },
-        )
-    }
     renamingBookmark?.let { bookmark ->
         RenameDialog(
             title = "Rename bookmark",

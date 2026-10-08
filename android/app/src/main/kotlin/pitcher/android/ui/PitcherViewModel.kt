@@ -94,7 +94,7 @@ class PitcherViewModel(app: Application) : AndroidViewModel(app) {
         private set
     var exportFormat by mutableStateOf(ExportFormat.M4a)
         private set
-    var exportLoopOnly by mutableStateOf(true)
+    var exportLoopOnly by mutableStateOf(false)
         private set
     var exportMime by mutableStateOf(ExportFormat.M4a.mime)
         private set
@@ -210,6 +210,7 @@ class PitcherViewModel(app: Application) : AndroidViewModel(app) {
         loops = repo.listLoops(track.id)
         selectedLoopId = loops.firstOrNull()?.id
         loopMode = LoopMode.NONE
+        exportLoopOnly = loops.any { it.enabled }
         tunerSource = track.tunerSource
         tunerTarget = track.tunerTarget
         peaks = FloatArray(0)
@@ -266,8 +267,13 @@ class PitcherViewModel(app: Application) : AndroidViewModel(app) {
 
     fun addBookmark(name: String?) {
         val track = current ?: return
-        val t = (controller?.currentPosition ?: positionMs) / 1000.0
-        repo.addBookmark(track.id, t, name)
+        val atMs = controller?.currentPosition ?: positionMs
+        val existing = bookmarks.firstOrNull { kotlin.math.abs((it.t * 1000).toLong() - atMs) < 750L }
+        if (existing != null) {
+            repo.deleteBookmark(existing.id)
+        } else {
+            repo.addBookmark(track.id, atMs / 1000.0, name)
+        }
         bookmarks = repo.listBookmarks(track.id)
     }
 
@@ -302,13 +308,17 @@ class PitcherViewModel(app: Application) : AndroidViewModel(app) {
         val id = repo.addLoop(track.id, s, e, name)
         loops = repo.listLoops(track.id)
         selectedLoopId = id
+        exportLoopOnly = true
     }
 
     fun deleteLoop(id: Long) {
         repo.deleteLoop(id)
         current?.let { loops = repo.listLoops(it.id) }
         if (selectedLoopId == id) selectedLoopId = loops.firstOrNull()?.id
-        if (loops.isEmpty()) loopMode = LoopMode.NONE
+        if (loops.isEmpty()) {
+            loopMode = LoopMode.NONE
+            exportLoopOnly = false
+        }
     }
 
     fun renameLoop(id: Long, name: String) {
@@ -341,15 +351,20 @@ class PitcherViewModel(app: Application) : AndroidViewModel(app) {
             LoopMode.ONE -> LoopMode.NONE
         }
         if (loopMode == LoopMode.NONE) return
-        val start = when (loopMode) {
-            LoopMode.ONE -> (loops.firstOrNull { it.id == selectedLoopId && it.enabled }
-                ?: loops.firstOrNull { it.enabled })?.startMs
-            LoopMode.ALL -> loops.firstOrNull { it.enabled }?.startMs
+        val pos = controller?.currentPosition ?: positionMs
+        val target = when (loopMode) {
+            LoopMode.ONE -> {
+                val containing = loops.firstOrNull { it.enabled && pos >= it.startMs && pos < it.endMs }
+                val chosen = containing ?: loops.firstOrNull { it.enabled }
+                selectedLoopId = chosen?.id
+                chosen
+            }
+            LoopMode.ALL -> loops.firstOrNull { it.enabled }
             else -> null
         }
-        start?.let {
-            controller?.seekTo(it)
-            positionMs = it
+        target?.let {
+            controller?.seekTo(it.startMs)
+            positionMs = it.startMs
         }
     }
 

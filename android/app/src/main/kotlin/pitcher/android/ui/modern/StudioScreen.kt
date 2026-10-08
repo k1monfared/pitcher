@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -198,12 +199,12 @@ fun StudioContent(
                 )
                 Row {
                     TextButton(onClick = onAddBookmark) { Text("bookmark") }
-                    TextButton(
+                    SnapChip(
+                        on = snap,
+                        accent = accent,
                         onClick = onSnapToggle,
                         modifier = Modifier.onboardingTarget(onboarding, "snap"),
-                    ) {
-                        Text(if (snap) "snap: on" else "snap: off")
-                    }
+                    )
                 }
             }
 
@@ -265,7 +266,9 @@ fun StudioContent(
                         statusMessage ?: "rendering...",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.secondary,
-                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false),
                     )
                     if (saving) {
                         TextButton(onClick = onCancelRender) { Text("cancel") }
@@ -295,6 +298,27 @@ fun StudioContent(
 }
 
 @Composable
+private fun SnapChip(
+    on: Boolean,
+    accent: Color,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        modifier = modifier.clickable(onClick = onClick),
+        shape = RoundedCornerShape(50),
+        color = if (on) accent.copy(alpha = 0.28f) else Color.White.copy(alpha = 0.06f),
+    ) {
+        Text(
+            "snap",
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+            style = MaterialTheme.typography.labelLarge,
+            color = if (on) accent else MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+@Composable
 private fun StudioTopBar(
     title: String,
     artist: String?,
@@ -312,7 +336,7 @@ private fun StudioTopBar(
         )
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.align(Alignment.Center),
+            modifier = Modifier.align(Alignment.Center).padding(horizontal = 96.dp),
         ) {
             Text(
                 title,

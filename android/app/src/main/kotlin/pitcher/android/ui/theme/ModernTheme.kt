@@ -52,8 +52,12 @@ private fun lerpColor(a: Color, b: Color, t: Float): Color = Color(
 
 @Composable
 fun ModernTheme(content: @Composable () -> Unit) {
-    MaterialTheme(
-        colorScheme = ModernDark,
-        content = content,
-    )
+    androidx.compose.runtime.CompositionLocalProvider(
+        androidx.compose.material3.LocalContentColor provides ModernDark.onBackground,
+    ) {
+        MaterialTheme(
+            colorScheme = ModernDark,
+            content = content,
+        )
+    }
 }

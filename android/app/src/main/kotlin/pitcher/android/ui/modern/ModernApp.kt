@@ -92,7 +92,7 @@ fun ModernApp(
     }
 
     if (showExport) {
-        ExportSheet(vm = vm, onDismiss = { showExport = false })
+        ExportSheet(vm = vm, onDismiss = { showExport = false }, onOpenTimeline = { showTimeline = true })
     }
     if (showSettings) {
         SettingsSheet(vm = vm, onDismiss = { showSettings = false })
