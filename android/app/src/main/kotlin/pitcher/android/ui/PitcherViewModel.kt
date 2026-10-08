@@ -303,8 +303,13 @@ class PitcherViewModel(app: Application) : AndroidViewModel(app) {
 
     fun addLoop(startMs: Long, endMs: Long, name: String? = null) {
         val track = current ?: return
-        val s = minOf(startMs, endMs)
-        val e = maxOf(startMs, endMs)
+        var s = minOf(startMs, endMs)
+        var e = maxOf(startMs, endMs)
+        if (e - s < Timeline.MIN_LOOP_MS) {
+            val limit = if (durationMs > 0) durationMs else e
+            e = (s + Timeline.MIN_LOOP_MS).coerceAtMost(maxOf(limit, s + Timeline.MIN_LOOP_MS))
+            s = (e - Timeline.MIN_LOOP_MS).coerceAtLeast(0)
+        }
         if (!Timeline.canAdd(coreLoops(), s, e)) return
         val id = repo.addLoop(track.id, s, e, name)
         loops = repo.listLoops(track.id)

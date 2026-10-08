@@ -155,6 +155,7 @@ fun WaveformScrubber(
                             var edgeBase = 0L
                             var accum = 0f
                             var lastX = startX
+                            var draggedPx = 0f
                             val startTime = down.uptimeMillis
                             while (true) {
                                 val event = awaitPointerEvent()
@@ -190,6 +191,7 @@ fun WaveformScrubber(
                                 when (mode) {
                                     1 -> {
                                         laneEnd = xToMs(pos.x, width)
+                                        draggedPx = maxOf(draggedPx, abs(pos.x - startX))
                                         bubbleMs = laneEnd
                                     }
                                     2 -> {
@@ -204,7 +206,7 @@ fun WaveformScrubber(
                                 if (!change.pressed) break
                             }
                             if (mode == 1) {
-                                if (abs(laneEnd - laneStart) >= 200L) onCreateLoop(laneStart, laneEnd)
+                                if (draggedPx >= 10f * density) onCreateLoop(laneStart, laneEnd)
                                 laneActive = false
                                 bubbleMs = null
                             } else if (mode == 2) {
