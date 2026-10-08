@@ -82,6 +82,10 @@ fun StudioScreen(
         onMoveLoopEdge = { id, isStart, ms -> vm.moveLoopEdge(id, isStart, ms) },
         onMoveBookmark = { id, ms -> vm.moveBookmark(id, ms / 1000.0) },
         onSelectLoop = { vm.selectLoop(it) },
+        onRenameLoop = { id, name -> vm.renameLoop(id, name) },
+        onDeleteLoop = { vm.deleteLoop(it) },
+        onRenameBookmark = { id, name -> vm.renameBookmark(id, name) },
+        onDeleteBookmark = { vm.deleteBookmark(it) },
         onCycleLoopMode = { vm.cycleLoopMode() },
         onPlayPause = { vm.togglePlay() },
         onSkip = { delta -> vm.seekTo(vm.positionMs + delta) },
@@ -134,6 +138,10 @@ fun StudioContent(
     onMoveLoopEdge: (Long, Boolean, Long) -> Unit,
     onMoveBookmark: (Long, Long) -> Unit,
     onSelectLoop: (Long) -> Unit,
+    onRenameLoop: (Long, String) -> Unit,
+    onDeleteLoop: (Long) -> Unit,
+    onRenameBookmark: (Long, String) -> Unit,
+    onDeleteBookmark: (Long) -> Unit,
     onCycleLoopMode: () -> Unit,
     onPlayPause: () -> Unit,
     onSkip: (Long) -> Unit,
@@ -225,6 +233,10 @@ fun StudioContent(
                 onMoveLoopEdge = onMoveLoopEdge,
                 onMoveBookmark = onMoveBookmark,
                 onSelectLoop = onSelectLoop,
+                onRenameLoop = onRenameLoop,
+                onDeleteLoop = onDeleteLoop,
+                onRenameBookmark = onRenameBookmark,
+                onDeleteBookmark = onDeleteBookmark,
                 onboarding = onboarding,
                 modifier = Modifier.fillMaxWidth(),
             )
@@ -307,16 +319,25 @@ private fun SnapChip(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val interaction = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
     Surface(
-        modifier = modifier.clickable(onClick = onClick),
+        modifier = modifier.clickable(
+            interactionSource = interaction,
+            indication = null,
+            onClick = onClick,
+        ),
         shape = RoundedCornerShape(50),
-        color = if (on) accent.copy(alpha = 0.28f) else Color.White.copy(alpha = 0.06f),
+        color = if (on) {
+            MaterialTheme.colorScheme.primary.copy(alpha = 0.30f)
+        } else {
+            Color.White.copy(alpha = 0.06f)
+        },
     ) {
         Text(
             "snap",
             modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
             style = MaterialTheme.typography.labelLarge,
-            color = if (on) accent else MaterialTheme.colorScheme.onSurfaceVariant,
+            color = if (on) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
 }

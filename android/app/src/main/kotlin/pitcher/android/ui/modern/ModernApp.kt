@@ -10,6 +10,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -71,7 +72,6 @@ fun ModernApp(
                 onOpenSettings = { showSettings = true },
                 onOpenTuner = { showTuner = true },
                 onOpenTimeline = { showTimeline = true },
-                forceSpeedHud = vm.onboardingActive && onboardingStep == "speed",
                 onboarding = onboarding,
             )
         }
@@ -92,6 +92,14 @@ fun ModernApp(
                     onStep = { onboardingStep = it.targetKey },
                 )
             }
+        }
+
+        if (vm.onboardingActive && onboardingStep == "speed") {
+            SpeedHud(
+                tempo = vm.tempo,
+                accent = pitcher.android.ui.theme.PitchHues.forCents(vm.faderCents),
+                modifier = Modifier.align(Alignment.Center),
+            )
         }
     }
 

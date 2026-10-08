@@ -34,6 +34,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -242,45 +243,66 @@ fun ExportSheet(vm: PitcherViewModel, onDismiss: () -> Unit, onOpenTimeline: () 
 @Composable
 private fun FormatToken(selected: ExportFormat, onSelect: (ExportFormat) -> Unit) {
     val entries = ExportFormat.entries
-    val startIndex = entries.indexOf(selected).coerceAtLeast(0)
+    val index = entries.indexOf(selected).coerceAtLeast(0)
+    val current by rememberUpdatedState(selected)
     Surface(
-        shape = RoundedCornerShape(10.dp),
-        color = Color.White.copy(alpha = 0.05f),
+        shape = RoundedCornerShape(12.dp),
+        color = Color.White.copy(alpha = 0.06f),
         modifier = Modifier
             .padding(start = 8.dp)
             .pointerInput(entries) {
-                val stepPx = 18f * density
+                val stepPx = 28f * density
                 awaitEachGesture {
                     val down = awaitFirstDown()
+                    var emitted = entries.indexOf(current)
+                    var accum = 0f
+                    var lastY = down.position.y
                     while (true) {
                         val event = awaitPointerEvent()
                         val change = event.changes.firstOrNull { it.id == down.id } ?: break
-                        val dy = change.position.y - down.position.y
-                        val delta = -(dy / stepPx).roundToInt()
-                        val idx = (startIndex + delta).coerceIn(0, entries.lastIndex)
-                        if (entries[idx] != selected) onSelect(entries[idx])
+                        accum += change.position.y - lastY
+                        lastY = change.position.y
+                        while (accum >= stepPx) {
+                            accum -= stepPx
+                            emitted = (emitted + 1).coerceAtMost(entries.lastIndex)
+                            onSelect(entries[emitted])
+                        }
+                        while (accum <= -stepPx) {
+                            accum += stepPx
+                            emitted = (emitted - 1).coerceAtLeast(0)
+                            onSelect(entries[emitted])
+                        }
                         change.consume()
                         if (!change.pressed) break
                     }
                 }
             },
     ) {
-        Column(modifier = Modifier.width(56.dp).padding(vertical = 4.dp)) {
-            entries.forEach { fmt ->
-                val active = fmt == selected
-                Text(
-                    fmt.id,
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = if (active) {
-                        MaterialTheme.colorScheme.primary
-                    } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    },
-                    fontWeight = if (active) FontWeight.Bold else FontWeight.Normal,
-                    textAlign = TextAlign.Center,
-                )
-            }
+        Column(
+            modifier = Modifier.width(72.dp).padding(vertical = 6.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            val previous = entries.getOrNull(index - 1)
+            val next = entries.getOrNull(index + 1)
+            Text(
+                previous?.id ?: " ",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f),
+                maxLines = 1,
+            )
+            Text(
+                selected.id,
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary,
+                maxLines = 1,
+            )
+            Text(
+                next?.id ?: " ",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f),
+                maxLines = 1,
+            )
         }
     }
 }

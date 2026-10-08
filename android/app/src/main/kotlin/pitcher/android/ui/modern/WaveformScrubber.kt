@@ -7,15 +7,21 @@ import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -77,6 +83,10 @@ fun WaveformScrubber(
     onMoveLoopEdge: (Long, Boolean, Long) -> Unit,
     onMoveBookmark: (Long, Long) -> Unit,
     onSelectLoop: (Long) -> Unit,
+    onRenameLoop: (Long, String) -> Unit,
+    onDeleteLoop: (Long) -> Unit,
+    onRenameBookmark: (Long, String) -> Unit,
+    onDeleteBookmark: (Long) -> Unit,
     modifier: Modifier = Modifier,
     onboarding: OnboardingTargets? = null,
 ) {
@@ -86,6 +96,8 @@ fun WaveformScrubber(
     var laneActive by remember { mutableStateOf(false) }
     var bubbleMs by remember { mutableStateOf<Long?>(null) }
     var chartWidth by remember { mutableFloatStateOf(0f) }
+    var loopMenu by remember { mutableStateOf<LoopSection?>(null) }
+    var bookmarkMenu by remember { mutableStateOf<Bookmark?>(null) }
     val drag = remember { DragState() }
     val textMeasurer = rememberTextMeasurer()
 
@@ -156,16 +168,17 @@ fun WaveformScrubber(
                                         minOf(abs(it.startMs - startMs), abs(it.endMs - startMs))
                                     }
                                     val nearEdge = hit != null &&
-                                        minOf(abs(hit.startMs - startMs), abs(hit.endMs - startMs)) < 24 * density
-                                    if (held > 400L && nearEdge) {
+                                        minOf(abs(hit.startMs - startMs), abs(hit.endMs - startMs)) < 32 * density
+                                    if (held > 250L && nearEdge) {
                                         mode = 2
                                         edgeLoopId = hit!!.id
                                         edgeIsStart = abs(hit.startMs - startMs) <= abs(hit.endMs - startMs)
                                         edgeBase = if (edgeIsStart) hit.startMs else hit.endMs
                                         accum = 0f
                                         bubbleMs = edgeBase
-                                    } else if (held > 400L) {
+                                    } else if (held > 250L) {
                                         mode = 3
+                                        loopMenu = loops.firstOrNull { startMs in it.startMs..it.endMs } ?: hit
                                     } else {
                                         mode = 1
                                         laneStart = startMs
@@ -239,16 +252,25 @@ fun WaveformScrubber(
             Canvas(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(18.dp)
+                    .height(24.dp)
                     .pointerInput(span, durationMs, bookmarks) {
                         val width = size.width.toFloat()
-                        detectTapGestures { off ->
-                            val ms = xToMs(off.x, width)
-                            val hit = bookmarks.minByOrNull { abs((it.t * 1000).toLong() - ms) }
-                            if (hit != null && abs((hit.t * 1000).toLong() - ms) < 20 * density) {
-                                onSeekMs((hit.t * 1000).toLong())
-                            }
-                        }
+                        detectTapGestures(
+                            onLongPress = { off ->
+                                val ms = xToMs(off.x, width)
+                                val hit = bookmarks.minByOrNull { abs((it.t * 1000).toLong() - ms) }
+                                if (hit != null && abs((hit.t * 1000).toLong() - ms) < 32 * density) {
+                                    bookmarkMenu = hit
+                                }
+                            },
+                            onTap = { off ->
+                                val ms = xToMs(off.x, width)
+                                val hit = bookmarks.minByOrNull { abs((it.t * 1000).toLong() - ms) }
+                                if (hit != null && abs((hit.t * 1000).toLong() - ms) < 32 * density) {
+                                    onSeekMs((hit.t * 1000).toLong())
+                                }
+                            },
+                        )
                     }
                     .pointerInput(span, durationMs, bookmarks) {
                         val width = size.width.toFloat()
@@ -258,7 +280,7 @@ fun WaveformScrubber(
                             onDragStart = { off ->
                                 val ms = xToMs(off.x, width)
                                 val hit = bookmarks.minByOrNull { abs((it.t * 1000).toLong() - ms) }
-                                if (hit != null) {
+                                if (hit != null && abs((hit.t * 1000).toLong() - ms) < 32 * density) {
                                     drag.bookmarkId = hit.id
                                     drag.base = (hit.t * 1000).toLong()
                                     drag.accum = 0f
@@ -278,22 +300,31 @@ fun WaveformScrubber(
                     },
             ) {
                 val w = size.width
+                val h = size.height
+                val tagH = 13f
+                val tagW = 15f
                 bookmarks.forEach { b ->
                     val x = msToX((b.t * 1000).toLong(), w)
                     if (x in 0f..w) {
-                        val path = Path().apply {
-                            moveTo(x, size.height)
-                            lineTo(x - 5f, size.height - 10f)
-                            lineTo(x + 5f, size.height - 10f)
+                        drawLine(
+                            color = BOOKMARK_GOLD.copy(alpha = 0.5f),
+                            start = Offset(x, tagH + 4f),
+                            end = Offset(x, h),
+                            strokeWidth = 3f,
+                        )
+                        drawRoundRect(
+                            color = BOOKMARK_GOLD,
+                            topLeft = Offset(x - tagW / 2f, 0f),
+                            size = Size(tagW, tagH),
+                            cornerRadius = CornerRadius(4f, 4f),
+                        )
+                        val point = Path().apply {
+                            moveTo(x - 5f, tagH)
+                            lineTo(x + 5f, tagH)
+                            lineTo(x, tagH + 6f)
                             close()
                         }
-                        drawPath(path, color = BOOKMARK_GOLD)
-                        drawLine(
-                            color = BOOKMARK_GOLD.copy(alpha = 0.6f),
-                            start = Offset(x, 0f),
-                            end = Offset(x, size.height - 10f),
-                            strokeWidth = 2f,
-                        )
+                        drawPath(point, color = BOOKMARK_GOLD)
                     }
                 }
             }
@@ -381,24 +412,25 @@ fun WaveformScrubber(
                         drawLine(
                             color = Color.White.copy(alpha = 0.9f),
                             start = Offset(px, 2f),
-                            end = Offset(px, h - 14f),
+                            end = Offset(px, h - 6f),
                             strokeWidth = 3f,
                         )
                     }
                 }
+            }
 
-                if (durationMs > 0) {
-                    val labelStyle = TextStyle(color = Color.White.copy(alpha = 0.5f), fontSize = 9.sp)
-                    val ticks = 4
-                    for (i in 0..ticks) {
-                        val frac = i.toFloat() / ticks
+            if (durationMs > 0) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    for (i in 0..4) {
+                        val frac = i / 4f
                         val ms = ((span.start + frac * (span.end - span.start)) * durationMs).toLong()
-                        val x = (frac * w).coerceIn(0f, (w - 34f).coerceAtLeast(0f))
-                        drawText(
-                            textMeasurer = textMeasurer,
-                            text = formatTime(ms),
-                            topLeft = Offset(x + 3f, h - 13f),
-                            style = labelStyle,
+                        Text(
+                            formatTime(ms),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
                 }
@@ -423,6 +455,64 @@ fun WaveformScrubber(
             }
         }
     }
+
+    loopMenu?.let { loop ->
+        ChartMenu(
+            title = loop.name ?: "Loop ${formatTime(loop.startMs)} - ${formatTime(loop.endMs)}",
+            onRename = { onRenameLoop(loop.id, it); loopMenu = null },
+            onDelete = { onDeleteLoop(loop.id); loopMenu = null },
+            onDismiss = { loopMenu = null },
+        )
+    }
+    bookmarkMenu?.let { bookmark ->
+        ChartMenu(
+            title = bookmark.name ?: "Bookmark ${formatTime((bookmark.t * 1000).toLong())}",
+            onRename = { onRenameBookmark(bookmark.id, it); bookmarkMenu = null },
+            onDelete = { onDeleteBookmark(bookmark.id); bookmarkMenu = null },
+            onDismiss = { bookmarkMenu = null },
+        )
+    }
+}
+
+@Composable
+private fun ChartMenu(
+    title: String,
+    onRename: (String) -> Unit,
+    onDelete: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var text by remember { mutableStateOf("") }
+    var renaming by remember { mutableStateOf(false) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text = {
+            if (renaming) {
+                OutlinedTextField(
+                    value = text,
+                    onValueChange = { text = it },
+                    singleLine = true,
+                    label = { Text("Name") },
+                )
+            } else {
+                Text("Rename or delete this.")
+            }
+        },
+        confirmButton = {
+            if (renaming) {
+                TextButton(onClick = { onRename(text) }) { Text("Save") }
+            } else {
+                TextButton(onClick = { text = ""; renaming = true }) { Text("Rename") }
+            }
+        },
+        dismissButton = {
+            if (renaming) {
+                TextButton(onClick = onDismiss) { Text("Cancel") }
+            } else {
+                TextButton(onClick = onDelete) { Text("Delete") }
+            }
+        },
+    )
 }
 
 fun formatTime(ms: Long): String {
