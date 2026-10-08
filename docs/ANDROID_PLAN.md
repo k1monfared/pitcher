@@ -1,10 +1,10 @@
 # Pitcher for Android — Plan (v1)
 
-> Status: shipped. The UI was later redesigned; see
-> [ANDROID_V2_PLAN.md](ANDROID_V2_PLAN.md). The v1 multi-screen interface lives
-> in `android/app/.../ui/classic/` and is kept as a fallback, switchable in
-> Settings. Two corrections inline: offline renders use the in-app WSOLA shifter
-> (not TarsosDSP), and screen-on uses the window keep-screen-on flag.
+> Status: shipped, then superseded. The UI was redesigned in
+> [ANDROID_V2_PLAN.md](ANDROID_V2_PLAN.md), and the multi-screen interface was
+> removed entirely in 2.5 ([ANDROID_V3_PLAN.md](ANDROID_V3_PLAN.md)). Two
+> corrections inline: offline renders use the in-app WSOLA shifter (not
+> TarsosDSP), and screen-on uses the window keep-screen-on flag.
 
 Independent native Android app. No downloading, no streaming, no server: the user
 picks an audio or video file already on the device and gets the full pitcher

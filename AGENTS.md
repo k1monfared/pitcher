@@ -23,8 +23,9 @@ decisions. Summary of the chosen stack:
   native Kotlin + Compose, offline-only, no downloaders.
 - The Android v2 redesign (touch-first, full-screen pitch gesture) is planned in
   [docs/ANDROID_V2_PLAN.md](docs/ANDROID_V2_PLAN.md) and built in `ui/modern/`.
-  The v1 screens live in `ui/classic/` and are kept as a fallback; a UiStyle
-  preference switches between them and both share the view model and engine.
+- The Android 2.5 rework (rebuilt gesture, loops and bookmarks timeline, unified
+  render sheet, tuner modal) is in [docs/ANDROID_V3_PLAN.md](docs/ANDROID_V3_PLAN.md).
+  The classic interface was removed; the modern Studio is the only one.
 
 ## Layout
 
@@ -37,6 +38,7 @@ site/                  static project site (GitHub Pages): landing + web UI guid
 docs/PLAN.md           the plan
 docs/ANDROID_PLAN.md   the Android app plan
 docs/ANDROID_V2_PLAN.md  the Android v2 redesign plan
+docs/ANDROID_V3_PLAN.md  the Android 2.5 gesture/timeline/render plan
 docs/LEGALITY.md       source/ToS notes
 data/                  sqlite db + rendered variants (gitignored)
 android/core/          pure-Kotlin note math (ported from notes.rs), tested on JVM

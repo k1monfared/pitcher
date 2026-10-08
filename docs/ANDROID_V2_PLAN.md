@@ -1,10 +1,11 @@
 # pitcher for Android v2 — design plan
 
-> Status: shipped and iterated. The touch-first Studio is the default interface
-> (the v1 screens live in `android/app/.../ui/classic/` as a fallback), and a
-> guided tour was added on top of this plan. A few details changed during the
-> build and are marked inline: Material 3 Expressive was not usable, the speed
-> and loop controls took simpler forms, and the view model was not split.
+> Status: shipped and iterated. The touch-first Studio is the interface, and a
+> guided tour was added on top of this plan. The v1 multi-screen screens were
+> removed in 2.5; see [ANDROID_V3_PLAN.md](ANDROID_V3_PLAN.md). A few details
+> changed during the build and are marked inline: Material 3 Expressive was not
+> usable, the speed and loop controls took simpler forms, and the view model was
+> not split.
 
 A complete visual and interaction redesign of the mobile app. This document is
 design-first: it defines the vision, the screens, and the gestures before any

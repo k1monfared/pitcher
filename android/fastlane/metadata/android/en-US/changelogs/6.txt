@@ -1,0 +1,14 @@
+- Rebuilt the pitch gesture: the rate follows how fast you move, the start is
+  extra fine, and a flick keeps going until you catch it. Snap rounds on a
+  20-cent grid with a stronger pull to semitones.
+- The song chart now holds multiple loops and bookmarks. Drag the lane to make a
+  loop, long-press an edge or a bookmark pin to fine-tune, pinch to zoom, drag
+  to pan, long-press to scrub.
+- Loops and bookmarks have a drawer to rename, delete, enable, and select. A
+  repeat button cycles whole song, all loops, or one loop.
+- Renders join the enabled loops into one file with hard cuts.
+- One render sheet with a folder picker, an editable file name, a format strip,
+  and Save file / Share.
+- The tuner is a modal: set a source and target note and apply the interval.
+- Settings is a floating gear. Haptics can be turned off.
+- The classic interface is removed.

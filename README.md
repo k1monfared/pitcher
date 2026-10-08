@@ -62,11 +62,10 @@ a note tuner with manual override, and a variant shelf.
 ## Android
 
 A separate native Kotlin + Jetpack Compose app, fully offline (no network
-permission, no bundled downloader). The touch-first "modern" interface is the
-default, with the earlier multi-screen interface kept as a fallback; both share
-the same engine and view model. A short guided tour runs on first launch and can
-be replayed from Settings. See [android/README.md](android/README.md) and
-[docs/ANDROID_V2_PLAN.md](docs/ANDROID_V2_PLAN.md).
+permission, no bundled downloader). The touch-first Studio is the whole app. A
+short guided tour runs on first launch and can be replayed from Settings. See
+[android/README.md](android/README.md) and
+[docs/ANDROID_V3_PLAN.md](docs/ANDROID_V3_PLAN.md).
 
 ## Tests
 

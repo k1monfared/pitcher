@@ -12,21 +12,23 @@ Settings at any time.
 Features:
 - Transpose by any amount in cents or semitones, with live preview: pitch moves
   while tempo stays fixed.
-- A full-screen pitch gesture: drag up or down to shift, and hold left of where
-  you touched for coarse steps or right for 1-cent fine control. Snap to the
-  nearest semitone, or type an exact value.
-- A waveform you can pinch to zoom, drag to pan, and tap to seek, with time
-  stamps and bookmark snapping.
-- Drag the lane above the waveform to set an A/B loop, or use the loop chip.
-- Change the play speed with a hold-and-slide preset picker from 0.5x to 2x.
-- Detect the note at the playhead with a monophonic tuner, or type a note or a
-  frequency. Target note and target Hz fill each other in.
-- Keep every pitch you like; the shelf lists the original plus each variant,
-  sorted by how far it shifted. Switching pitches never moves the playhead.
-  Long-press a saved pitch to rename, export, share, or delete it.
-- Bookmarks on the waveform.
-- Export and share a pitch as WAV, MP3, M4A, or Opus, optionally only the A/B
-  loop. Renders can be cancelled, and exports keep stereo where the device
+- A full-screen pitch gesture: drag up or down to shift. The rate follows how
+  fast you move, so slow is fine and fast is coarse, and a flick keeps going and
+  slows down until you catch it. Snap to a 20-cent grid with a stronger pull to
+  semitones.
+- A timeline: make multiple loops by dragging the lane above the wave, and add
+  bookmarks. Long-press a loop edge or a bookmark pin to fine-tune it. Pinch to
+  zoom, drag to pan, long-press to scrub, tap to seek.
+- A repeat button cycles whole song, all loops, or one loop. Loops can be turned
+  off individually, and renders join the enabled loops into one file.
+- A tuner: keep a source and a target note, detected at the playhead or a
+  bookmark or typed, and apply the interval to the slider in one tap.
+- Detect the note at the playhead, or type a note or a frequency.
+- Keep every pitch you like; the shelf lists the original plus each variant.
+  Long-press a saved pitch to rename, share, or delete it.
+- One render sheet: choose the folder, edit the file name, pick a format, and
+  Save file or Share. Renders can be cancelled.
+- Export and share as WAV, MP3, M4A, or Opus, with stereo where the device
   allows.
 - Screen stays on while you work, and playback continues in the background.
 

@@ -4,14 +4,14 @@ Native Kotlin + Jetpack Compose app for pitcher. Fully offline: no network
 permission, no bundled downloader. Import audio or video (audio only is kept),
 or share a file into pitcher from another app.
 
-The touch-first "modern" interface is the default. The earlier multi-screen
-interface is kept as a fallback and switchable in Settings; both share the same
-view model and engine. A short guided tour runs on first launch and can be
-replayed from Settings.
+The app is a single touch-first Studio. A short guided tour runs on first launch
+and can be replayed from Settings.
 
 See [../docs/ANDROID_PLAN.md](../docs/ANDROID_PLAN.md) for the original app
-design and [../docs/ANDROID_V2_PLAN.md](../docs/ANDROID_V2_PLAN.md) for the
-touch-first redesign.
+design, [../docs/ANDROID_V2_PLAN.md](../docs/ANDROID_V2_PLAN.md) for the
+touch-first redesign, and [../docs/ANDROID_V3_PLAN.md](../docs/ANDROID_V3_PLAN.md)
+for the 2.5 gesture, timeline, and render rework. The earlier multi-screen
+interface was removed in 2.5.
 
 ## Build
 

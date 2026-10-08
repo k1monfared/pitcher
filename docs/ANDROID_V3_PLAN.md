@@ -1,8 +1,8 @@
 # pitcher for Android - Studio, timeline, and render rewrite (release 2.5)
 
-Status: planning. Not implemented. This pulls together the decisions from the
-planning discussion and supersedes the v2 plan wherever they differ. The v2
-"classic" interface is removed in this release.
+Status: shipped in 2.5.0. This pulls together the decisions from the planning
+discussion and supersedes the v2 plan wherever they differ. The v2 "classic"
+interface is removed in this release.
 
 ## Scope
 

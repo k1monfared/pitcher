@@ -1,5 +1,32 @@
 # Changelog
 
+## 2.5.0
+
+A rebuilt pitch gesture, a real timeline, and a single render flow. The classic
+interface is gone; the touch-first Studio is now the only one.
+
+- Rebuilt pitch gesture: vertical, no absolute scale. The rate follows how fast
+  you move (slow is fine, fast is coarse), the first few pixels are extra fine,
+  and a flick keeps going and slows down until you catch it. Snap rounds on a
+  light 20-cent grid with a stronger pull to semitones.
+- The song chart holds multiple loops and bookmarks. Drag the wider lane to make
+  a loop, long-press a loop edge or a bookmark pin to fine-tune it with a
+  timestamp that follows your thumb. Tap the wave to seek, drag to pan when
+  zoomed, long-press and drag to scrub, pinch to zoom.
+- Loops and bookmarks have a drawer to rename, delete, enable, and select. Each
+  loop can be toggled off, and a Spotify-style repeat button cycles whole song,
+  all loops, or one loop.
+- Renders concatenate the enabled loops with hard cuts into one file.
+- One render sheet: the save address (tap to choose a folder for the song), an
+  editable file name with a non-editable extension token and an always-open
+  format strip, Save file and Share, and a cancel.
+- A default save folder in Settings, with a per-song override.
+- The tuner is a modal now (long-press the readout): keep a source and target
+  note, detected at the playhead or a bookmark or typed, and apply the interval
+  to the slider. It remembers the last notes per song.
+- Settings is a floating gear; haptics can be turned off.
+- The classic interface and the interface switch are removed.
+
 ## 2.0.1
 
 A guided tour, cancellable renders, and a round of gesture and control fixes.
