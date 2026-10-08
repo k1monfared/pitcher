@@ -1,0 +1,9 @@
+- Making a loop now works at any zoom level (it used to need a 200 ms drag, so
+  a zoomed-in drag created nothing).
+- Snap lights blue when on, with no tap flash.
+- Waveform time stamps sit below the chart so they are never clipped, and
+  bookmarks are fatter pins.
+- Loop edges and bookmarks are easier to grab; long-press the middle of a loop
+  or a bookmark to rename or delete it.
+- The export format is a bigger wheel centred on the file name.
+- The onboarding speed step shows the speed HUD above the tour.
