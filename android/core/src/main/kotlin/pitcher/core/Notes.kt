@@ -55,8 +55,8 @@ object Notes {
             offsetCents = 0
         }
 
-        if (pitchPart.isEmpty() || !pitchPart[0].isUpperCase()) return null
-        val letter = pitchPart[0]
+        if (pitchPart.isEmpty()) return null
+        val letter = pitchPart[0].uppercaseChar()
         val semitone = LETTERS[letter] ?: return null
 
         var rest = pitchPart.substring(1)

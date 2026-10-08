@@ -111,6 +111,15 @@ class NotesTest {
     }
 
     @Test
+    fun noteToHzIsCaseInsensitive() {
+        assertEquals(Notes.noteToHz("C#4")!!, Notes.noteToHz("c#4")!!, EPS)
+        assertEquals(Notes.noteToHz("A4")!!, Notes.noteToHz("a4")!!, EPS)
+        assertEquals(Notes.noteToHz("Bb3")!!, Notes.noteToHz("bb3")!!, EPS)
+        assertEquals(Notes.noteToHz("Eb4")!!, Notes.noteToHz("eb4")!!, EPS)
+        assertEquals(Notes.noteToHz("C#4+37")!!, Notes.noteToHz("c#4+37")!!, EPS)
+    }
+
+    @Test
     fun downloadFilenameMatchesServerRules() {
         assertEquals(
             "nava sol darya - Tasnife Yad Bad - low.opus",
