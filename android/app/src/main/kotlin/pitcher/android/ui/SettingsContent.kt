@@ -115,7 +115,7 @@ fun SettingsContent(vm: PitcherViewModel, modifier: Modifier = Modifier) {
         )
         Button(onClick = { vm.startOnboarding() }) { Text("Replay the tour") }
 
-        Text("pitcher 2.5.0 for Android", style = MaterialTheme.typography.bodySmall)
+        Text("pitcher 2.5.1 for Android", style = MaterialTheme.typography.bodySmall)
         Text(
             "Offline only. This app requests no network permission.",
             style = MaterialTheme.typography.bodySmall,

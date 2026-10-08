@@ -1,0 +1,11 @@
+- Installing a new version no longer needs deleting the old one (releases now
+  use one signing key).
+- Fixed invisible text in the studio and the library.
+- Cleaner pitch pad and a colour snap chip; the bookmark button toggles.
+- Reliable loop creation, fuller loop bars, and scrubbing that follows your
+  finger and commits on release.
+- The render sheet picks the format inline, defaults loop-only off, and has a
+  confirmed cancel. Renders run in the background and notify you when saved.
+- A pitch name and a file name are now separate; tapping a pitch opens the
+  render sheet and long-press gives render, rename, share, and delete.
+- Shorter onboarding, with the speed HUD shown on the speed step.

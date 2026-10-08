@@ -1,5 +1,28 @@
 # Changelog
 
+## 2.5.1
+
+Fixes and polish from first use, plus an install fix.
+
+- Installing a new version no longer requires deleting the old one. Releases
+  are now signed with a stable key (see below); before, each build used a
+  throwaway debug key, which Android treats as a different app.
+- Fixed text being invisible in the studio and the library (black on black).
+- The pitch pad no longer shows the fine/coarse label; snap is a colour chip.
+- The bookmark button toggles a bookmark at the playhead.
+- The loop lane is one gesture (drag to make a loop, hold then drag an edge),
+  and the bars fill the lane.
+- Long-press on the wave scrubs under your finger and commits on release.
+- The render sheet puts the format picker inline as a draggable extension token,
+  defaults the loop-only row off, and splits the action into rendering and a
+  confirmed cancel. Renders run in the background and post a notification whose
+  tap opens the folder.
+- A pitch's name (shelf) and the file name (render sheet) are separate. Tapping
+  a pitch opens the render sheet; long-press gives render, rename, share, and
+  delete. The same cents can no longer be saved twice.
+- The onboarding is shorter, and its speed step shows the speed HUD.
+- The settings sheet no longer jitters when dragged.
+
 ## 2.5.0
 
 A rebuilt pitch gesture, a real timeline, and a single render flow. The classic

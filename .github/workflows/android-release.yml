@@ -30,6 +30,11 @@ jobs:
           if [ -n "$KEYSTORE_BASE64" ]; then
             echo "$KEYSTORE_BASE64" | base64 -d > "$GITHUB_WORKSPACE/release.keystore"
             echo "PITCHER_KEYSTORE=$GITHUB_WORKSPACE/release.keystore" >> "$GITHUB_ENV"
+          elif [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            echo "::error::KEYSTORE_BASE64 is not set. A tagged release must be signed with the release key, otherwise each build gets a different debug key and Android refuses to update in place (users must uninstall first)."
+            exit 1
+          else
+            echo "::warning::No release keystore; building with the debug key. Do not publish this artifact."
           fi
 
       - name: Build
