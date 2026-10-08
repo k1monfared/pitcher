@@ -1,5 +1,11 @@
 # Pitcher for Android — Plan (v1)
 
+> Status: shipped. The UI was later redesigned; see
+> [ANDROID_V2_PLAN.md](ANDROID_V2_PLAN.md). The v1 multi-screen interface lives
+> in `android/app/.../ui/classic/` and is kept as a fallback, switchable in
+> Settings. Two corrections inline: offline renders use the in-app WSOLA shifter
+> (not TarsosDSP), and screen-on uses the window keep-screen-on flag.
+
 Independent native Android app. No downloading, no streaming, no server: the user
 picks an audio or video file already on the device and gets the full pitcher
 workflow (pitch lab, tuner, variant shelf, bookmarks, loop, speed, export) with a
@@ -37,7 +43,7 @@ clean multi-screen UI. Fully offline, fully FOSS, F-Droid friendly.
 | Video sources | MediaExtractor + MediaMuxer | Import extracts the audio track to an audio-only file, no re-encode, no video kept |
 | Waveform | Custom Compose Canvas | Full control of zoom/pan/markers, no chart dependency |
 | Background | Foreground service + Media3 notification (optional toggle) | Playback survives screen-off when the user wants it |
-| Screen-on | `setKeepScreenOn(true)` on player screens | Explicit requirement, one line per screen |
+| Screen-on | Window `FLAG_KEEP_SCREEN_ON` while the app is foreground | Reliable; `View.keepScreenOn` on a Compose host was not always honored |
 
 Why not reuse the Rust core via JNI: the core shells out to ffmpeg, which does not
 exist on Android, so the engine half would need replacing anyway. What we do reuse
@@ -46,9 +52,10 @@ Port `notes.rs` to Kotlin with the same unit-test vectors so the two apps agree
 exactly (C#4 = 277.18 Hz, interval math, fractional semitones).
 
 Why not Rubber Band via NDK for v1: best quality, but the NDK build is stale
-upstream and the JNI surface would be hand-rolled. TarsosDSP ships today with no
-native code. Kept renders on the server stay Rubber Band; the phone renders with
-TarsosDSP and says so in the UI.
+upstream and the JNI surface would be hand-rolled. TarsosDSP was the original
+choice but is not on Maven Central, so the app ships its own dependency-free
+WSOLA shifter instead. Kept renders on the server stay Rubber Band; the phone
+renders with in-app WSOLA and says so in the UI.
 
 ## Screens (one job each, bottom nav)
 

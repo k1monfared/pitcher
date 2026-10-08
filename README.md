@@ -59,20 +59,34 @@ Builds the frontend if needed, builds the server, and serves on the first free p
 snap modes, keyboard nudges), a canvas waveform with click-to-seek and shift-drag looping,
 a note tuner with manual override, and a variant shelf.
 
+## Android
+
+A separate native Kotlin + Jetpack Compose app, fully offline (no network
+permission, no bundled downloader). The touch-first "modern" interface is the
+default, with the earlier multi-screen interface kept as a fallback; both share
+the same engine and view model. A short guided tour runs on first launch and can
+be replayed from Settings. See [android/README.md](android/README.md) and
+[docs/ANDROID_V2_PLAN.md](docs/ANDROID_V2_PLAN.md).
+
 ## Tests
 
 ```
 cargo test                    # Rust: notes, engine, tuner, shelf, CLI, server, ports
 cd web && npm install && npm test   # TypeScript: notes, fader, audio, api
+cd android && ./gradlew :core:test :app:testDebugUnitTest   # Kotlin core + app
 ```
 
 ## Layout
 
 ```
-crates/pitcher-core/   engine, tuner, note math, sqlite shelf, import
+crates/pitcher-core/   engine, tuner, note math, sqlite shelf, import, model
 crates/pitcher-cli/    the `pitcher` binary
-server/                axum REST server (serves web/dist)
-web/                   Svelte 5 + Vite + TS frontend
-docs/                  plan and legality notes
+server/                axum REST server over pitcher-core (serves web/dist)
+web/                   Svelte 5 + Vite + TS frontend (live preview via soundtouchjs)
+site/                  static project site (GitHub Pages): landing + web UI guide
+docs/                  plan, Android plans, and legality notes
 data/                  sqlite db + rendered variants (gitignored)
+android/core/          pure-Kotlin note math, tested on the JVM
+android/app/           native Android app (Kotlin + Compose), offline only
+android/fastlane/      store listing metadata and screenshots
 ```

@@ -41,6 +41,7 @@ docs/LEGALITY.md       source/ToS notes
 data/                  sqlite db + rendered variants (gitignored)
 android/core/          pure-Kotlin note math (ported from notes.rs), tested on JVM
 android/app/           native Android app (Kotlin + Compose), offline only
+android/fastlane/      store listing metadata and screenshots
 ```
 
 ## Conventions
@@ -76,6 +77,7 @@ cargo fmt                        # format
 cd web && npm install && npm run build   # frontend
 cd web && npm test               # frontend tests
 cd android && ./gradlew :core:test        # Android core note-math tests
+cd android && ./gradlew :app:testDebugUnitTest  # Android app unit + screenshot tests
 cd android && ./gradlew :app:assembleDebug  # build debug APK
 cd android && ./gradlew :app:assembleRelease # minified release APK
 cd android && ./gradlew :app:testDebugUnitTest -Proborazzi.test.record=true --tests "*ScreenshotTest"  # render screenshots

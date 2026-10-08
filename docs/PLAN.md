@@ -1,5 +1,12 @@
 # Pitcher — Implementation Plan (v1)
 
+> Status: historical. The CLI, server, and web UI shipped from this plan; the
+> Android app was built separately (see [ANDROID_PLAN.md](ANDROID_PLAN.md)),
+> and two choices changed along the way: the browser live-audition engine is
+> `soundtouchjs` (not `rubberband-wasm`), and a `bookmarks` table plus a
+> `variants.name` column were added. Corrections are marked inline. For the
+> current touch interface see [ANDROID_V2_PLAN.md](ANDROID_V2_PLAN.md).
+
 ## Goal
 
 Transpose audio by an arbitrary pitch interval while preserving tempo, with optional
@@ -19,7 +26,7 @@ aubio, or type a note/frequency manually, then move it by any amount.
 | Shelf storage | SQLite (`rusqlite`) | Source, variants, favorites, metadata |
 | Web server | Rust `axum` (thin REST) | One language for server, no Python runtime needed |
 | Web UI | Svelte 5 + Vite + TypeScript | Instant slider/playback, custom canvas |
-| Live audition | `rubberband-wasm` AudioWorklet | Zero-latency in-browser preview, same algorithm |
+| Live audition | `soundtouchjs` AudioWorklet | Zero-latency in-browser preview of pitch and tempo; kept files are rendered server-side with Rubber Band |
 | Importer | `yt-dlp` | YouTube/SoundCloud (ToS note documented) |
 
 Python/ML tuners (torchcrepe, Basic Pitch) are explicitly deferred past v1.
@@ -47,13 +54,16 @@ pitcher/
   server/                   # axum REST over pitcher-core
     src/main.rs
   web/                      # Svelte 5 + Vite + TS
-    src/lib/{cents.ts,api.ts,notes.ts}
-    src/components/{PitchFader.svelte,Waveform.svelte,LoopRegion.svelte,
-                    NoteTuner.svelte,VariantShelf.svelte,Transport.svelte}
-    src/workers/rubberband-processor.js
-    public/rubberband.wasm
+    src/lib/{cents.ts,api.ts,notes.ts,engine.ts,audio.ts,fader.ts,view.ts}
+    src/components/{PitchFader.svelte,Waveform.svelte,NoteTuner.svelte,
+                    VariantShelf.svelte,Transport.svelte}
+    src/App.svelte
+  site/                     # static project site (GitHub Pages)
+  android/                  # native Kotlin + Compose app (separate plan)
   docs/
     PLAN.md                 # this file
+    ANDROID_PLAN.md         # the Android app plan
+    ANDROID_V2_PLAN.md      # the touch-first Android redesign
     LEGALITY.md             # Spotify/YouTube/SoundCloud ToS notes
   data/                     # SQLite db + rendered variants (gitignored)
 ```
@@ -110,14 +120,16 @@ pub enum Backend { RubberBandLinked, Ffmpeg }
 ```sql
 tracks(id, source_path, source_kind, source_url, title, artist,
        duration_s, sample_rate, created_at)
-variants(id, track_id, cents, formant, engine, pitch_quality,
+variants(id, track_id, name, cents, formant, engine, pitch_quality,
          section_start, section_end, output_path, output_format,
          src_note, src_hz, target_note, target_hz,
          favorite, created_at)
+bookmarks(id, track_id, t, name, created_at)
 ```
 
 Original audio is a row in `tracks`; each transpose is a `variants` row. `favorite` is
-the keep-1-or-2 mechanism. Cascade delete by `track_id`.
+the keep-1-or-2 mechanism. Cascade delete by `track_id`. (`bookmarks` and
+`variants.name` were added after the first cut.)
 
 ## CLI (`pitcher`)
 
@@ -162,10 +174,12 @@ Svelte components:
 - `Transport.svelte` — play/pause, A/B original vs shifted, seek.
 - `VariantShelf.svelte` — grid of variants, star/keep, delete, export.
 
-Live audition: `public/rubberband-processor.js` + `rubberband.wasm` from `rubberband-wasm`,
-loaded into an `AudioWorkletNode`. The worklet owns the decoded `AudioBuffer`; the store
-drives pitch/tempo/loop from the UI. Server render is used only when you export,
-guaranteeing the file matches the CLI engine settings.
+Live audition: `web/src/lib/engine.ts` drives a `soundtouchjs` `PitchShifter`
+over Web Audio in the browser (`PREVIEW_ENGINE = "soundtouch"`). The store
+drives pitch, tempo, and loop from the UI. Server render with Rubber Band
+(`RENDER_ENGINE`) is used only when you export, so the file matches the CLI
+engine settings. (The plan originally proposed `rubberband-wasm`; the
+implementation uses `soundtouchjs`.)
 
 Smoothness details: pointer events with `setPointerCapture` on the fader,
 `requestAnimationFrame`-throttled parameter writes, no reactive round trip through the
@@ -199,8 +213,12 @@ path. The tool does not circumvent DRM.
 ## Deferred (post-v1)
 
 - torchcrepe accurate tuner, Basic Pitch polyphonic mode.
-- Android Kotlin app reusing `pitcher-core` via JNI.
 - `signalsmith-stretch` alternative engine comparison.
+
+The Android app was planned here as "reusing `pitcher-core` via JNI". It shipped
+as a native Kotlin + Compose app that ports the note math and tuner instead (the
+Rust core shells out to ffmpeg, which is not on Android). See
+[ANDROID_PLAN.md](ANDROID_PLAN.md) and [ANDROID_V2_PLAN.md](ANDROID_V2_PLAN.md).
 
 ## Milestone order
 

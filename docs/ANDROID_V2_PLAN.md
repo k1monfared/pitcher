@@ -1,5 +1,11 @@
 # pitcher for Android v2 — design plan
 
+> Status: shipped and iterated. The touch-first Studio is the default interface
+> (the v1 screens live in `android/app/.../ui/classic/` as a fallback), and a
+> guided tour was added on top of this plan. A few details changed during the
+> build and are marked inline: Material 3 Expressive was not usable, the speed
+> and loop controls took simpler forms, and the view model was not split.
+
 A complete visual and interaction redesign of the mobile app. This document is
 design-first: it defines the vision, the screens, and the gestures before any
 code. v1's engine, storage, playback, and export layers are reused unchanged.
@@ -26,14 +32,18 @@ Instagram's smooth direct manipulation) rather than a form with sliders.
 The app is one main screen plus sheets and one secondary page. There is no
 bottom tab bar on the Studio; it would compete with the canvas.
 
-- **Studio (home)** — the open song. Pitch, playback, speed, loop, pitch shelf,
+- **Studio (home)**: the open song. Pitch, playback, speed, loop, pitch shelf,
   export. Everything the user does day to day.
-- **Library** — import and browse songs. Opened from the top-left button (or a
-  left-edge swipe). Not a place the user sits; a place they visit.
-- **Pitches sheet** — the shelf for the current song, pulled up from the Studio.
-- **Export sheet** — format, loop-only, save, share. Pulled up from the Studio.
-- **Settings** — overflow menu (top-right): keep screen on, default format,
-  storage, engine info.
+- **Library**: import and browse songs. Opened from the top-left button. Not a
+  place the user sits; a place they visit.
+- **Export sheet**: format, loop-only, save, share. Pulled up from the Studio.
+- **Settings**: a button at the bottom of the Studio (the plan proposed a
+  top-right overflow menu): keep screen on, interface style, storage, engine
+  info, and replaying the guided tour.
+
+Shipped changes: the separate Pitches sheet was dropped; the shelf is inline on
+the Studio. The Library uses a list (not a grid) for now, and the left-edge
+swipe was not built.
 
 Rationale: importing happens once per song; experimenting with pitch happens
 constantly. So import is demoted and pitch experimentation is the home.
@@ -148,22 +158,19 @@ the HUD shows the note name it will land on.
 
 Listening at different speeds back and forth is a first-class use.
 
-- **Speed chip**: shows the current rate (1.0x). Drag it horizontally to change
-  the rate continuously with a HUD. Tap it to open a fine slider and the preset
-  row (0.5x to 2x).
-- **Hold to audition**: press and hold the chip to temporarily drop to a slower
-  rate (default 0.7x) and snap back on release, like a pitch-bend spring. This
-  is the "back and forth" comparison in one finger.
+- **Speed chip**: shows the current rate (1x). Shipped behavior: press and slide
+  up or down to pick a preset (0.5x to 2x) with a HUD listing the presets, and
+  tap it to return to 1x. (The plan proposed a horizontal drag plus a slider.)
 - Tempo is independent of pitch (Media3 Sonic), so speed never changes the note.
+
+Hold-to-audition was explored and dropped in favor of the preset picker.
 
 ## Loop and repeat a part
 
-- **Loop handles**: two draggable handles on the waveform define A and B. The
-  region tints; the loop chip enables it. Dragging a handle gives a magnified
-  time readout.
-- **Quick loop**: buttons in the waveform strip to set A and B at the playhead.
-- **Repeat count**: the loop chip long-press sets repeat N times or forever, with
-  a small counter badge on the chip.
+- **Loop lane**: shipped behavior: drag the thin lane above the waveform to set A
+  and B; the region tints. (The plan proposed draggable handles over the wave.)
+- **Loop chip**: taps cycle set A, then set B (which turns the loop on), then
+  toggle; long-press clears. The plan's repeat count was not built.
 - Loop and speed apply to whichever pitch is selected from the shelf.
 
 ## Pitch shelf (per song)
@@ -197,13 +204,16 @@ A bottom sheet:
 
 ## Screen-on
 
-The screen stays on whenever the Studio is in the foreground (already
-implemented via the window keep-screen-on flag).
+The screen stays on while the app is in the foreground, via the window
+keep-screen-on flag in `AppRoot`, gated by a Settings toggle. Note: the modern
+interface missed this until 2.0.1; only the classic interface honored it before.
 
 ## Visual language
 
-- **Theme**: Material 3 Expressive. `MaterialExpressiveTheme` with
-  `MotionScheme.expressive()`, expressive shapes, and dynamic color as a base.
+- **Theme**: Material 3 Expressive was the intent. `MaterialExpressiveTheme` and
+  `MotionScheme` are still `internal` in `material3` 1.4.0, so the shipped theme
+  is a plain `MaterialTheme` (custom dark scheme) with motion curves defined by
+  hand in `theme/ModernTheme.kt`.
 - **Palette**: deep near-black background, one accent that shifts with the pitch
   (a cool blue when down, a warm amber when up, neutral at 0), a calm green for
   saved state. Text is high contrast, with large display numerals for cents.
@@ -234,8 +244,9 @@ The "modern stack of objects", each a small composable:
 
 ## Tech stack
 
-- Kotlin + Jetpack Compose, Material 3 Expressive (bump `material3` to the
-  expressive line if the current version lacks `MaterialExpressiveTheme`).
+- Kotlin + Jetpack Compose on `material3` 1.4.0. The Expressive theme API is not
+  public yet, so the theme is a custom `MaterialTheme`; revisit when the
+  Expressive API ships.
 - Reuse everything below the UI: Media3 playback and Sonic pitch/tempo,
   `MediaSessionService` background play, the WSOLA renderer, `RenderedStore`
   (MediaStore to `Music/pitcher`), the SQLite shelf, the YIN tuner, and the
@@ -250,10 +261,10 @@ The "modern stack of objects", each a small composable:
 
 - The engine, storage, playback, and export layers are unchanged; only the UI is
   rebuilt.
-- Split the single ViewModel into a `StudioViewModel` (playback, pitch, shelf,
-  speed, loop) and a `LibraryViewModel` (songs, import).
-- The pitch gesture math moves into `:core` as a pure, tested function (like
-  `FaderMath` today), so it can be unit tested without a device.
+- Shipped: the single `PitcherViewModel` was kept and shared by both interface
+  styles (the plan proposed splitting it into studio and library view models).
+- The pitch gesture math moves into `:core` as a pure, tested function
+  (`PitchGesture`, tested in `PitchGestureTest`).
 
 ## Milestones
 
@@ -272,9 +283,10 @@ The "modern stack of objects", each a small composable:
 - Sensitivity axis: **horizontal offset from the touch-down point**, not
   absolute screen position. Start anywhere; move right of the start for fine,
   left for coarse.
-- Snap: **off by default**, with a toggle near the readout.
-- Library access: **top-left button plus a left-edge swipe**.
-- Background: **blurred album art when present, else a generative gradient**.
+- Snap: **off by default**, toggled by a button above the waveform.
+- Library access: **top-left button** (the left-edge swipe was not built).
+- Background: a **radial glow tinted by the current pitch** (blurred album art
+  was not built).
 
 ## Open questions
 

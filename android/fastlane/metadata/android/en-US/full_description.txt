@@ -1,26 +1,34 @@
-pitcher transposes audio by any pitch interval while keeping the tempo, and lets you
-keep a shelf of pitch variants per track.
+pitcher transposes audio by any pitch interval while keeping the tempo, and lets
+you keep a shelf of pitch variants per track.
 
 It is fully offline. The app requests no network permission and bundles no
 downloader. Import audio (or video, from which only the audio is kept) from your
 device, or share a file into pitcher from any other app.
 
+The interface is built for touch. A short guided tour runs the first time you
+open a song and points out the gestures and controls; you can replay it from
+Settings at any time.
+
 Features:
 - Transpose by any amount in cents or semitones, with live preview: pitch moves
   while tempo stays fixed.
-- A touch fader built for precision: drag to shift, slide left to tune finely,
-  slide right to move fast, double-tap to reset.
+- A full-screen pitch gesture: drag up or down to shift, and hold left of where
+  you touched for coarse steps or right for 1-cent fine control. Snap to the
+  nearest semitone, or type an exact value.
+- A waveform you can pinch to zoom, drag to pan, and tap to seek, with time
+  stamps and bookmark snapping.
+- Drag the lane above the waveform to set an A/B loop, or use the loop chip.
+- Change the play speed with a hold-and-slide preset picker from 0.5x to 2x.
 - Detect the note at the playhead with a monophonic tuner, or type a note or a
   frequency. Target note and target Hz fill each other in.
 - Keep every pitch you like; the shelf lists the original plus each variant,
   sorted by how far it shifted. Switching pitches never moves the playhead.
-- Section loop (A/B) and a playback speed control from 0.5x to 2x.
-- Precise seeking: pinch to zoom the waveform, drag to pan, tap to seek, plus
-  one-second and five-second steppers.
+  Long-press a saved pitch to rename, export, share, or delete it.
 - Bookmarks on the waveform.
 - Export and share a pitch as WAV, MP3, M4A, or Opus, optionally only the A/B
-  loop. Exports keep stereo where the device allows.
-- Screen stays on while playing; playback continues in the background.
+  loop. Renders can be cancelled, and exports keep stereo where the device
+  allows.
+- Screen stays on while you work, and playback continues in the background.
 
 pitcher is free and open source software (GPL-3.0-or-later). No ads, no
 tracking, no accounts.
