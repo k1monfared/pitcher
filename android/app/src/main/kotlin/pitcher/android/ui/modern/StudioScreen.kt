@@ -37,6 +37,7 @@ fun StudioScreen(
     onOpenLibrary: () -> Unit,
     onOpenExport: () -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenTuner: () -> Unit = {},
     onboarding: OnboardingTargets? = null,
 ) {
     val track = vm.current
@@ -83,7 +84,9 @@ fun StudioScreen(
         onOpenLibrary = onOpenLibrary,
         onOpenExport = onOpenExport,
         onOpenSettings = onOpenSettings,
+        onOpenTuner = onOpenTuner,
         onCancelRender = { vm.cancelExport() },
+        hapticsEnabled = vm.hapticsEnabled,
         onboarding = onboarding,
     )
 }
@@ -128,6 +131,8 @@ fun StudioContent(
     onOpenExport: () -> Unit,
     onOpenSettings: () -> Unit,
     onCancelRender: () -> Unit = {},
+    onOpenTuner: () -> Unit = {},
+    hapticsEnabled: Boolean = true,
     onboarding: OnboardingTargets? = null,
 ) {
     val accent by animateColorAsState(targetValue = PitchHues.forCents(cents), label = "accent")
@@ -155,6 +160,8 @@ fun StudioContent(
                 snap = snap,
                 accent = accent,
                 onCents = onCents,
+                onOpenTuner = onOpenTuner,
+                hapticsEnabled = hapticsEnabled,
                 onboarding = onboarding,
                 modifier = Modifier.weight(1f).fillMaxWidth(),
             )

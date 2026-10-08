@@ -90,6 +90,8 @@ class PitcherViewModel(app: Application) : AndroidViewModel(app) {
         private set
     var keepScreenOn by mutableStateOf(true)
         private set
+    var hapticsEnabled by mutableStateOf(true)
+        private set
     var uiStyle by mutableStateOf(UiStyle.MODERN)
         private set
     var onboardingActive by mutableStateOf(false)
@@ -131,6 +133,7 @@ class PitcherViewModel(app: Application) : AndroidViewModel(app) {
             UiStyle.MODERN
         }
         keepScreenOn = prefs.getBoolean("keep_screen_on", true)
+        hapticsEnabled = prefs.getBoolean("haptics", true)
         onboardingActive = !prefs.getBoolean("onboarding_done", false)
         refreshTracks()
         connectController()
@@ -513,6 +516,11 @@ class PitcherViewModel(app: Application) : AndroidViewModel(app) {
     fun changeKeepScreenOn(value: Boolean) {
         keepScreenOn = value
         prefs.edit().putBoolean("keep_screen_on", value).apply()
+    }
+
+    fun changeHaptics(value: Boolean) {
+        hapticsEnabled = value
+        prefs.edit().putBoolean("haptics", value).apply()
     }
 
     fun changeUiStyle(style: UiStyle) {

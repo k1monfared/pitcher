@@ -5,6 +5,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -23,13 +24,15 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
@@ -38,6 +41,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -45,7 +49,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlin.math.abs
+import kotlin.math.min
 import kotlin.math.roundToInt
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import pitcher.core.PitchGesture
 
 private val HUD_GRADES = listOf(1200, 1000, 800, 600, 400, 200, 0, -200, -400, -600, -800, -1000, -1200)
@@ -56,24 +63,86 @@ fun PitchPad(
     snap: Boolean,
     accent: Color,
     onCents: (Int) -> Unit,
+    onOpenTuner: () -> Unit,
     modifier: Modifier = Modifier,
+    hapticsEnabled: Boolean = true,
     onboarding: OnboardingTargets? = null,
 ) {
-    val currentCents by rememberUpdatedState(cents)
-    val snapNow by rememberUpdatedState(snap)
-    var dragging by remember { mutableStateOf(false) }
-    var mode by remember { mutableStateOf(PitchGesture.Mode.NORMAL) }
-    var lastSemitone by remember { mutableIntStateOf(0) }
-    var lastTapMs by remember { mutableLongStateOf(0L) }
-    var showExact by remember { mutableStateOf(false) }
+    val density = LocalDensity.current
     val haptics = LocalHapticFeedback.current
+    val scope = rememberCoroutineScope()
+    val snapNow by rememberUpdatedState(snap)
+    val hapticsNow by rememberUpdatedState(hapticsEnabled)
+    val onCentsNow by rememberUpdatedState(onCents)
+    val onOpenTunerNow by rememberUpdatedState(onOpenTuner)
 
-    fun bump(delta: Int) {
-        onCents((currentCents + delta).coerceIn(-1200, 1200))
+    val raw = remember { mutableStateOf(cents.toDouble()) }
+    val lastApplied = remember { mutableIntStateOf(cents) }
+    val dragging = remember { mutableStateOf(false) }
+    val flinging = remember { mutableStateOf(false) }
+    val gear = remember { mutableIntStateOf(PitchGesture.GRAINS.first()) }
+    var showExact by remember { mutableStateOf(false) }
+
+    fun apply(rawValue: Double) {
+        val applied = if (snapNow) PitchGesture.snapCents(rawValue) else rawValue.roundToInt()
+        val prev = lastApplied.intValue
+        if (applied != prev) {
+            lastApplied.intValue = applied
+            onCentsNow(applied)
+            if (hapticsNow && snapNow) {
+                val strong = applied / 100 != prev / 100
+                haptics.performHapticFeedback(
+                    if (strong) HapticFeedbackType.LongPress else HapticFeedbackType.TextHandleMove,
+                )
+            }
+        }
+    }
+
+    fun reset() {
+        raw.value = 0.0
+        apply(0.0)
+    }
+
+    fun adjust(delta: Int) {
+        raw.value = (raw.value + delta)
+            .coerceIn(PitchGesture.MIN_CENTS.toDouble(), PitchGesture.MAX_CENTS.toDouble())
+        apply(raw.value)
+    }
+
+    fun fling(velocity: Double) {
+        if (abs(velocity) < PitchGesture.STOP_CENTS_PER_SEC) return
+        scope.launch {
+            flinging.value = true
+            var value = raw.value
+            var v = velocity
+            var last = withFrameNanos { it }
+            while (true) {
+                val now = withFrameNanos { it }
+                val dt = ((now - last) / 1_000_000_000.0).coerceIn(0.001, 0.05)
+                last = now
+                val f = PitchGesture.fling(value, v, dt)
+                value = f.cents
+                v = f.velocityCentsPerSec
+                raw.value = value
+                apply(value)
+                if (f.done) break
+            }
+            flinging.value = false
+        }
+    }
+
+    LaunchedEffect(cents) {
+        if (!dragging.value && !flinging.value && cents != lastApplied.intValue) {
+            raw.value = cents.toDouble()
+            lastApplied.intValue = cents
+        }
+    }
+    LaunchedEffect(snap) {
+        if (snap) apply(raw.value)
     }
 
     Column(modifier = modifier, horizontalAlignment = Alignment.CenterHorizontally) {
-        PillRow(deltas = listOf(1, 10, 100), onTap = { bump(it) })
+        PillRow(deltas = listOf(1, 10, 100), onTap = { delta -> adjust(delta) })
 
         Box(
             modifier = Modifier
@@ -81,83 +150,84 @@ fun PitchPad(
                 .fillMaxWidth()
                 .onboardingTarget(onboarding, "pad")
                 .pointerInput(Unit) {
+                    val slopPx = 10f * density.density
+                    val rampPx = min(10f * density.density, 0.10f * size.height)
                     awaitEachGesture {
-                        val down = awaitFirstDown()
+                        val down = awaitFirstDown(requireUnconsumed = false)
                         val startX = down.position.x
+                        val startY = down.position.y
                         var lastY = down.position.y
-                        var c = currentCents
+                        var lastTime = down.uptimeMillis
+                        var rawLocal = raw.value
+                        var travel = 0.0
+                        var velocity = 0.0
                         var moved = false
-                        dragging = true
-                        lastSemitone = (c / 100.0).roundToInt()
+                        dragging.value = true
                         while (true) {
                             val event = awaitPointerEvent()
                             val change = event.changes.firstOrNull { it.id == down.id } ?: break
-                            if (!change.pressed) break
                             val pos = change.position
+                            val dt = (change.uptimeMillis - lastTime).coerceAtLeast(1) / 1000.0
                             val dy = lastY - pos.y
-                            val offsetX = pos.x - startX
-                            if (abs(offsetX) > 8f || abs(dy) > 8f) moved = true
+                            if (abs(pos.x - startX) > slopPx || abs(pos.y - startY) > slopPx) moved = true
                             if (moved) {
-                                c = PitchGesture.step(
-                                    currentCents = c,
-                                    dyPx = dy,
-                                    offsetPx = offsetX,
-                                    widthPx = size.width.toFloat(),
-                                    snapCents = if (snapNow) 100 else 0,
+                                travel += dy
+                                velocity = PitchGesture.smoothedSpeed(velocity, dy / dt, 0.25)
+                                rawLocal = PitchGesture.advance(
+                                    rawCents = rawLocal,
+                                    dyPx = dy.toDouble(),
+                                    totalTravelPx = travel,
+                                    speedPxPerSec = abs(velocity),
+                                    rampPx = rampPx.toDouble(),
                                 )
-                                onCents(c)
-                                val m = PitchGesture.mode(offsetX, size.width.toFloat())
-                                if (m != mode) {
-                                    mode = m
-                                    haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                }
-                                val semi = (c / 100.0).roundToInt()
-                                if (semi != lastSemitone) {
-                                    lastSemitone = semi
-                                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                                }
+                                raw.value = rawLocal
+                                gear.intValue = PitchGesture.grain(abs(velocity))
+                                apply(rawLocal)
+                                change.consume()
                             }
                             lastY = pos.y
-                            change.consume()
+                            lastTime = change.uptimeMillis
+                            if (!change.pressed) break
                         }
-                        dragging = false
-                        if (!moved) {
-                            val now = System.currentTimeMillis()
-                            if (now - lastTapMs < 350L) {
-                                onCents(0)
-                                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                                lastTapMs = 0L
-                            } else {
-                                lastTapMs = now
-                            }
+                        dragging.value = false
+                        if (moved) {
+                            fling(velocity * PitchGesture.centsPerPx(abs(velocity)))
                         }
                     }
                 },
             contentAlignment = Alignment.Center,
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(
-                    text = (if (cents >= 0) "+$cents" else "$cents"),
-                    fontSize = 84.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onBackground,
-                    textAlign = TextAlign.Center,
+                Box(
                     modifier = Modifier
                         .onboardingTarget(onboarding, "cents")
-                        .clickable { showExact = true },
-                )
+                        .pointerInput(Unit) {
+                            detectTapGestures(
+                                onTap = { showExact = true },
+                                onDoubleTap = {
+                                    reset()
+                                    if (hapticsNow) haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                                },
+                                onLongPress = { onOpenTunerNow() },
+                            )
+                        },
+                ) {
+                    Text(
+                        text = (if (cents >= 0) "+$cents" else "$cents"),
+                        fontSize = 84.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onBackground,
+                        textAlign = TextAlign.Center,
+                    )
+                }
                 Text(
                     "cents",
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                if (dragging) {
+                if (dragging.value) {
                     Text(
-                        when (mode) {
-                            PitchGesture.Mode.FINE -> "fine · 1 cent"
-                            PitchGesture.Mode.NORMAL -> "normal"
-                            PitchGesture.Mode.COARSE -> "fast"
-                        },
+                        gearLabel(gear.intValue),
                         style = MaterialTheme.typography.labelLarge,
                         color = accent,
                     )
@@ -165,7 +235,7 @@ fun PitchPad(
             }
 
             val hudAlpha by animateFloatAsState(
-                targetValue = if (dragging) 1f else 0f,
+                targetValue = if (dragging.value) 1f else 0f,
                 label = "hud",
             )
             PitchHud(
@@ -176,19 +246,26 @@ fun PitchPad(
             )
         }
 
-        PillRow(deltas = listOf(-1, -10, -100), onTap = { bump(it) })
+        PillRow(deltas = listOf(-1, -10, -100), onTap = { delta -> adjust(delta) })
     }
 
     if (showExact) {
         ExactEntryDialog(
             initial = cents,
             onConfirm = {
-                onCents(it)
+                raw.value = it.toDouble()
+                apply(raw.value)
                 showExact = false
             },
             onDismiss = { showExact = false },
         )
     }
+}
+
+private fun gearLabel(grain: Int): String = when {
+    grain <= 1 -> "fine · 1c"
+    grain >= 200 -> "fast · 200c"
+    else -> "grain ${grain}c"
 }
 
 @Composable

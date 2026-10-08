@@ -4,81 +4,112 @@ import kotlin.math.abs
 import kotlin.math.roundToInt
 
 /**
- * The full-screen pitch gesture. Vertical movement changes the pitch; the
- * horizontal offset from the touch-down point selects a grain, continuously
- * from coarse at the left of the start to fine at the right. The value is
- * snapped to the current grain, so the increments are always a clean 1, 5, 10,
- * 25, 50, 100, or 200 cents. The mapping is incremental per pointer move, so
- * changing grain mid-drag never jumps the value.
+ * The full-screen pitch gesture, vertical only.
+ *
+ * A continuous accumulator is advanced by `dy * centsPerPixel`. The rate comes
+ * from the pointer speed (slow is fine, fast is coarse), and the first few
+ * pixels of a touch are finer than 1:1 (a precision ramp). The raw value is
+ * never quantized, so small moves are never lost and changing rate mid-drag
+ * does not jump. Snapping is applied only when asked, on a dual grid: a light
+ * 20-cent grid and a stronger 100-cent (semitone) grid.
  */
 object PitchGesture {
 
-    /** Cents per pixel at the coarse and fine ends. */
-    const val COARSE = 8.0
-    const val FINE = 0.15
-    const val DEAD_ZONE_PX = 24.0
+    const val MIN_CENTS = -1200
+    const val MAX_CENTS = 1200
 
-    /** Grain levels, coarse to fine. The rightmost is single-cent precision. */
-    val GRAINS = intArrayOf(200, 100, 50, 25, 10, 5, 1)
+    /** Gear levels, fine to coarse, for the HUD label. */
+    val GRAINS = intArrayOf(1, 5, 10, 25, 50, 100, 200)
 
-    enum class Mode { COARSE, NORMAL, FINE }
+    /** Cents per pixel at the fine and coarse ends of the speed window. */
+    const val FINE_CENTS_PER_PX = 0.08
+    const val COARSE_CENTS_PER_PX = 2.0
 
-    /** Travel that spans the full grain range, as a fraction of screen width. */
-    private const val TRAVEL_FRAC = 0.5
+    /** Pointer speed window in pixels per second. */
+    const val SLOW_SPEED_PX_PER_S = 120.0
+    const val FAST_SPEED_PX_PER_S = 2400.0
 
-    fun sensitivity(
-        offsetPx: Float,
-        widthPx: Float,
-        coarse: Double = COARSE,
-        fine: Double = FINE,
-        deadZonePx: Double = DEAD_ZONE_PX,
-    ): Double {
-        val t = blend(offsetPx, widthPx, deadZonePx)
-        return coarse * Math.pow(fine / coarse, t)
+    /** Dual magnetic snap grids. */
+    const val LIGHT_GRID = 20
+    const val STRONG_GRID = 100
+    const val STRONG_RADIUS_CENTS = 12.0
+
+    /** Momentum: exponential velocity decay and the stop threshold. */
+    const val FRICTION = 4.0
+    const val STOP_CENTS_PER_SEC = 8.0
+
+    /** Cents per pixel for a pointer moving at [speedPxPerSec]. */
+    fun centsPerPx(speedPxPerSec: Double): Double {
+        val t = ((speedPxPerSec - SLOW_SPEED_PX_PER_S) /
+            (FAST_SPEED_PX_PER_S - SLOW_SPEED_PX_PER_S)).coerceIn(0.0, 1.0)
+        return FINE_CENTS_PER_PX * Math.pow(COARSE_CENTS_PER_PX / FINE_CENTS_PER_PX, t)
     }
 
-    /** The current grain in cents, from 200 at the left to 1 at the right. */
-    fun grain(offsetPx: Float, widthPx: Float, deadZonePx: Double = DEAD_ZONE_PX): Int {
-        val t = blend(offsetPx, widthPx, deadZonePx)
+    /** The coarse/fine gear for the HUD, one of [GRAINS]. */
+    fun grain(speedPxPerSec: Double): Int {
+        val ratio = Math.log(centsPerPx(speedPxPerSec) / FINE_CENTS_PER_PX) /
+            Math.log(COARSE_CENTS_PER_PX / FINE_CENTS_PER_PX)
+        val t = ratio.coerceIn(0.0, 1.0)
         val idx = (t * (GRAINS.size - 1)).roundToInt().coerceIn(0, GRAINS.size - 1)
         return GRAINS[idx]
     }
 
-    fun mode(offsetPx: Float, widthPx: Float, deadZonePx: Double = DEAD_ZONE_PX): Mode {
-        val t = blend(offsetPx, widthPx, deadZonePx)
-        return when {
-            t < 0.42 -> Mode.COARSE
-            t > 0.58 -> Mode.FINE
-            else -> Mode.NORMAL
+    /**
+     * Advances the continuous value by [dyPx]. [totalTravelPx] is the net distance
+     * travelled since the touch began, used by the precision ramp, which scales
+     * the first [rampPx] pixels down to finer than 1:1 and then latches to 1:1.
+     */
+    fun advance(
+        rawCents: Double,
+        dyPx: Double,
+        totalTravelPx: Double,
+        speedPxPerSec: Double,
+        rampPx: Double,
+    ): Double {
+        val rampScale = if (rampPx > 0.0) {
+            (abs(totalTravelPx) / rampPx).coerceIn(0.0, 1.0)
+        } else {
+            1.0
         }
+        val next = rawCents + dyPx * rampScale * centsPerPx(speedPxPerSec)
+        return next.coerceIn(MIN_CENTS.toDouble(), MAX_CENTS.toDouble())
     }
 
-    fun step(
-        currentCents: Int,
-        dyPx: Float,
-        offsetPx: Float,
-        widthPx: Float,
-        range: Int = 1200,
-        snapCents: Int = 0,
-    ): Int {
-        val s = sensitivity(offsetPx, widthPx)
-        var next = currentCents + dyPx * s
-        val grain = if (snapCents > 0) snapCents else grain(offsetPx, widthPx)
-        if (grain > 0) {
-            next = (next / grain).roundToInt().toDouble() * grain
-        }
-        return next.roundToInt().coerceIn(-range, range)
+    /**
+     * Rounds [cents] on the dual grid: hard to the nearest 100 within
+     * [STRONG_RADIUS_CENTS], otherwise to the nearest 20.
+     */
+    fun snapCents(cents: Double): Int {
+        val strong = (cents / STRONG_GRID).roundToInt() * STRONG_GRID
+        if (abs(cents - strong) <= STRONG_RADIUS_CENTS) return strong
+        return (cents / LIGHT_GRID).roundToInt() * LIGHT_GRID
     }
 
-    /** Blend factor in 0..1: 0 is coarse (left), 1 is fine (right). */
-    private fun blend(offsetPx: Float, widthPx: Float, deadZonePx: Double): Double {
-        if (widthPx <= 0f) return 0.5
-        val travel = (TRAVEL_FRAC * widthPx).toDouble()
-        if (travel <= deadZonePx) return 0.5
-        val d = offsetPx.toDouble()
-        val mag = abs(d)
-        if (mag <= deadZonePx) return 0.5
-        val frac = ((mag - deadZonePx) / (travel - deadZonePx)).coerceIn(0.0, 1.0)
-        return if (d > 0) 0.5 + 0.5 * frac else 0.5 - 0.5 * frac
+    /** Low-pass the pointer speed so the rate does not flicker frame to frame. */
+    fun smoothedSpeed(previous: Double, instantPxPerSec: Double, alpha: Double): Double =
+        previous + alpha * (instantPxPerSec - previous)
+
+    data class Fling(val cents: Double, val velocityCentsPerSec: Double, val done: Boolean)
+
+    /**
+     * One momentum frame. Decays the velocity exponentially, moves the value by
+     * the average velocity over [dtSeconds], and reports when it has settled or
+     * hit the clamp.
+     */
+    fun fling(
+        rawCents: Double,
+        velocityCentsPerSec: Double,
+        dtSeconds: Double,
+        friction: Double = FRICTION,
+    ): Fling {
+        if (abs(velocityCentsPerSec) < STOP_CENTS_PER_SEC) {
+            return Fling(rawCents, 0.0, true)
+        }
+        val decayed = velocityCentsPerSec * Math.exp(-friction * dtSeconds)
+        val next = rawCents + (velocityCentsPerSec + decayed) / 2.0 * dtSeconds
+        if (next >= MAX_CENTS) return Fling(MAX_CENTS.toDouble(), 0.0, true)
+        if (next <= MIN_CENTS) return Fling(MIN_CENTS.toDouble(), 0.0, true)
+        val done = abs(decayed) < STOP_CENTS_PER_SEC
+        return Fling(next, if (done) 0.0 else decayed, done)
     }
 }
