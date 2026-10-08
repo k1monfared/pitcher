@@ -82,4 +82,44 @@ class PitchGestureTest {
     fun stepNoVerticalMoveIsIdentity() {
         assertEquals(250, PitchGesture.step(250, dyPx = 0f, offsetPx = width / 4f, widthPx = width))
     }
+
+    @Test
+    fun grainIsOneCentAtTheRight() {
+        assertEquals(1, PitchGesture.grain(width / 2f, width))
+    }
+
+    @Test
+    fun grainIsTwoHundredAtTheLeft() {
+        assertEquals(200, PitchGesture.grain(-width / 2f, width))
+    }
+
+    @Test
+    fun grainIsNormalInTheDeadZone() {
+        val g = PitchGesture.grain(0f, width)
+        assertTrue("grain=$g", g in PitchGesture.GRAINS)
+        assertTrue(g <= 50)
+    }
+
+    @Test
+    fun grainNeverExceedsTwoHundred() {
+        for (d in listOf(-width, -width / 2f, 0f, width / 2f, width)) {
+            assertTrue(PitchGesture.grain(d, width) <= 200)
+        }
+    }
+
+    @Test
+    fun stepSnapsToTheGrain() {
+        // Far right: grain 1, so the result is a whole cent.
+        val fine = PitchGesture.step(0, dyPx = 37f, offsetPx = width / 2f, widthPx = width)
+        assertEquals(0, fine % 1)
+        // Far left: grain 200, so the result is a multiple of 200.
+        val coarse = PitchGesture.step(0, dyPx = 100f, offsetPx = -width / 2f, widthPx = width)
+        assertEquals(0, coarse % 200)
+    }
+
+    @Test
+    fun semitoneSnapOverridesGrain() {
+        val out = PitchGesture.step(0, dyPx = 137f, offsetPx = width / 2f, widthPx = width, snapCents = 100)
+        assertEquals(0, out % 100)
+    }
 }

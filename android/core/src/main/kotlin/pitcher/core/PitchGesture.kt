@@ -5,19 +5,25 @@ import kotlin.math.roundToInt
 
 /**
  * The full-screen pitch gesture. Vertical movement changes the pitch; the
- * horizontal offset from the touch-down point sets sensitivity, continuously,
- * from coarse (left of the start) to fine (right of the start). The mapping is
- * incremental per pointer move, so changing gear mid-drag never jumps the value.
+ * horizontal offset from the touch-down point selects a grain, continuously
+ * from coarse at the left of the start to fine at the right. The value is
+ * snapped to the current grain, so the increments are always a clean 1, 5, 10,
+ * 25, 50, 100, or 200 cents. The mapping is incremental per pointer move, so
+ * changing grain mid-drag never jumps the value.
  */
 object PitchGesture {
 
+    /** Cents per pixel at the coarse and fine ends. */
     const val COARSE = 8.0
     const val FINE = 0.15
     const val DEAD_ZONE_PX = 24.0
 
+    /** Grain levels, coarse to fine. The rightmost is single-cent precision. */
+    val GRAINS = intArrayOf(200, 100, 50, 25, 10, 5, 1)
+
     enum class Mode { COARSE, NORMAL, FINE }
 
-    /** Travel that spans the full gear range, as a fraction of screen width. */
+    /** Travel that spans the full grain range, as a fraction of screen width. */
     private const val TRAVEL_FRAC = 0.5
 
     fun sensitivity(
@@ -29,6 +35,13 @@ object PitchGesture {
     ): Double {
         val t = blend(offsetPx, widthPx, deadZonePx)
         return coarse * Math.pow(fine / coarse, t)
+    }
+
+    /** The current grain in cents, from 200 at the left to 1 at the right. */
+    fun grain(offsetPx: Float, widthPx: Float, deadZonePx: Double = DEAD_ZONE_PX): Int {
+        val t = blend(offsetPx, widthPx, deadZonePx)
+        val idx = (t * (GRAINS.size - 1)).roundToInt().coerceIn(0, GRAINS.size - 1)
+        return GRAINS[idx]
     }
 
     fun mode(offsetPx: Float, widthPx: Float, deadZonePx: Double = DEAD_ZONE_PX): Mode {
@@ -50,8 +63,9 @@ object PitchGesture {
     ): Int {
         val s = sensitivity(offsetPx, widthPx)
         var next = currentCents + dyPx * s
-        if (snapCents > 0) {
-            next = ((next / snapCents).roundToInt() * snapCents).toDouble()
+        val grain = if (snapCents > 0) snapCents else grain(offsetPx, widthPx)
+        if (grain > 0) {
+            next = (next / grain).roundToInt().toDouble() * grain
         }
         return next.roundToInt().coerceIn(-range, range)
     }
