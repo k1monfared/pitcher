@@ -211,6 +211,11 @@ class ShelfRepository(
         db().update("bookmarks", values, "id = ?", arrayOf(id.toString()))
     }
 
+    fun updateBookmarkTime(id: Long, t: Double) {
+        val values = ContentValues().apply { put("t", t) }
+        db().update("bookmarks", values, "id = ?", arrayOf(id.toString()))
+    }
+
     fun deleteBookmark(id: Long) {
         db().delete("bookmarks", "id = ?", arrayOf(id.toString()))
     }

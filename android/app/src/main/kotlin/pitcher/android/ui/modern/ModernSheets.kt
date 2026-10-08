@@ -72,9 +72,9 @@ fun ExportSheet(vm: PitcherViewModel, onDismiss: () -> Unit) {
                 Checkbox(
                     checked = vm.exportLoopOnly,
                     onCheckedChange = { vm.changeExportLoopOnly(it) },
-                    enabled = vm.loopStartMs != null && vm.loopEndMs != null,
+                    enabled = vm.loops.any { it.enabled },
                 )
-                Text("Only the A/B loop", style = MaterialTheme.typography.bodyMedium)
+                Text("Render only the loops", style = MaterialTheme.typography.bodyMedium)
             }
 
             Button(

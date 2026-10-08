@@ -12,21 +12,16 @@ import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import pitcher.android.data.Bookmark
+import pitcher.android.data.LoopSection
 import pitcher.android.data.Track
 import pitcher.android.data.Variant
-import pitcher.android.ui.classic.LibraryScreen
-import pitcher.android.ui.classic.PitchesScreen
-import pitcher.android.ui.classic.PitchLabScreen
-import pitcher.android.ui.classic.PlayerScreen
-import pitcher.android.ui.classic.TunerScreen
 import pitcher.android.ui.modern.LIBRARY_TOUR
 import pitcher.android.ui.modern.LibraryContent
 import pitcher.android.ui.modern.OnboardingOverlay
 import pitcher.android.ui.modern.OnboardingTargets
 import pitcher.android.ui.modern.StudioContent
 import pitcher.android.ui.theme.ModernTheme
-import pitcher.android.ui.theme.PitcherTheme
-import pitcher.core.ExportFormat
+import pitcher.core.LoopMode
 import kotlin.math.abs
 import kotlin.math.sin
 
@@ -62,56 +57,14 @@ class ScreenshotTest {
         Bookmark(3, 1, 96.0, "chorus", "now"),
     )
 
+    private val loops = listOf(
+        LoopSection(1, 1, 30_000, 60_000, "chorus", true, "now"),
+        LoopSection(2, 1, 90_000, 120_000, null, false, "now"),
+    )
+
     private val peaks = FloatArray(600) { i ->
         val envelope = 0.4 + 0.6 * abs(sin(i / 37.0))
         (envelope * (0.5 + 0.5 * abs(sin(i / 5.0)))).toFloat()
-    }
-
-    @Test
-    fun library() {
-        compose.setContent {
-            PitcherTheme {
-                LibraryScreen(
-                    tracks = listOf(track),
-                    message = null,
-                    onImport = {},
-                    onOpen = {},
-                    onDelete = {},
-                    onRename = { _, _, _ -> },
-                )
-            }
-        }
-        compose.onRoot().captureRoboImage("build/screenshots/01-library.png")
-    }
-
-    @Test
-    fun player() {
-        compose.setContent {
-            PitcherTheme {
-                PlayerScreen(
-                    track = track,
-                    peaks = peaks,
-                    positionMs = 48_000,
-                    durationMs = 210_000,
-                    isPlaying = true,
-                    bookmarks = bookmarks,
-                    tempo = 1f,
-                    loopStartMs = 30_000,
-                    loopEndMs = 60_000,
-                    loopEnabled = true,
-                    onTogglePlay = {},
-                    onSeekMs = {},
-                    onAddBookmark = {},
-                    onDeleteBookmark = {},
-                    onTempo = {},
-                    onSetLoopStart = {},
-                    onSetLoopEnd = {},
-                    onToggleLoop = {},
-                    onClearLoop = {},
-                )
-            }
-        }
-        compose.onRoot().captureRoboImage("build/screenshots/02-player.png")
     }
 
     @Test
@@ -201,9 +154,9 @@ class ScreenshotTest {
             peaks = peaks,
             positionMs = 48_000,
             durationMs = 210_000,
-            loopStartMs = 30_000,
-            loopEndMs = 60_000,
-            loopEnabled = true,
+            loops = loops,
+            selectedLoopId = 1,
+            loopMode = LoopMode.ALL,
             bookmarks = bookmarks,
             playing = true,
             tempo = 1f,
@@ -214,12 +167,14 @@ class ScreenshotTest {
             onCents = {},
             onSnapToggle = {},
             onSeekMs = {},
-            onSetLoop = { _, _ -> },
+            onCreateLoop = { _, _ -> },
+            onMoveLoopEdge = { _, _, _ -> },
+            onMoveBookmark = { _, _ -> },
+            onSelectLoop = {},
+            onCycleLoopMode = {},
             onPlayPause = {},
             onSkip = {},
             onTempo = {},
-            onLoopTap = {},
-            onLoopClear = {},
             onAddBookmark = {},
             onSelectOriginal = {},
             onSelectVariant = {},
@@ -233,69 +188,6 @@ class ScreenshotTest {
             onOpenSettings = {},
             onboarding = onboarding,
         )
-    }
-
-    @Test
-    @Config(qualifiers = "w411dp-h1400dp-xxhdpi")
-    fun pitchLab() {
-        compose.setContent {
-            PitcherTheme {
-                PitchLabScreen(
-                    track = track,
-                    variants = variants,
-                    cents = -600,
-                    selectedVariantId = 1,
-                    exportMessage = null,
-                    exporting = false,
-                    exportFormat = ExportFormat.M4a,
-                    exportLoopOnly = false,
-                    loopAvailable = true,
-                    onCents = {},
-                    onRender = {},
-                    onExport = {},
-                    onFormat = {},
-                    onLoopOnly = {},
-                )
-            }
-        }
-        compose.onRoot().captureRoboImage("build/screenshots/03-pitch-lab.png")
-    }
-
-    @Test
-    fun tuner() {
-        compose.setContent {
-            PitcherTheme {
-                TunerScreen(
-                    track = track,
-                    detectedHz = 277.18,
-                    detectMessage = null,
-                    pendingShiftCents = -100,
-                    onDetect = {},
-                    onApply = {},
-                )
-            }
-        }
-        compose.onRoot().captureRoboImage("build/screenshots/04-tuner.png")
-    }
-
-    @Test
-    fun pitches() {
-        compose.setContent {
-            PitcherTheme {
-                PitchesScreen(
-                    track = track,
-                    variants = variants,
-                    selectedVariantId = 1,
-                    exportMessage = null,
-                    onSelectOriginal = {},
-                    onSelectVariant = {},
-                    onRenameVariant = { _, _ -> },
-                    onDeleteVariant = {},
-                    onExportVariant = {},
-                )
-            }
-        }
-        compose.onRoot().captureRoboImage("build/screenshots/05-pitches.png")
     }
 
     private fun variant(id: Long, name: String, cents: Int) = Variant(

@@ -27,9 +27,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import pitcher.android.data.Bookmark
+import pitcher.android.data.LoopSection
 import pitcher.android.data.Variant
 import pitcher.android.ui.PitcherViewModel
 import pitcher.android.ui.theme.PitchHues
+import pitcher.core.LoopMode
 
 @Composable
 fun StudioScreen(
@@ -54,9 +56,9 @@ fun StudioScreen(
         peaks = vm.peaks,
         positionMs = vm.positionMs,
         durationMs = vm.durationMs,
-        loopStartMs = vm.loopStartMs,
-        loopEndMs = vm.loopEndMs,
-        loopEnabled = vm.loopEnabled,
+        loops = vm.loops,
+        selectedLoopId = vm.selectedLoopId,
+        loopMode = vm.loopMode,
         bookmarks = vm.bookmarks,
         playing = vm.isPlaying,
         tempo = vm.tempo,
@@ -67,12 +69,14 @@ fun StudioScreen(
         onCents = { vm.setPitchCents(it) },
         onSnapToggle = { snap = !snap },
         onSeekMs = { vm.seekTo(it) },
-        onSetLoop = { a, b -> if (a != null && b != null) vm.setLoop(a, b) else vm.clearLoop() },
+        onCreateLoop = { a, b -> vm.addLoop(a, b) },
+        onMoveLoopEdge = { id, isStart, ms -> vm.moveLoopEdge(id, isStart, ms) },
+        onMoveBookmark = { id, ms -> vm.moveBookmark(id, ms / 1000.0) },
+        onSelectLoop = { vm.selectLoop(it) },
+        onCycleLoopMode = { vm.cycleLoopMode() },
         onPlayPause = { vm.togglePlay() },
         onSkip = { delta -> vm.seekTo(vm.positionMs + delta) },
         onTempo = { vm.changeTempo(it) },
-        onLoopTap = { vm.loopChipTap() },
-        onLoopClear = { vm.clearLoop() },
         onAddBookmark = { vm.addBookmark(null) },
         onSelectOriginal = { vm.selectOriginal() },
         onSelectVariant = { vm.selectVariant(it) },
@@ -100,9 +104,9 @@ fun StudioContent(
     peaks: FloatArray,
     positionMs: Long,
     durationMs: Long,
-    loopStartMs: Long?,
-    loopEndMs: Long?,
-    loopEnabled: Boolean,
+    loops: List<LoopSection>,
+    selectedLoopId: Long?,
+    loopMode: LoopMode,
     bookmarks: List<Bookmark>,
     playing: Boolean,
     tempo: Float,
@@ -113,12 +117,14 @@ fun StudioContent(
     onCents: (Int) -> Unit,
     onSnapToggle: () -> Unit,
     onSeekMs: (Long) -> Unit,
-    onSetLoop: (Long?, Long?) -> Unit,
+    onCreateLoop: (Long, Long) -> Unit,
+    onMoveLoopEdge: (Long, Boolean, Long) -> Unit,
+    onMoveBookmark: (Long, Long) -> Unit,
+    onSelectLoop: (Long) -> Unit,
+    onCycleLoopMode: () -> Unit,
     onPlayPause: () -> Unit,
     onSkip: (Long) -> Unit,
     onTempo: (Float) -> Unit,
-    onLoopTap: () -> Unit,
-    onLoopClear: () -> Unit,
     onAddBookmark: () -> Unit,
     onSelectOriginal: () -> Unit,
     onSelectVariant: (Variant) -> Unit,
@@ -191,12 +197,15 @@ fun StudioContent(
                 peaks = peaks,
                 positionMs = positionMs,
                 durationMs = durationMs,
-                loopStartMs = loopStartMs,
-                loopEndMs = loopEndMs,
+                loops = loops,
+                selectedLoopId = selectedLoopId,
                 bookmarks = bookmarks,
                 accent = accent,
                 onSeekMs = onSeekMs,
-                onSetLoop = onSetLoop,
+                onCreateLoop = onCreateLoop,
+                onMoveLoopEdge = onMoveLoopEdge,
+                onMoveBookmark = onMoveBookmark,
+                onSelectLoop = onSelectLoop,
                 onboarding = onboarding,
                 modifier = Modifier.fillMaxWidth(),
             )
@@ -204,16 +213,14 @@ fun StudioContent(
             TransportBar(
                 playing = playing,
                 tempo = tempo,
-                loopStartMs = loopStartMs,
-                loopEndMs = loopEndMs,
-                loopEnabled = loopEnabled,
+                loopMode = loopMode,
+                hasLoops = loops.any { it.enabled },
                 accent = accent,
                 onPlayPause = onPlayPause,
                 onSkip = onSkip,
                 onTempo = onTempo,
                 onSpeedDragging = { speedDragging = it },
-                onLoopTap = onLoopTap,
-                onLoopClear = onLoopClear,
+                onCycleLoopMode = onCycleLoopMode,
                 onboarding = onboarding,
             )
 

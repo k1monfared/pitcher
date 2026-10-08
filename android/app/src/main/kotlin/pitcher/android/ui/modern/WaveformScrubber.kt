@@ -2,59 +2,95 @@ package pitcher.android.ui.modern
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlin.math.abs
+import kotlin.math.roundToInt
 import pitcher.android.data.Bookmark
+import pitcher.android.data.LoopSection
 import pitcher.core.WaveView
 
+private val BOOKMARK_GOLD = Color(0xFFFFD166)
+
+private class DragState {
+    var loopId: Long? = null
+    var isStart: Boolean = false
+    var bookmarkId: Long? = null
+    var base: Long = 0L
+    var accum: Float = 0f
+}
+
 /**
- * Waveform with zoom, pan, bookmarks, and a separate loop lane. Tap seeks
- * (snapping to a nearby bookmark), drag pans, pinch zooms, and the thin lane
- * above sets the A/B loop. Time stamps along the bottom keep the user oriented.
+ * The song chart. A wider loop lane on top (drag empty space to make a loop,
+ * long-press an edge to fine-tune), a bookmark strip of pins (long-press a pin
+ * to move it), and the waveform (tap to seek, drag to pan when zoomed,
+ * long-press and drag to scrub, pinch to zoom). Precise drags use a small
+ * precision ramp and show a timestamp that follows the thumb.
  */
 @Composable
 fun WaveformScrubber(
     peaks: FloatArray,
     positionMs: Long,
     durationMs: Long,
-    loopStartMs: Long?,
-    loopEndMs: Long?,
+    loops: List<LoopSection>,
+    selectedLoopId: Long?,
     bookmarks: List<Bookmark>,
     accent: Color,
     onSeekMs: (Long) -> Unit,
-    onSetLoop: (Long?, Long?) -> Unit,
+    onCreateLoop: (Long, Long) -> Unit,
+    onMoveLoopEdge: (Long, Boolean, Long) -> Unit,
+    onMoveBookmark: (Long, Long) -> Unit,
+    onSelectLoop: (Long) -> Unit,
     modifier: Modifier = Modifier,
     onboarding: OnboardingTargets? = null,
 ) {
     var view by remember { mutableStateOf<WaveView.Window?>(null) }
-    var laneStartMs by remember { mutableStateOf<Long?>(null) }
-    var laneEndMs by remember { mutableStateOf<Long?>(null) }
+    var laneStart by remember { mutableLongStateOf(0L) }
+    var laneEnd by remember { mutableLongStateOf(0L) }
+    var laneActive by remember { mutableStateOf(false) }
+    var bubbleMs by remember { mutableStateOf<Long?>(null) }
+    var chartWidth by remember { mutableFloatStateOf(0f) }
+    val drag = remember { DragState() }
     val textMeasurer = rememberTextMeasurer()
 
     LaunchedEffect(durationMs) {
         view = null
-        laneStartMs = null
-        laneEndMs = null
+        laneActive = false
+        bubbleMs = null
     }
 
     val span = view ?: WaveView.Window(0.0, 1.0)
@@ -71,165 +107,315 @@ fun WaveformScrubber(
         return (((frac - span.start) / (span.end - span.start)) * width).toFloat()
     }
 
-    Column(modifier = modifier) {
-        // Loop lane: drag to set A and B.
-        Canvas(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(26.dp)
-                .onboardingTarget(onboarding, "loop")
-                .pointerInput(span, durationMs) {
-                    val width = size.width.toFloat()
-                    detectDragGestures(
-                        onDragStart = { off ->
+    fun msPerPx(width: Float): Float =
+        if (width <= 0f) 0f else ((span.end - span.start) * durationMs / width).toFloat()
+
+    fun precise(base: Long, dxPx: Float, rampPx: Float, msPerPx: Float): Long {
+        val mag = abs(dxPx)
+        val scaled = if (rampPx > 0f && mag < rampPx) dxPx * (mag / rampPx) else dxPx
+        return (base + scaled * msPerPx).roundToInt().toLong().coerceIn(0L, durationMs)
+    }
+
+    Box(modifier = modifier) {
+        Column {
+            // Loop lane: create, select, and fine-tune edges.
+            Canvas(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(40.dp)
+                    .onboardingTarget(onboarding, "loop")
+                    .onSizeChanged { chartWidth = it.width.toFloat() }
+                    .pointerInput(span, durationMs, loops) {
+                        val width = size.width.toFloat()
+                        detectTapGestures { off ->
                             val ms = xToMs(off.x, width)
-                            laneStartMs = ms
-                            laneEndMs = ms
-                        },
-                        onDragEnd = {
-                            val a = laneStartMs
-                            val b = laneEndMs
-                            if (a != null && b != null && a != b) onSetLoop(a, b) else onSetLoop(null, null)
-                        },
-                        onDragCancel = {
-                            laneStartMs = null
-                            laneEndMs = null
-                        },
-                    ) { change, _ ->
-                        laneEndMs = xToMs(change.position.x, width)
-                        change.consume()
+                            val hit = loops.minByOrNull { minOf(abs(it.startMs - ms), abs(it.endMs - ms)) }
+                            if (hit != null &&
+                                (abs(hit.startMs - ms) < 20 * density || abs(hit.endMs - ms) < 20 * density)
+                            ) {
+                                onSelectLoop(hit.id)
+                            }
+                        }
                     }
-                },
-        ) {
-            val w = size.width
-            val h = size.height
-            val ls = laneStartMs ?: loopStartMs
-            val le = laneEndMs ?: loopEndMs
-            if (ls != null && le != null && durationMs > 0) {
-                val x0 = msToX(minOf(ls, le), w)
-                val x1 = msToX(maxOf(ls, le), w)
-                drawRoundRect(
-                    color = accent.copy(alpha = 0.35f),
-                    topLeft = Offset(x0, h - 10f),
-                    size = Size((x1 - x0).coerceAtLeast(3f), 10f),
-                    cornerRadius = CornerRadius(5f, 5f),
-                )
-                listOf(x0, x1).forEach { x ->
-                    drawCircle(color = accent, radius = 7f, center = Offset(x, h - 5f))
+                    .pointerInput(span, durationMs, loops) {
+                        val width = size.width.toFloat()
+                        val msPer = msPerPx(width)
+                        val rampPx = 10f * density
+                        detectDragGesturesAfterLongPress(
+                            onDragStart = { off ->
+                                val ms = xToMs(off.x, width)
+                                val hit = loops.minByOrNull { minOf(abs(it.startMs - ms), abs(it.endMs - ms)) }
+                                if (hit != null) {
+                                    onSelectLoop(hit.id)
+                                    drag.loopId = hit.id
+                                    drag.isStart = abs(hit.startMs - ms) <= abs(hit.endMs - ms)
+                                    drag.base = if (drag.isStart) hit.startMs else hit.endMs
+                                    drag.accum = 0f
+                                    bubbleMs = drag.base
+                                }
+                            },
+                            onDragEnd = { drag.loopId = null; bubbleMs = null },
+                            onDragCancel = { drag.loopId = null; bubbleMs = null },
+                        ) { change, amount ->
+                            val id = drag.loopId ?: return@detectDragGesturesAfterLongPress
+                            drag.accum += amount.x
+                            val next = precise(drag.base, drag.accum, rampPx, msPer)
+                            bubbleMs = next
+                            onMoveLoopEdge(id, drag.isStart, next)
+                            change.consume()
+                        }
+                    }
+                    .pointerInput(span, durationMs) {
+                        val width = size.width.toFloat()
+                        detectDragGestures(
+                            onDragStart = { off ->
+                                laneStart = xToMs(off.x, width)
+                                laneEnd = laneStart
+                                laneActive = true
+                                bubbleMs = laneStart
+                            },
+                            onDragEnd = {
+                                if (laneActive && abs(laneEnd - laneStart) >= 200L) {
+                                    onCreateLoop(laneStart, laneEnd)
+                                }
+                                laneActive = false
+                                bubbleMs = null
+                            },
+                            onDragCancel = { laneActive = false; bubbleMs = null },
+                        ) { change, _ ->
+                            laneEnd = xToMs(change.position.x, width)
+                            bubbleMs = laneEnd
+                            change.consume()
+                        }
+                    },
+            ) {
+                val w = size.width
+                val h = size.height
+                val barTop = h - 16f
+                val barH = 14f
+                loops.forEach { loop ->
+                    val x0 = msToX(loop.startMs, w)
+                    val x1 = msToX(loop.endMs, w)
+                    val selected = loop.id == selectedLoopId
+                    val color = when {
+                        !loop.enabled -> Color.White.copy(alpha = 0.18f)
+                        selected -> accent
+                        else -> accent.copy(alpha = 0.55f)
+                    }
+                    drawRoundRect(
+                        color = color,
+                        topLeft = Offset(x0, barTop),
+                        size = Size((x1 - x0).coerceAtLeast(3f), barH),
+                        cornerRadius = CornerRadius(barH / 2f, barH / 2f),
+                    )
+                    listOf(x0, x1).forEach { x ->
+                        drawCircle(color = color, radius = 7f, center = Offset(x, barTop + barH / 2f))
+                    }
                 }
-            } else {
+                if (laneActive) {
+                    val x0 = msToX(minOf(laneStart, laneEnd), w)
+                    val x1 = msToX(maxOf(laneStart, laneEnd), w)
+                    drawRoundRect(
+                        color = accent.copy(alpha = 0.4f),
+                        topLeft = Offset(x0, barTop),
+                        size = Size((x1 - x0).coerceAtLeast(3f), barH),
+                        cornerRadius = CornerRadius(barH / 2f, barH / 2f),
+                    )
+                }
+            }
+
+            // Bookmark strip: pins that can be long-pressed and dragged.
+            Canvas(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(18.dp)
+                    .pointerInput(span, durationMs, bookmarks) {
+                        val width = size.width.toFloat()
+                        detectTapGestures { off ->
+                            val ms = xToMs(off.x, width)
+                            val hit = bookmarks.minByOrNull { abs((it.t * 1000).toLong() - ms) }
+                            if (hit != null && abs((hit.t * 1000).toLong() - ms) < 20 * density) {
+                                onSeekMs((hit.t * 1000).toLong())
+                            }
+                        }
+                    }
+                    .pointerInput(span, durationMs, bookmarks) {
+                        val width = size.width.toFloat()
+                        val msPer = msPerPx(width)
+                        val rampPx = 10f * density
+                        detectDragGesturesAfterLongPress(
+                            onDragStart = { off ->
+                                val ms = xToMs(off.x, width)
+                                val hit = bookmarks.minByOrNull { abs((it.t * 1000).toLong() - ms) }
+                                if (hit != null) {
+                                    drag.bookmarkId = hit.id
+                                    drag.base = (hit.t * 1000).toLong()
+                                    drag.accum = 0f
+                                    bubbleMs = drag.base
+                                }
+                            },
+                            onDragEnd = { drag.bookmarkId = null; bubbleMs = null },
+                            onDragCancel = { drag.bookmarkId = null; bubbleMs = null },
+                        ) { change, amount ->
+                            val id = drag.bookmarkId ?: return@detectDragGesturesAfterLongPress
+                            drag.accum += amount.x
+                            val next = precise(drag.base, drag.accum, rampPx, msPer)
+                            bubbleMs = next
+                            onMoveBookmark(id, next)
+                            change.consume()
+                        }
+                    },
+            ) {
+                val w = size.width
+                bookmarks.forEach { b ->
+                    val x = msToX((b.t * 1000).toLong(), w)
+                    if (x in 0f..w) {
+                        val path = Path().apply {
+                            moveTo(x, size.height)
+                            lineTo(x - 5f, size.height - 10f)
+                            lineTo(x + 5f, size.height - 10f)
+                            close()
+                        }
+                        drawPath(path, color = BOOKMARK_GOLD)
+                        drawLine(
+                            color = BOOKMARK_GOLD.copy(alpha = 0.6f),
+                            start = Offset(x, 0f),
+                            end = Offset(x, size.height - 10f),
+                            strokeWidth = 2f,
+                        )
+                    }
+                }
+            }
+
+            // Waveform body: tap seek, drag pan, long-press scrub, pinch zoom.
+            Canvas(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(104.dp)
+                    .onboardingTarget(onboarding, "wave")
+                    .pointerInput(durationMs) {
+                        detectTransformGestures { centroid, pan, zoom, _ ->
+                            val w = view ?: WaveView.Window(0.0, 1.0)
+                            val s = w.end - w.start
+                            val panFrac = -(pan.x / size.width.toFloat()) * s
+                            var next = WaveView.panBy(w, panFrac)
+                            if (zoom != 1f) {
+                                val absCenter = w.start + (centroid.x / size.width.toFloat()) * s
+                                next = WaveView.zoomAt(next ?: w, absCenter, 1.0 / zoom)
+                            }
+                            view = next
+                        }
+                    }
+                    .pointerInput(span, durationMs, bookmarks) {
+                        val width = size.width.toFloat()
+                        detectTapGestures { off ->
+                            val snapDist = 18f * density
+                            val hit = bookmarks.minByOrNull { b ->
+                                abs(msToX((b.t * 1000).toLong(), width) - off.x)
+                            }?.takeIf { b -> abs(msToX((b.t * 1000).toLong(), width) - off.x) < snapDist }
+                            onSeekMs(hit?.let { (it.t * 1000).toLong() } ?: xToMs(off.x, width))
+                        }
+                    }
+                    .pointerInput(span, durationMs) {
+                        val width = size.width.toFloat()
+                        val msPer = msPerPx(width)
+                        val rampPx = 10f * density
+                        var base = 0L
+                        detectDragGesturesAfterLongPress(
+                            onDragStart = {
+                                base = positionMs
+                                drag.accum = 0f
+                                bubbleMs = positionMs
+                            },
+                            onDragEnd = {
+                                bubbleMs?.let { onSeekMs(it) }
+                                bubbleMs = null
+                            },
+                            onDragCancel = { bubbleMs = null },
+                        ) { change, amount ->
+                            drag.accum += amount.x
+                            val next = precise(base, drag.accum, rampPx, msPer)
+                            bubbleMs = next
+                            change.consume()
+                        }
+                    },
+            ) {
+                val w = size.width
+                val h = size.height
+                val mid = (h - 18f) / 2f
                 drawRoundRect(
-                    color = Color.White.copy(alpha = 0.06f),
-                    topLeft = Offset(0f, h - 10f),
-                    size = Size(w, 10f),
-                    cornerRadius = CornerRadius(5f, 5f),
+                    color = Color.White.copy(alpha = 0.05f),
+                    size = Size(w, h),
+                    cornerRadius = CornerRadius(16f, 16f),
                 )
+
+                if (peaks.isNotEmpty()) {
+                    val n = peaks.size
+                    val firstVisible = ((span.start * n).toInt()).coerceIn(0, n)
+                    val lastVisible = ((span.end * n).toInt() + 1).coerceIn(0, n)
+                    val count = (lastVisible - firstVisible).coerceAtLeast(1)
+                    val step = w / count
+                    for (i in 0 until count) {
+                        val idx = firstVisible + i
+                        if (idx >= n) break
+                        val x = i * step
+                        val barH = (peaks[idx] * mid * 0.9f).coerceAtLeast(1f)
+                        val played = idx.toFloat() / n <= positionMs.toFloat() / durationMs.coerceAtLeast(1)
+                        drawRoundRect(
+                            color = if (played) accent.copy(alpha = 0.85f) else Color.White.copy(alpha = 0.28f),
+                            topLeft = Offset(x, mid - barH),
+                            size = Size((step - 1f).coerceAtLeast(1f), barH * 2f),
+                            cornerRadius = CornerRadius(1f, 1f),
+                        )
+                    }
+                }
+
+                if (durationMs > 0) {
+                    val pf = positionMs.toFloat() / durationMs
+                    if (pf >= span.start && pf <= span.end) {
+                        val px = msToX(positionMs, w)
+                        drawLine(
+                            color = Color.White.copy(alpha = 0.9f),
+                            start = Offset(px, 2f),
+                            end = Offset(px, h - 14f),
+                            strokeWidth = 3f,
+                        )
+                    }
+                }
+
+                if (durationMs > 0) {
+                    val labelStyle = TextStyle(color = Color.White.copy(alpha = 0.5f), fontSize = 9.sp)
+                    val ticks = 4
+                    for (i in 0..ticks) {
+                        val frac = i.toFloat() / ticks
+                        val ms = ((span.start + frac * (span.end - span.start)) * durationMs).toLong()
+                        val x = (frac * w).coerceIn(0f, (w - 34f).coerceAtLeast(0f))
+                        drawText(
+                            textMeasurer = textMeasurer,
+                            text = formatTime(ms),
+                            topLeft = Offset(x + 3f, h - 13f),
+                            style = labelStyle,
+                        )
+                    }
+                }
             }
         }
 
-        // Waveform body: tap to seek, drag to pan, pinch to zoom.
-        Canvas(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(104.dp)
-                .onboardingTarget(onboarding, "wave")
-                .pointerInput(durationMs) {
-                    detectTransformGestures { centroid, pan, zoom, _ ->
-                        val w = view ?: WaveView.Window(0.0, 1.0)
-                        val s = w.end - w.start
-                        val panFrac = -(pan.x / size.width.toFloat()) * s
-                        var next = WaveView.panBy(w, panFrac)
-                        if (zoom != 1f) {
-                            val absCenter = w.start + (centroid.x / size.width.toFloat()) * s
-                            next = WaveView.zoomAt(next ?: w, absCenter, 1.0 / zoom)
-                        }
-                        view = next
-                    }
-                }
-                .pointerInput(span, durationMs, bookmarks) {
-                    val width = size.width.toFloat()
-                    detectTapGestures { off ->
-                        val snapDist = 18f * density
-                        val hit = bookmarks.minByOrNull { b ->
-                            kotlin.math.abs(msToX((b.t * 1000).toLong(), width) - off.x)
-                        }?.takeIf { b ->
-                            kotlin.math.abs(msToX((b.t * 1000).toLong(), width) - off.x) < snapDist
-                        }
-                        onSeekMs(hit?.let { (it.t * 1000).toLong() } ?: xToMs(off.x, width))
-                    }
-                },
-        ) {
-            val w = size.width
-            val h = size.height
-            val mid = (h - 16f) / 2f
-            drawRoundRect(
-                color = Color.White.copy(alpha = 0.05f),
-                size = Size(w, h),
-                cornerRadius = CornerRadius(16f, 16f),
-            )
-
-            // bookmarks
-            bookmarks.forEach { b ->
-                val x = msToX((b.t * 1000).toLong(), w)
-                if (x in 0f..w) {
-                    drawLine(
-                        color = Color(0xFFFFD166),
-                        start = Offset(x, 4f),
-                        end = Offset(x, h - 18f),
-                        strokeWidth = 2f,
-                    )
-                }
-            }
-
-            if (peaks.isNotEmpty()) {
-                val n = peaks.size
-                val firstVisible = ((span.start * n).toInt()).coerceIn(0, n)
-                val lastVisible = ((span.end * n).toInt() + 1).coerceIn(0, n)
-                val count = (lastVisible - firstVisible).coerceAtLeast(1)
-                val step = w / count
-                for (i in 0 until count) {
-                    val idx = firstVisible + i
-                    if (idx >= n) break
-                    val x = i * step
-                    val barH = (peaks[idx] * mid * 0.9f).coerceAtLeast(1f)
-                    val played = idx.toFloat() / n <= positionMs.toFloat() / durationMs.coerceAtLeast(1)
-                    drawRoundRect(
-                        color = if (played) accent.copy(alpha = 0.85f) else Color.White.copy(alpha = 0.28f),
-                        topLeft = Offset(x, mid - barH),
-                        size = Size((step - 1f).coerceAtLeast(1f), barH * 2f),
-                        cornerRadius = CornerRadius(1f, 1f),
-                    )
-                }
-            }
-
-            if (durationMs > 0) {
-                val pf = positionMs.toFloat() / durationMs
-                if (pf >= span.start && pf <= span.end) {
-                    val px = msToX(positionMs, w)
-                    drawLine(
-                        color = Color.White.copy(alpha = 0.9f),
-                        start = Offset(px, 4f),
-                        end = Offset(px, h - 18f),
-                        strokeWidth = 3f,
-                    )
-                }
-            }
-
-            // time stamps along the bottom
-            if (durationMs > 0) {
-                val labelStyle = TextStyle(color = Color.White.copy(alpha = 0.5f), fontSize = 9.sp)
-                val ticks = 4
-                for (i in 0..ticks) {
-                    val frac = i.toFloat() / ticks
-                    val ms = ((span.start + frac * (span.end - span.start)) * durationMs).toLong()
-                    val x = (frac * w).coerceIn(0f, w - 30f)
-                    drawText(
-                        textMeasurer = textMeasurer,
-                        text = formatTime(ms),
-                        topLeft = Offset(x + 3f, h - 14f),
-                        style = labelStyle,
-                    )
-                }
+        bubbleMs?.let { ms ->
+            val x = msToX(ms, chartWidth)
+            Surface(
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .offset { IntOffset((x - 40f).roundToInt().coerceAtLeast(0), 0) },
+                shape = RoundedCornerShape(8.dp),
+                color = Color(0xFF14141A),
+                shadowElevation = 6.dp,
+            ) {
+                Text(
+                    formatTime(ms),
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                    style = TextStyle(fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = accent),
+                )
             }
         }
     }

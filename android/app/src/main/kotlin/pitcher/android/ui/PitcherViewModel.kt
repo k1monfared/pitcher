@@ -22,7 +22,9 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.coroutines.cancellation.CancellationException
+import kotlin.math.roundToInt
 import pitcher.android.data.Bookmark
+import pitcher.android.data.LoopSection
 import pitcher.android.data.ShelfRepository
 import pitcher.android.data.Track
 import pitcher.android.data.Variant
@@ -34,7 +36,11 @@ import pitcher.android.media.RenderedStore
 import pitcher.android.media.TunerDecoder
 import pitcher.android.media.WaveformDecoder
 import pitcher.core.ExportFormat
+import pitcher.core.LoopMode
+import pitcher.core.LoopPlayback
 import pitcher.core.Notes
+import pitcher.core.PcmConcat
+import pitcher.core.Timeline
 import pitcher.core.Tuner
 import pitcher.core.Waveform
 
@@ -70,11 +76,17 @@ class PitcherViewModel(app: Application) : AndroidViewModel(app) {
         private set
     var selectedVariantId by mutableStateOf<Long?>(null)
         private set
-    var loopStartMs by mutableStateOf<Long?>(null)
+    var loops by mutableStateOf<List<LoopSection>>(emptyList())
         private set
-    var loopEndMs by mutableStateOf<Long?>(null)
+    var selectedLoopId by mutableStateOf<Long?>(null)
         private set
-    var loopEnabled by mutableStateOf(false)
+    var loopMode by mutableStateOf(LoopMode.NONE)
+        private set
+    var tunerSource by mutableStateOf<String?>(null)
+        private set
+    var tunerTarget by mutableStateOf<String?>(null)
+        private set
+    var defaultFolder by mutableStateOf<String?>(null)
         private set
     var shareUri by mutableStateOf<Uri?>(null)
         private set
@@ -82,7 +94,7 @@ class PitcherViewModel(app: Application) : AndroidViewModel(app) {
         private set
     var exportFormat by mutableStateOf(ExportFormat.M4a)
         private set
-    var exportLoopOnly by mutableStateOf(false)
+    var exportLoopOnly by mutableStateOf(true)
         private set
     var exportMime by mutableStateOf(ExportFormat.M4a.mime)
         private set
@@ -91,8 +103,6 @@ class PitcherViewModel(app: Application) : AndroidViewModel(app) {
     var keepScreenOn by mutableStateOf(true)
         private set
     var hapticsEnabled by mutableStateOf(true)
-        private set
-    var uiStyle by mutableStateOf(UiStyle.MODERN)
         private set
     var onboardingActive by mutableStateOf(false)
         private set
@@ -127,14 +137,10 @@ class PitcherViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     init {
-        uiStyle = if (prefs.getString("ui_style", "modern") == "classic") {
-            UiStyle.CLASSIC
-        } else {
-            UiStyle.MODERN
-        }
         keepScreenOn = prefs.getBoolean("keep_screen_on", true)
         hapticsEnabled = prefs.getBoolean("haptics", true)
         onboardingActive = !prefs.getBoolean("onboarding_done", false)
+        defaultFolder = prefs.getString("default_folder", null)
         refreshTracks()
         connectController()
         viewModelScope.launch {
@@ -142,11 +148,10 @@ class PitcherViewModel(app: Application) : AndroidViewModel(app) {
                 if (isPlaying) {
                     val pos = controller?.currentPosition ?: 0L
                     positionMs = pos
-                    val end = loopEndMs
-                    val start = loopStartMs
-                    if (loopEnabled && end != null && start != null && pos >= end) {
-                        controller?.seekTo(start)
-                        positionMs = start
+                    val target = LoopPlayback.seekTarget(coreLoops(), loopMode, pos, selectedLoopId)
+                    if (target != null) {
+                        controller?.seekTo(target)
+                        positionMs = target
                     }
                 }
                 delay(50)
@@ -202,6 +207,11 @@ class PitcherViewModel(app: Application) : AndroidViewModel(app) {
         current = track
         variants = repo.listVariants(track.id)
         bookmarks = repo.listBookmarks(track.id)
+        loops = repo.listLoops(track.id)
+        selectedLoopId = loops.firstOrNull()?.id
+        loopMode = LoopMode.NONE
+        tunerSource = track.tunerSource
+        tunerTarget = track.tunerTarget
         peaks = FloatArray(0)
         detectedHz = null
         detectMessage = null
@@ -271,79 +281,84 @@ class PitcherViewModel(app: Application) : AndroidViewModel(app) {
         bookmarks = bookmarks.filterNot { it.id == id }
     }
 
+    fun moveBookmark(id: Long, t: Double) {
+        repo.updateBookmarkTime(id, t)
+        current?.let { bookmarks = repo.listBookmarks(it.id) }
+    }
+
     fun selectOriginal() {
         selectedVariantId = null
         setPitchCents(0)
     }
 
-    fun setLoopStart() {
-        loopStartMs = controller?.currentPosition ?: positionMs
-        normalizeLoop()
+    private fun coreLoops(): List<Timeline.Loop> =
+        loops.map { Timeline.Loop(it.id, it.startMs, it.endMs, it.enabled) }
+
+    fun addLoop(startMs: Long, endMs: Long, name: String? = null) {
+        val track = current ?: return
+        val s = minOf(startMs, endMs)
+        val e = maxOf(startMs, endMs)
+        if (!Timeline.canAdd(coreLoops(), s, e)) return
+        val id = repo.addLoop(track.id, s, e, name)
+        loops = repo.listLoops(track.id)
+        selectedLoopId = id
     }
 
-    fun setLoopEnd() {
-        loopEndMs = controller?.currentPosition ?: positionMs
-        normalizeLoop()
+    fun deleteLoop(id: Long) {
+        repo.deleteLoop(id)
+        current?.let { loops = repo.listLoops(it.id) }
+        if (selectedLoopId == id) selectedLoopId = loops.firstOrNull()?.id
+        if (loops.isEmpty()) loopMode = LoopMode.NONE
     }
 
-    private fun normalizeLoop() {
-        val a = loopStartMs
-        val b = loopEndMs
-        if (a != null && b != null && b < a) {
-            loopStartMs = b
-            loopEndMs = a
+    fun renameLoop(id: Long, name: String) {
+        repo.renameLoop(id, name)
+        current?.let { loops = repo.listLoops(it.id) }
+    }
+
+    fun setLoopEnabled(id: Long, enabled: Boolean) {
+        repo.setLoopEnabled(id, enabled)
+        current?.let { loops = repo.listLoops(it.id) }
+    }
+
+    fun moveLoopEdge(id: Long, isStart: Boolean, valueMs: Long) {
+        val track = current ?: return
+        val moved = Timeline.moveEdge(coreLoops(), id, isStart, valueMs, durationMs)
+        val target = moved.firstOrNull { it.id == id } ?: return
+        repo.updateLoopEdges(id, target.startMs, target.endMs)
+        loops = repo.listLoops(track.id)
+    }
+
+    fun selectLoop(id: Long?) {
+        selectedLoopId = id
+    }
+
+    /** Cycles the master loop mode: whole song, all loops, one loop. */
+    fun cycleLoopMode() {
+        loopMode = when (loopMode) {
+            LoopMode.NONE -> LoopMode.ALL
+            LoopMode.ALL -> LoopMode.ONE
+            LoopMode.ONE -> LoopMode.NONE
+        }
+        if (loopMode == LoopMode.NONE) return
+        val start = when (loopMode) {
+            LoopMode.ONE -> (loops.firstOrNull { it.id == selectedLoopId && it.enabled }
+                ?: loops.firstOrNull { it.enabled })?.startMs
+            LoopMode.ALL -> loops.firstOrNull { it.enabled }?.startMs
+            else -> null
+        }
+        start?.let {
+            controller?.seekTo(it)
+            positionMs = it
         }
     }
 
-    fun toggleLoop() {
-        loopEnabled = !loopEnabled && loopStartMs != null && loopEndMs != null
-        if (loopEnabled) {
-            val start = loopStartMs
-            if (start != null) {
-                controller?.seekTo(start)
-                positionMs = start
-            }
-        }
-    }
-
-    /**
-     * The loop chip cycles: first tap sets A at the playhead, second tap sets B
-     * and turns the loop on, later taps toggle it. Long-press clears.
-     */
-    fun loopChipTap() {
-        val pos = controller?.currentPosition ?: positionMs
-        when {
-            loopStartMs == null -> {
-                loopStartMs = pos
-                loopEndMs = null
-                loopEnabled = false
-            }
-            loopEndMs == null -> {
-                val a = loopStartMs!!
-                loopStartMs = minOf(a, pos)
-                loopEndMs = maxOf(a, pos)
-                loopEnabled = true
-                controller?.seekTo(loopStartMs!!)
-                positionMs = loopStartMs!!
-            }
-            else -> {
-                loopEnabled = !loopEnabled
-            }
-        }
-    }
-
-    fun setLoop(startMs: Long, endMs: Long) {
-        loopStartMs = minOf(startMs, endMs)
-        loopEndMs = maxOf(startMs, endMs)
-        loopEnabled = true
-        controller?.seekTo(loopStartMs!!)
-        positionMs = loopStartMs!!
-    }
-
-    fun clearLoop() {
-        loopEnabled = false
-        loopStartMs = null
-        loopEndMs = null
+    fun clearLoops() {
+        val track = current ?: return
+        loops.forEach { repo.deleteLoop(it.id) }
+        loops = emptyList()
+        selectedLoopId = null
+        loopMode = LoopMode.NONE
     }
 
     fun changeExportFormat(format: ExportFormat) {
@@ -354,13 +369,15 @@ class PitcherViewModel(app: Application) : AndroidViewModel(app) {
         exportLoopOnly = value
     }
 
-    /** The A/B loop as a section in seconds, or null for the whole track. */
-    private fun currentSection(): Pair<Double, Double>? =
-        if (exportLoopOnly && loopStartMs != null && loopEndMs != null) {
-            (loopStartMs!! / 1000.0) to (loopEndMs!! / 1000.0)
-        } else {
-            null
-        }
+    /**
+     * The ranges to render: the enabled loops when loop-only is on, or null for
+     * the whole track.
+     */
+    private fun renderSegments(): List<Pair<Long, Long>>? {
+        if (!exportLoopOnly) return null
+        val enabled = Timeline.active(coreLoops())
+        return enabled.takeIf { it.isNotEmpty() }?.map { it.startMs to it.endMs }
+    }
 
     /**
      * Renders the current pitch into the library folder (Music/pitcher) and
@@ -389,8 +406,12 @@ class PitcherViewModel(app: Application) : AndroidViewModel(app) {
         startRender {
             val track = current!!
             val format = exportFormat
-            val section = currentSection()
-            val existing = repo.findVariant(track.id, faderCents, true, section, format.id)
+            val hasLoops = renderSegments() != null
+            val existing = if (hasLoops) {
+                null
+            } else {
+                repo.findVariant(track.id, faderCents, true, null, format.id)
+            }
             val variant = if (existing != null && RenderedStore.exists(existing.outputPath)) {
                 existing
             } else {
@@ -453,7 +474,9 @@ class PitcherViewModel(app: Application) : AndroidViewModel(app) {
     private suspend fun renderToLibrary(cents: Int, name: String?): Variant? {
         val track = current ?: return null
         val format = exportFormat
-        val section = currentSection()
+        val segments = renderSegments()
+        val section = segments?.takeIf { it.size == 1 }?.first()
+            ?.let { it.first / 1000.0 to it.second / 1000.0 }
         val app = getApplication<Application>()
         return withContext(Dispatchers.IO) {
             val tmpDir = File(app.cacheDir, "renders").apply { mkdirs() }
@@ -465,8 +488,7 @@ class PitcherViewModel(app: Application) : AndroidViewModel(app) {
                     target = tmp,
                     format = format,
                     cents = cents,
-                    startMs = section?.let { (it.first * 1000).toLong() } ?: 0L,
-                    endMs = section?.let { (it.second * 1000).toLong() } ?: -1L,
+                    segments = segments,
                     cancelled = { renderCancelled },
                 )
                 val displayName = Notes.downloadFilename(
@@ -478,7 +500,11 @@ class PitcherViewModel(app: Application) : AndroidViewModel(app) {
                     ext,
                 )
                 val uri = RenderedStore.save(app, displayName, format.mime, tmp)
-                val existing = repo.findVariant(track.id, cents, true, section, format.id)
+                val existing = if (segments == null) {
+                    repo.findVariant(track.id, cents, true, null, format.id)
+                } else {
+                    null
+                }
                 if (existing != null) {
                     repo.updateVariantFile(existing.id, uri, format.id, name)
                     repo.getVariant(existing.id)
@@ -521,13 +547,6 @@ class PitcherViewModel(app: Application) : AndroidViewModel(app) {
     fun changeHaptics(value: Boolean) {
         hapticsEnabled = value
         prefs.edit().putBoolean("haptics", value).apply()
-    }
-
-    fun changeUiStyle(style: UiStyle) {
-        uiStyle = style
-        prefs.edit()
-            .putString("ui_style", if (style == UiStyle.CLASSIC) "classic" else "modern")
-            .apply()
     }
 
     /** Reopens the guided tour, e.g. from the settings sheet. */
@@ -592,6 +611,66 @@ class PitcherViewModel(app: Application) : AndroidViewModel(app) {
         detectedHz = null
         detectMessage = null
     }
+
+    fun updateTunerSource(note: String?) {
+        tunerSource = note?.trim()?.takeIf { it.isNotEmpty() }
+        current?.let { repo.setTunerNotes(it.id, tunerSource, tunerTarget) }
+    }
+
+    fun updateTunerTarget(note: String?) {
+        tunerTarget = note?.trim()?.takeIf { it.isNotEmpty() }
+        current?.let { repo.setTunerNotes(it.id, tunerSource, tunerTarget) }
+    }
+
+    /** The interval between the source and target notes, in cents. */
+    fun tunerCents(): Double? {
+        val source = tunerSource ?: return null
+        val target = tunerTarget ?: return null
+        return Notes.centsBetweenNotes(source, target)
+    }
+
+    fun detectIntoTunerSource() = detectInto(isSource = true)
+
+    fun detectIntoTunerTarget() = detectInto(isSource = false)
+
+    private fun detectInto(isSource: Boolean) {
+        val track = current ?: return
+        val atMs = controller?.currentPosition ?: positionMs
+        viewModelScope.launch {
+            detectMessage = "detecting..."
+            val reading = withContext(Dispatchers.IO) {
+                TunerDecoder.decodeWindow(track.sourcePath, atMs)
+                    ?.let { Tuner.detect(it.samples, it.sampleRate) }
+            }
+            if (reading == null) {
+                detectMessage = "no clear pitch here"
+                return@launch
+            }
+            detectMessage = null
+            detectedHz = reading.hz
+            val note = Notes.hzToNote(reading.hz).name
+            if (isSource) updateTunerSource(note) else updateTunerTarget(note)
+        }
+    }
+
+    /** Sets the pitch slider to the interval between the two tuner notes. */
+    fun applyTunerToFader() {
+        val cents = tunerCents() ?: return
+        setPitchCents(cents.roundToInt().coerceIn(-1200, 1200))
+    }
+
+    fun updateDefaultFolder(uri: String?) {
+        defaultFolder = uri
+        prefs.edit().putString("default_folder", uri).apply()
+    }
+
+    fun setSongFolder(uri: String?) {
+        val track = current ?: return
+        repo.setSaveFolder(track.id, uri)
+        current = repo.getTrack(track.id)
+    }
+
+    fun effectiveFolder(): String? = current?.saveFolder ?: defaultFolder
 
     fun setPitchCents(cents: Int) {
         faderCents = cents

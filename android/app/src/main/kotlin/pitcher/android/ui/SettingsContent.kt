@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
@@ -22,27 +21,6 @@ fun SettingsContent(vm: PitcherViewModel, modifier: Modifier = Modifier) {
         modifier = modifier.fillMaxWidth().padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text("Interface", style = MaterialTheme.typography.titleMedium)
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            FilterChip(
-                selected = vm.uiStyle == UiStyle.MODERN,
-                onClick = { vm.changeUiStyle(UiStyle.MODERN) },
-                label = { Text("Modern") },
-            )
-            FilterChip(
-                selected = vm.uiStyle == UiStyle.CLASSIC,
-                onClick = { vm.changeUiStyle(UiStyle.CLASSIC) },
-                label = { Text("Classic") },
-            )
-        }
-        Text(
-            "Both share the same engine, library, and playback. Classic is kept as a fallback.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-
-        HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
-
         Text("Playback", style = MaterialTheme.typography.titleMedium)
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -51,6 +29,14 @@ fun SettingsContent(vm: PitcherViewModel, modifier: Modifier = Modifier) {
         ) {
             Text("Keep screen on", style = MaterialTheme.typography.bodyMedium)
             Switch(checked = vm.keepScreenOn, onCheckedChange = { vm.changeKeepScreenOn(it) })
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text("Haptics", style = MaterialTheme.typography.bodyMedium)
+            Switch(checked = vm.hapticsEnabled, onCheckedChange = { vm.changeHaptics(it) })
         }
 
         HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
@@ -84,19 +70,17 @@ fun SettingsContent(vm: PitcherViewModel, modifier: Modifier = Modifier) {
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
 
-        if (vm.uiStyle == UiStyle.MODERN) {
-            HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+        HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
 
-            Text("Guided tour", style = MaterialTheme.typography.titleMedium)
-            Text(
-                "A short tour points out the pitch gesture, the A/B loop, the play speed, and export.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Button(onClick = { vm.startOnboarding() }) { Text("Replay the tour") }
-        }
+        Text("Guided tour", style = MaterialTheme.typography.titleMedium)
+        Text(
+            "A short tour points out the pitch gesture, the loops, the play speed, and render.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Button(onClick = { vm.startOnboarding() }) { Text("Replay the tour") }
 
-        Text("pitcher for Android 2.0.1", style = MaterialTheme.typography.bodySmall)
+        Text("pitcher for Android 2.5.0", style = MaterialTheme.typography.bodySmall)
         Text(
             "Offline only. This app requests no network permission.",
             style = MaterialTheme.typography.bodySmall,
