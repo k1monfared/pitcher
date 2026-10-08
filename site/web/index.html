@@ -13,7 +13,7 @@
   </head>
   <body>
     <header class="site">
-      <div class="wrap">
+      <div class="wrap header-inner">
         <a class="brand" href="../">
           <svg width="24" height="24" viewBox="0 0 108 108" aria-hidden="true">
             <rect x="46" y="28" width="16" height="52" rx="4" fill="#1B1B1F" />
@@ -21,12 +21,25 @@
           </svg>
           pitcher
         </a>
-        <nav class="site">
+        <button
+          class="nav-toggle"
+          type="button"
+          aria-label="Toggle menu"
+          aria-expanded="false"
+          aria-controls="site-nav"
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <line x1="4" y1="7" x2="20" y2="7" />
+            <line x1="4" y1="12" x2="20" y2="12" />
+            <line x1="4" y1="17" x2="20" y2="17" />
+          </svg>
+        </button>
+        <nav class="site" id="site-nav">
           <a href="../#desktop">Desktop</a>
           <a href="./">Web UI</a>
           <a href="../#android">Android</a>
           <a href="../#install">Install</a>
-          <a href="https://github.com/k1monfared/pitcher">GitHub</a>
+          <a class="nav-cta" href="https://github.com/k1monfared/pitcher/releases">Download</a>
         </nav>
       </div>
     </header>
@@ -121,12 +134,36 @@ PITCHER_WEB=web/dist PITCHER_DATA=data ./target/release/pitcher-server</code></p
     <footer class="site">
       <div class="wrap">
         <span>pitcher, GPL-3.0-or-later. Free and open source software.</span>
-        <span>
-          <a href="https://github.com/k1monfared/pitcher">Source</a> &middot;
-          <a href="https://github.com/k1monfared/pitcher/releases">Releases</a> &middot;
+        <span class="links">
+          <a href="https://github.com/k1monfared/pitcher">Source</a>
+          <a href="https://github.com/k1monfared/pitcher/releases">Releases</a>
           <a href="../">Home</a>
         </span>
       </div>
     </footer>
+
+    <script>
+      (function () {
+        var toggle = document.querySelector(".nav-toggle");
+        var nav = document.getElementById("site-nav");
+        if (!toggle || !nav) return;
+        toggle.addEventListener("click", function () {
+          var open = nav.classList.toggle("open");
+          toggle.setAttribute("aria-expanded", open ? "true" : "false");
+        });
+        nav.addEventListener("click", function (e) {
+          if (e.target.tagName === "A") {
+            nav.classList.remove("open");
+            toggle.setAttribute("aria-expanded", "false");
+          }
+        });
+        window.addEventListener("resize", function () {
+          if (window.innerWidth > 760) {
+            nav.classList.remove("open");
+            toggle.setAttribute("aria-expanded", "false");
+          }
+        });
+      })();
+    </script>
   </body>
 </html>
