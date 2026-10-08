@@ -40,7 +40,8 @@ class ShelfRepository(
             """
             SELECT t.id, t.source_path, t.source_kind, t.source_url, t.title, t.artist,
                    t.duration_s, t.sample_rate, t.created_at,
-                   (SELECT COUNT(*) FROM variants v WHERE v.track_id = t.id) AS variant_count
+                   (SELECT COUNT(*) FROM variants v WHERE v.track_id = t.id) AS variant_count,
+                   t.tuner_source, t.tuner_target, t.save_folder
             FROM tracks t ORDER BY t.created_at DESC, t.id DESC
             """.trimIndent()
         return db().rawQuery(sql, null).use { c ->
@@ -53,7 +54,8 @@ class ShelfRepository(
             """
             SELECT t.id, t.source_path, t.source_kind, t.source_url, t.title, t.artist,
                    t.duration_s, t.sample_rate, t.created_at,
-                   (SELECT COUNT(*) FROM variants v WHERE v.track_id = t.id) AS variant_count
+                   (SELECT COUNT(*) FROM variants v WHERE v.track_id = t.id) AS variant_count,
+                   t.tuner_source, t.tuner_target, t.save_folder
             FROM tracks t WHERE t.id = ?
             """.trimIndent()
         return db().rawQuery(sql, arrayOf(id.toString())).use { c ->
@@ -213,6 +215,67 @@ class ShelfRepository(
         db().delete("bookmarks", "id = ?", arrayOf(id.toString()))
     }
 
+    fun setTunerNotes(trackId: Long, source: String?, target: String?) {
+        val values = ContentValues().apply {
+            put("tuner_source", source?.trim()?.takeIf { it.isNotEmpty() })
+            put("tuner_target", target?.trim()?.takeIf { it.isNotEmpty() })
+        }
+        db().update("tracks", values, "id = ?", arrayOf(trackId.toString()))
+    }
+
+    fun setSaveFolder(trackId: Long, uri: String?) {
+        val values = ContentValues().apply { put("save_folder", uri) }
+        db().update("tracks", values, "id = ?", arrayOf(trackId.toString()))
+    }
+
+    fun addLoop(trackId: Long, startMs: Long, endMs: Long, name: String? = null): Long {
+        val values = ContentValues().apply {
+            put("track_id", trackId)
+            put("start_ms", startMs)
+            put("end_ms", endMs)
+            put("name", name?.trim()?.takeIf { it.isNotEmpty() })
+        }
+        return db().insert("loops", null, values)
+    }
+
+    fun listLoops(trackId: Long): List<LoopSection> {
+        val sql = "SELECT $LOOP_COLUMNS FROM loops WHERE track_id = ? ORDER BY start_ms, id"
+        return db().rawQuery(sql, arrayOf(trackId.toString())).use { c ->
+            c.mapAll { readLoop(it) }
+        }
+    }
+
+    fun getLoop(id: Long): LoopSection? {
+        val sql = "SELECT $LOOP_COLUMNS FROM loops WHERE id = ?"
+        return db().rawQuery(sql, arrayOf(id.toString())).use { c ->
+            if (c.moveToFirst()) readLoop(c) else null
+        }
+    }
+
+    fun renameLoop(id: Long, name: String) {
+        val values = ContentValues().apply {
+            put("name", name.trim().takeIf { it.isNotEmpty() })
+        }
+        db().update("loops", values, "id = ?", arrayOf(id.toString()))
+    }
+
+    fun setLoopEnabled(id: Long, enabled: Boolean) {
+        val values = ContentValues().apply { put("enabled", if (enabled) 1 else 0) }
+        db().update("loops", values, "id = ?", arrayOf(id.toString()))
+    }
+
+    fun updateLoopEdges(id: Long, startMs: Long, endMs: Long) {
+        val values = ContentValues().apply {
+            put("start_ms", startMs)
+            put("end_ms", endMs)
+        }
+        db().update("loops", values, "id = ?", arrayOf(id.toString()))
+    }
+
+    fun deleteLoop(id: Long) {
+        db().delete("loops", "id = ?", arrayOf(id.toString()))
+    }
+
     fun close() {
         helper.close()
     }
@@ -228,6 +291,9 @@ class ShelfRepository(
         sampleRate = if (c.isNull(7)) null else c.getInt(7),
         createdAt = c.getString(8),
         variantCount = c.getInt(9),
+        tunerSource = c.getStringOrNull(10),
+        tunerTarget = c.getStringOrNull(11),
+        saveFolder = c.getStringOrNull(12),
     )
 
     private fun readVariant(c: Cursor) = Variant(
@@ -258,11 +324,23 @@ class ShelfRepository(
         createdAt = c.getString(4),
     )
 
+    private fun readLoop(c: Cursor) = LoopSection(
+        id = c.getLong(0),
+        trackId = c.getLong(1),
+        startMs = c.getLong(2),
+        endMs = c.getLong(3),
+        name = c.getStringOrNull(4),
+        enabled = c.getInt(5) != 0,
+        createdAt = c.getString(6),
+    )
+
     private companion object {
         const val VARIANT_COLUMNS =
             "id, track_id, name, cents, formant, engine, pitch_quality, section_start, " +
                 "section_end, output_path, output_format, src_note, src_hz, " +
                 "target_note, target_hz, favorite, created_at"
+        const val LOOP_COLUMNS =
+            "id, track_id, start_ms, end_ms, name, enabled, created_at"
     }
 }
 

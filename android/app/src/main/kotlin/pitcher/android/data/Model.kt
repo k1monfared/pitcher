@@ -11,6 +11,9 @@ data class Track(
     val sampleRate: Int?,
     val createdAt: String,
     val variantCount: Int,
+    val tunerSource: String? = null,
+    val tunerTarget: String? = null,
+    val saveFolder: String? = null,
 )
 
 data class Variant(
@@ -52,5 +55,15 @@ data class Bookmark(
     val trackId: Long,
     val t: Double,
     val name: String?,
+    val createdAt: String,
+)
+
+data class LoopSection(
+    val id: Long,
+    val trackId: Long,
+    val startMs: Long,
+    val endMs: Long,
+    val name: String?,
+    val enabled: Boolean,
     val createdAt: String,
 )

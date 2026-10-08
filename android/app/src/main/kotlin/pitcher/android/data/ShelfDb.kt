@@ -25,6 +25,9 @@ internal class ShelfDb(
                 artist TEXT,
                 duration_s REAL NOT NULL,
                 sample_rate INTEGER,
+                tuner_source TEXT,
+                tuner_target TEXT,
+                save_folder TEXT,
                 created_at TEXT NOT NULL DEFAULT (datetime('now'))
             )
             """.trimIndent(),
@@ -63,15 +66,47 @@ internal class ShelfDb(
             )
             """.trimIndent(),
         )
+        db.execSQL(
+            """
+            CREATE TABLE loops (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                track_id INTEGER NOT NULL REFERENCES tracks(id) ON DELETE CASCADE,
+                start_ms INTEGER NOT NULL,
+                end_ms INTEGER NOT NULL,
+                name TEXT,
+                enabled INTEGER NOT NULL DEFAULT 1,
+                created_at TEXT NOT NULL DEFAULT (datetime('now'))
+            )
+            """.trimIndent(),
+        )
         db.execSQL("CREATE INDEX idx_variants_track ON variants(track_id)")
         db.execSQL("CREATE INDEX idx_bookmarks_track ON bookmarks(track_id)")
+        db.execSQL("CREATE INDEX idx_loops_track ON loops(track_id)")
     }
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
-        // v1 is the first schema; future versions migrate here.
+        if (oldVersion < 2) {
+            db.execSQL("ALTER TABLE tracks ADD COLUMN tuner_source TEXT")
+            db.execSQL("ALTER TABLE tracks ADD COLUMN tuner_target TEXT")
+            db.execSQL("ALTER TABLE tracks ADD COLUMN save_folder TEXT")
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS loops (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    track_id INTEGER NOT NULL REFERENCES tracks(id) ON DELETE CASCADE,
+                    start_ms INTEGER NOT NULL,
+                    end_ms INTEGER NOT NULL,
+                    name TEXT,
+                    enabled INTEGER NOT NULL DEFAULT 1,
+                    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+                )
+                """.trimIndent(),
+            )
+            db.execSQL("CREATE INDEX IF NOT EXISTS idx_loops_track ON loops(track_id)")
+        }
     }
 
     companion object {
-        const val VERSION = 1
+        const val VERSION = 2
     }
 }
