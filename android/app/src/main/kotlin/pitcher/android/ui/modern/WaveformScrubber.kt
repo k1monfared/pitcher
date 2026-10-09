@@ -31,6 +31,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
@@ -69,6 +70,12 @@ private val GRAB_RADIUS = 24.dp
 /** Where the playhead sits across a zoomed view while following. */
 private const val FOLLOW_ANCHOR = 0.75
 
+/** A reported position this far from the smooth clock is a seek, not drift. */
+private const val SNAP_MS = 250.0
+
+/** How much of the drift to a new position report the smooth clock takes up. */
+private const val EASE = 0.15
+
 /**
  * The song chart. A loop lane on top (drag empty space to make a loop, tap a
  * loop to select it, long-press an edge and drag to fine-tune, long-press a
@@ -100,6 +107,7 @@ fun WaveformScrubber(
     onCommitLoopEdge: (Long) -> Unit = {},
     onCommitBookmark: (Long) -> Unit = {},
     playing: Boolean = false,
+    tempo: Float = 1f,
     follow: Boolean = false,
     onFollowChange: (Boolean) -> Unit = {},
     onboarding: OnboardingTargets? = null,
@@ -139,16 +147,45 @@ fun WaveformScrubber(
         scrubMs = null
     }
 
-    // Following keeps the playhead three quarters across a zoomed view, so a
-    // quarter of the view shows what is coming.
-    LaunchedEffect(positionMs, follow, playing) {
-        val v = view ?: return@LaunchedEffect
-        if (!follow || !playing || scrubMs != null || durationMs <= 0) return@LaunchedEffect
-        WaveView.followAt(v, positionMs.toDouble() / durationMs, FOLLOW_ANCHOR)?.let { view = it }
+    // The player reports its position every few tens of milliseconds. While
+    // playing, a frame clock runs between reports at the play speed and eases
+    // toward each report, so the playhead and the followed view glide instead
+    // of stepping. A jump larger than a beat is a seek and snaps.
+    var smoothMs by remember { mutableLongStateOf(positionMs) }
+    val positionNow by rememberUpdatedState(positionMs)
+    LaunchedEffect(playing, tempo) {
+        smoothMs = positionNow
+        if (!playing) return@LaunchedEffect
+        var anchorMs = positionNow.toDouble()
+        var anchorNanos = withFrameNanos { it }
+        var lastReport = positionNow
+        while (true) {
+            withFrameNanos { now ->
+                val predicted = anchorMs + (now - anchorNanos) / 1_000_000.0 * tempo
+                if (positionNow != lastReport) {
+                    lastReport = positionNow
+                    val error = positionNow - predicted
+                    if (abs(error) > SNAP_MS) {
+                        anchorMs = positionNow.toDouble()
+                        anchorNanos = now
+                    } else {
+                        anchorMs += error * EASE
+                    }
+                }
+                val ms = (anchorMs + (now - anchorNanos) / 1_000_000.0 * tempo).toLong()
+                smoothMs = ms.coerceIn(0L, durationNow.coerceAtLeast(0L))
+                // Following keeps the playhead three quarters across a zoomed
+                // view, so a quarter of the view shows what is coming.
+                val v = view
+                if (followNow && v != null && scrubMs == null && durationNow > 0) {
+                    WaveView.followAt(v, smoothMs.toDouble() / durationNow, FOLLOW_ANCHOR)?.let { view = it }
+                }
+            }
+        }
     }
 
     val span = view ?: WaveView.Window(0.0, 1.0)
-    val shownMs = scrubMs ?: positionMs
+    val shownMs = scrubMs ?: if (playing) smoothMs else positionMs
     val spanNow by rememberUpdatedState(span)
 
     fun xToMs(x: Float, width: Float): Long {

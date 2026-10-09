@@ -2,20 +2,32 @@
 
 ## Unreleased
 
-Saving pitches and files, reworked:
+Pitches and files, reworked:
 
-- `+ save` keeps the current pitch on the shelf without rendering. Tapping a
-  pitch plays it, and tapping the playing pitch again opens the render sheet.
-  `render` at the end of the shelf opens it too. Saving a file also keeps its
-  pitch.
+- One pill per pitch. The original and every kept pitch always show. When the
+  pitch is somewhere nothing is kept, one dashed pill stands for it, in order;
+  it disappears when the pitch reaches a kept one, which lights up instead.
+- Tap the dashed pill to keep that pitch. Keeping renders it in the background,
+  so saving or sharing a file later only has to encode. Tap a kept pitch to
+  play it, and tap the playing one to save or share it as a file.
+- Every pitch works on its own: saving one never blocks another. Long-press a
+  busy pitch to cancel just that one.
 - Pitches remember every file saved from them (name, format, and loop set).
   `Save file` reads `Saved` until one of those changes, and `Share` shares that
   file instead of rendering a new one. A file deleted outside the app can be
   saved again.
-- The render sheet's buttons keep their place: during a render they read
-  `Saving...` and `Cancel`. Formats are separate pills, tapped or slid, and the
-  choice follows the finger. The extension shows at the end of the name.
-- Deleting a pitch keeps the files it rendered.
+- The file sheet's buttons keep their place: while saving they read
+  `Saving...` and `Cancel`. The format is a knob that rolls with the finger,
+  after the file name and a dot.
+- "Saved" is a short popup instead of text on the screen.
+- Removing a pitch keeps the files it saved.
+
+Studio:
+
+- `follow` glides with playback instead of stepping.
+- Play and pause are an icon. Follow, snap, speed, and repeat have no
+  backgrounds, and the repeat icon is wider so its `1` reads clearly.
+- The interval (for example "up a minor third") sits right above the cents.
 
 Chart and transport:
 

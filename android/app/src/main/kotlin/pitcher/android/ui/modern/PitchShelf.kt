@@ -1,6 +1,5 @@
 package pitcher.android.ui.modern
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
@@ -8,12 +7,14 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
@@ -25,100 +26,107 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import pitcher.android.data.Variant
+import pitcher.core.ShelfModel
 
 private fun signed(cents: Int) = if (cents >= 0) "+${cents}c" else "${cents}c"
 
 /**
- * The pitch shelf: the original, every kept pitch, `+ save` to keep the
- * current pitch, and `render` to save it as a file. Tapping a pitch plays it;
- * tapping the pitch that is already playing opens the render sheet. Long-press
- * a pitch for render, share, rename, and delete. Every card has the same size
- * so nothing shifts while rendering.
+ * The pitch shelf: one pill per pitch, sorted by cents. The original and every
+ * kept pitch always show. While the pitch is somewhere nothing is kept, one
+ * dashed pill stands for it; tap it to keep that pitch, which also renders it
+ * in the background. Tap a kept pitch to play it, and tap the playing one to
+ * save or share it as a file. Long-press a kept pitch for more.
  */
 @Composable
 fun PitchShelf(
     variants: List<Variant>,
     faderCents: Int,
     accent: Color,
+    busyIds: Set<Long>,
     onSelectPitch: (Variant?) -> Unit,
-    onSavePitch: () -> Unit,
-    onOpenRender: () -> Unit,
-    onRenderVariant: (Variant) -> Unit,
+    onKeepPitch: () -> Unit,
+    onOpenFile: () -> Unit,
     onRenameVariant: (Variant, String) -> Unit,
     onShareVariant: (Variant) -> Unit,
     onDeleteVariant: (Variant) -> Unit,
-    saving: Boolean = false,
+    onCancelVariant: (Variant) -> Unit,
     modifier: Modifier = Modifier,
     onboarding: OnboardingTargets? = null,
 ) {
     var renaming by remember { mutableStateOf<Variant?>(null) }
-    val selected = variants.firstOrNull { it.cents == faderCents }
-    val canSave = faderCents != 0 && selected == null
+    val byId = variants.associateBy { it.id }
+    val pills = ShelfModel.pills(variants.map { ShelfModel.Kept(it.id, it.cents) }, faderCents)
+    val listState = rememberLazyListState()
+    val selectedIndex = pills.indexOfFirst { it.selected }
+
+    // Keep the highlighted pill in view as the pitch moves along the shelf.
+    LaunchedEffect(selectedIndex, pills.size) {
+        if (selectedIndex >= 0) listState.animateScrollToItem((selectedIndex - 1).coerceAtLeast(0))
+    }
 
     LazyRow(
-        modifier = modifier,
+        state = listState,
+        modifier = modifier.onboardingTarget(onboarding, "save"),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         contentPadding = PaddingValues(horizontal = 2.dp),
     ) {
-        item {
-            PitchCard(
-                label = "original",
-                sub = "+0c",
-                selected = faderCents == 0,
-                accent = accent,
-                onClick = { onSelectPitch(null) },
-            )
-        }
-        items(variants, key = { it.id }) { v ->
-            val isSelected = v.id == selected?.id
-            PitchCard(
-                label = v.name?.takeIf { it.isNotBlank() } ?: signed(v.cents),
-                sub = if (v.name?.isNotBlank() == true) signed(v.cents) else null,
-                badge = if (v.renderCount > 0) "file" else null,
-                selected = isSelected,
-                accent = accent,
-                onClick = { if (isSelected) onOpenRender() else onSelectPitch(v) },
-                menuItems = listOf(
-                    "save file" to { onRenderVariant(v) },
-                    "share" to { onShareVariant(v) },
-                    "rename" to { renaming = v },
-                    "delete" to { onDeleteVariant(v) },
-                ),
-            )
-        }
-        item {
-            Box(modifier = Modifier.onboardingTarget(onboarding, "save")) {
-                PitchCard(
-                    label = "+ save",
-                    sub = signed(faderCents),
-                    selected = false,
-                    enabled = canSave,
+        items(pills, key = { "${it.kind}-${it.id ?: it.cents}" }) { pill ->
+            when (pill.kind) {
+                ShelfModel.Kind.ORIGINAL -> PitchCard(
+                    label = "original",
+                    sub = "+0c",
+                    selected = pill.selected,
                     accent = accent,
-                    onClick = onSavePitch,
+                    onClick = { onSelectPitch(null) },
                 )
+                ShelfModel.Kind.NEW -> PitchCard(
+                    label = signed(pill.cents),
+                    sub = "tap to keep",
+                    selected = pill.selected,
+                    dashed = true,
+                    accent = accent,
+                    onClick = onKeepPitch,
+                )
+                ShelfModel.Kind.KEPT -> {
+                    val v = byId.getValue(pill.id!!)
+                    val busy = v.id in busyIds
+                    val named = v.name?.isNotBlank() == true
+                    PitchCard(
+                        label = if (named) v.name!! else signed(v.cents),
+                        sub = if (named) signed(v.cents) else null,
+                        badge = if (v.renderCount > 0) "file" else null,
+                        selected = pill.selected,
+                        busy = busy,
+                        accent = accent,
+                        onClick = { if (pill.selected) onOpenFile() else onSelectPitch(v) },
+                        menuItems = buildList {
+                            add("save file" to { onSelectPitch(v); onOpenFile() })
+                            add("share" to { onShareVariant(v) })
+                            add("rename" to { renaming = v })
+                            if (busy) add("cancel" to { onCancelVariant(v) })
+                            add("remove" to { onDeleteVariant(v) })
+                        },
+                    )
+                }
             }
-        }
-        item {
-            PitchCard(
-                label = "render",
-                sub = signed(faderCents),
-                selected = false,
-                outlined = true,
-                busy = saving,
-                accent = accent,
-                onClick = onOpenRender,
-            )
         }
     }
 
@@ -143,33 +151,47 @@ private fun PitchCard(
     accent: Color,
     onClick: () -> Unit,
     badge: String? = null,
-    enabled: Boolean = true,
-    outlined: Boolean = false,
+    dashed: Boolean = false,
     busy: Boolean = false,
     menuItems: List<Pair<String, () -> Unit>> = emptyList(),
 ) {
     var menu by remember { mutableStateOf(false) }
-    val alpha = if (enabled) 1f else 0.38f
 
     Box {
         Surface(
             shape = RoundedCornerShape(16.dp),
             color = when {
-                selected -> accent.copy(alpha = 0.22f)
-                outlined -> Color.Transparent
+                selected && !dashed -> accent.copy(alpha = 0.22f)
+                dashed -> Color.Transparent
                 else -> Color.White.copy(alpha = 0.05f)
             },
-            border = if (outlined) BorderStroke(1.dp, accent.copy(alpha = 0.6f)) else null,
             modifier = Modifier
+                .drawBehind {
+                    if (dashed) {
+                        val stroke = 1.5.dp.toPx()
+                        drawRoundRect(
+                            color = accent.copy(alpha = 0.8f),
+                            topLeft = Offset(stroke / 2, stroke / 2),
+                            size = Size(size.width - stroke, size.height - stroke),
+                            cornerRadius = CornerRadius(16.dp.toPx()),
+                            style = Stroke(
+                                width = stroke,
+                                pathEffect = PathEffect.dashPathEffect(floatArrayOf(6.dp.toPx(), 4.dp.toPx())),
+                            ),
+                        )
+                    }
+                }
                 .width(104.dp)
-                .height(64.dp)
+                .height(68.dp)
                 .combinedClickable(
-                    enabled = enabled,
                     onClick = onClick,
                     onLongClick = { if (menuItems.isNotEmpty()) menu = true },
                 ),
         ) {
-            Column(modifier = Modifier.padding(12.dp)) {
+            Column(
+                modifier = Modifier.fillMaxHeight().padding(horizontal = 12.dp, vertical = 8.dp),
+                verticalArrangement = Arrangement.Center,
+            ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -185,30 +207,33 @@ private fun PitchCard(
                         label,
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-                        color = (if (selected || outlined) accent else MaterialTheme.colorScheme.onSurface)
-                            .copy(alpha = alpha),
+                        color = if (selected) accent else MaterialTheme.colorScheme.onSurface,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                ) {
-                    if (sub != null) {
-                        Text(
-                            sub,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = alpha),
-                            maxLines = 1,
-                        )
-                    }
-                    if (badge != null) {
-                        Text(
-                            badge,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.tertiary,
-                        )
+                if (sub != null || badge != null) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        if (sub != null) {
+                            Text(
+                                sub,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                        if (badge != null) {
+                            Text(
+                                badge,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.tertiary,
+                                maxLines = 1,
+                            )
+                        }
                     }
                 }
             }

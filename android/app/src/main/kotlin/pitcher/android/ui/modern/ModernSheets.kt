@@ -3,6 +3,9 @@ package pitcher.android.ui.modern
 import android.content.Intent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.spring
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -11,9 +14,11 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -38,46 +43,60 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import kotlin.math.abs
+import kotlin.math.roundToInt
+import kotlinx.coroutines.launch
 import pitcher.android.media.RenderedStore
 import pitcher.android.ui.PitcherViewModel
-import pitcher.core.ChartLabels
 import pitcher.core.ExportFormat
 import pitcher.core.RenderPlan
+import pitcher.core.ShelfModel
 
-private val FORMAT_PILL_HEIGHT = 34.dp
-private val FORMAT_PILL_GAP = 4.dp
+private val DRUM_ITEM_HEIGHT = 26.dp
+private val DRUM_RADIUS = 58.dp
+private const val DRUM_STEP_DEGREES = 25f
 
 /**
- * Saves the current pitch as a file. The file name follows the pitch until it
- * is edited. `Save file` turns into `Saved` once a file with this name, format,
- * and loop set exists, and only comes back when one of those changes. `Share`
- * shares that file, rendering only if there is none. The two buttons keep
- * their place while rendering: they read `Saving...` and `Cancel`.
+ * Saves or shares the current pitch as a file. The pitch is kept (and
+ * rendering in the background) by the time this opens, so a save only has to
+ * encode. The file name follows the pitch until it is edited. `Save file`
+ * reads `Saved` once this name, format, and loop set exists, and comes back
+ * when one of them changes. The buttons keep their place: while this pitch is
+ * saving they read `Saving...` and `Cancel`. Other pitches are not affected.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ExportSheet(vm: PitcherViewModel, onDismiss: () -> Unit, onOpenTimeline: () -> Unit = {}) {
     val context = LocalContext.current
     val track = vm.current
+    val variant = vm.selectedVariant
     val format = vm.exportFormat
     val defaultBase = vm.defaultFileBase()
-    var typed by remember(track?.id) { mutableStateOf<String?>(null) }
+    var typed by remember(track?.id, variant?.id) { mutableStateOf<String?>(null) }
     val fileBase = typed ?: defaultBase
     var match by remember { mutableStateOf<RenderPlan.Record?>(null) }
     var confirmCancel by remember { mutableStateOf(false) }
 
-    LaunchedEffect(fileBase, format, vm.exportLoopOnly, vm.loops, vm.faderCents, vm.rendersVersion) {
-        match = vm.matchingRender(fileBase)
+    LaunchedEffect(Unit) {
+        if (variant == null) vm.keepPitch()
+    }
+    LaunchedEffect(variant?.id, fileBase, format, vm.exportLoopOnly, vm.loops, vm.rendersVersion) {
+        match = variant?.let { vm.matchingRender(it.id, fileBase) }
     }
 
     val folderPicker = rememberLauncherForActivityResult(
@@ -103,13 +122,12 @@ fun ExportSheet(vm: PitcherViewModel, onDismiss: () -> Unit, onOpenTimeline: () 
                 .padding(bottom = 32.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            val pitch = vm.selectedVariant
             val cents = vm.faderCents
             val centsText = if (cents >= 0) "+${cents}c" else "${cents}c"
             Column {
                 Text("Save as a file", style = MaterialTheme.typography.headlineSmall)
                 Text(
-                    listOfNotNull(pitch?.name?.takeIf { it.isNotBlank() }, centsText).joinToString(" · "),
+                    listOfNotNull(variant?.name?.takeIf { it.isNotBlank() }, centsText).joinToString(" · "),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -132,19 +150,20 @@ fun ExportSheet(vm: PitcherViewModel, onDismiss: () -> Unit, onOpenTimeline: () 
                 }
             }
 
-            Row(verticalAlignment = Alignment.Top) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
                 OutlinedTextField(
                     value = fileBase,
                     onValueChange = { typed = it },
                     label = { Text("File name") },
-                    suffix = { Text(".${format.extension}") },
                     modifier = Modifier.weight(1f),
                 )
-                FormatPills(
-                    selected = format,
-                    onSelect = { vm.changeExportFormat(it) },
-                    modifier = Modifier.padding(start = 12.dp, top = 6.dp),
+                Text(
+                    ".",
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(horizontal = 6.dp),
                 )
+                FormatDrum(selected = format, onSelect = { vm.changeExportFormat(it) })
             }
             if (typed != null && typed != defaultBase) {
                 TextButton(onClick = { typed = null }) { Text("use the default name") }
@@ -173,11 +192,15 @@ fun ExportSheet(vm: PitcherViewModel, onDismiss: () -> Unit, onOpenTimeline: () 
                 TextButton(onClick = onOpenTimeline) { Text("edit loops") }
             }
 
+            val work = variant?.let { vm.pitchWork[it.id] }
+            val exporting = work == PitcherViewModel.PitchWork.SAVING || work == PitcherViewModel.PitchWork.SHARING
             // One fixed line, so the buttons below never move.
             val status = when {
-                vm.exporting -> vm.exportMessage ?: "rendering..."
+                work == PitcherViewModel.PitchWork.SAVING -> "saving..."
+                work == PitcherViewModel.PitchWork.SHARING -> "getting the file ready to share..."
+                work == PitcherViewModel.PitchWork.PREPARING -> "rendering this pitch in the background..."
                 match != null -> "Saved in ${RenderedStore.folderLabel(folder)}"
-                else -> vm.exportMessage?.takeIf { it.startsWith("render failed") || it == "cancelled" } ?: ""
+                else -> variant?.let { vm.pitchStatus[it.id] } ?: ""
             }
             Text(
                 status,
@@ -188,54 +211,55 @@ fun ExportSheet(vm: PitcherViewModel, onDismiss: () -> Unit, onOpenTimeline: () 
                 modifier = Modifier.fillMaxWidth().height(18.dp),
             )
 
-            val saving = vm.exporting && vm.renderAction == PitcherViewModel.RenderAction.SAVE
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 Button(
-                    onClick = { vm.saveFile(fileBase) },
-                    enabled = !vm.exporting && match == null && fileBase.isNotBlank(),
+                    onClick = { variant?.let { vm.saveFile(it, fileBase) } },
+                    enabled = variant != null && !exporting && match == null && fileBase.isNotBlank(),
                     modifier = Modifier.weight(1f).height(48.dp),
                 ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        if (saving) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            ) {
-                                CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
-                                Text("Saving...")
-                            }
-                        } else {
-                            Text(if (match != null) "Saved" else "Save file")
+                    if (work == PitcherViewModel.PitchWork.SAVING) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                            Text("Saving...")
                         }
+                    } else {
+                        Text(if (match != null) "Saved" else "Save file")
                     }
                 }
                 OutlinedButton(
                     onClick = {
-                        if (vm.exporting) confirmCancel = true else vm.shareFile(fileBase)
+                        if (exporting) {
+                            confirmCancel = true
+                        } else {
+                            variant?.let { vm.shareFile(it, fileBase) }
+                        }
                     },
-                    enabled = vm.exporting || fileBase.isNotBlank(),
+                    enabled = variant != null && (exporting || fileBase.isNotBlank()),
                     modifier = Modifier.weight(1f).height(48.dp),
                 ) {
-                    Text(if (vm.exporting) "Cancel" else "Share")
+                    Text(if (exporting) "Cancel" else "Share")
                 }
             }
 
             if (confirmCancel) {
                 AlertDialog(
                     onDismissRequest = { confirmCancel = false },
-                    title = { Text("Cancel render?") },
-                    text = { Text("The file will not be saved.") },
+                    title = { Text("Cancel?") },
+                    text = { Text("This file will not be saved. Other pitches keep going.") },
                     confirmButton = {
                         TextButton(onClick = {
-                            vm.cancelExport()
+                            variant?.let { vm.cancelPitch(it.id) }
                             confirmCancel = false
-                        }) { Text("Cancel render") }
+                        }) { Text("Cancel it") }
                     },
                     dismissButton = {
-                        TextButton(onClick = { confirmCancel = false }) { Text("Keep rendering") }
+                        TextButton(onClick = { confirmCancel = false }) { Text("Keep going") }
                     },
                 )
             }
@@ -244,55 +268,107 @@ fun ExportSheet(vm: PitcherViewModel, onDismiss: () -> Unit, onOpenTimeline: () 
 }
 
 /**
- * Every format as its own pill in a column. Tap a pill, or press and slide:
- * the choice follows the finger one pill at a time, like the speed control.
+ * The format as a knob: the extensions sit on a drum that rolls with the
+ * finger, the one in the middle is chosen, and letting go settles on the
+ * nearest. Tapping an extension rolls to it.
  */
 @Composable
-private fun FormatPills(
+internal fun FormatDrum(
     selected: ExportFormat,
     onSelect: (ExportFormat) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val entries = ExportFormat.entries
-    val current by rememberUpdatedState(selected)
+    val index = entries.indexOf(selected).coerceAtLeast(0)
+    val scroll = remember { Animatable(index.toFloat()) }
+    val scope = rememberCoroutineScope()
     val onSelectNow by rememberUpdatedState(onSelect)
-    Column(
-        verticalArrangement = Arrangement.spacedBy(FORMAT_PILL_GAP),
-        modifier = modifier.pointerInput(Unit) {
-            val stepPx = (FORMAT_PILL_HEIGHT + FORMAT_PILL_GAP).toPx()
-            awaitEachGesture {
-                val down = awaitFirstDown()
-                val startIndex = entries.indexOf(current)
-                var moved = false
-                var picked = startIndex
-                while (true) {
-                    val event = awaitPointerEvent()
-                    val change = event.changes.firstOrNull { it.id == down.id } ?: break
-                    val dy = change.position.y - down.position.y
-                    if (!moved && kotlin.math.abs(dy) > viewConfiguration.touchSlop) moved = true
-                    if (moved) {
-                        val idx = ChartLabels.slideIndex(startIndex, dy, stepPx, entries.size)
-                        if (idx != picked) {
-                            picked = idx
-                            onSelectNow(entries[idx])
+    var dragging by remember { mutableStateOf(false) }
+    val density = LocalDensity.current
+    val radiusPx = with(density) { DRUM_RADIUS.toPx() }
+    val itemPx = with(density) { DRUM_ITEM_HEIGHT.toPx() }
+    val stepPx = radiusPx * Math.toRadians(DRUM_STEP_DEGREES.toDouble()).toFloat()
+    val accent = MaterialTheme.colorScheme.primary
+
+    LaunchedEffect(index) {
+        if (!dragging && ShelfModel.drumNearest(scroll.value, entries.size) != index) {
+            scroll.animateTo(index.toFloat(), spring(dampingRatio = 0.8f, stiffness = 400f))
+        }
+    }
+
+    Box(
+        modifier = modifier
+            .width(76.dp)
+            .height(DRUM_RADIUS * 2 + DRUM_ITEM_HEIGHT)
+            .pointerInput(Unit) {
+                awaitEachGesture {
+                    val down = awaitFirstDown()
+                    val start = scroll.value
+                    var moved = false
+                    var picked = ShelfModel.drumNearest(start, entries.size)
+                    dragging = true
+                    while (true) {
+                        val event = awaitPointerEvent()
+                        val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                        val dy = change.position.y - down.position.y
+                        if (!moved && abs(dy) > viewConfiguration.touchSlop) moved = true
+                        if (moved) {
+                            val next = ShelfModel.drumScroll(start, dy, stepPx)
+                                .coerceIn(-0.4f, entries.lastIndex + 0.4f)
+                            scope.launch { scroll.snapTo(next) }
+                            val nearest = ShelfModel.drumNearest(next, entries.size)
+                            if (nearest != picked) {
+                                picked = nearest
+                                onSelectNow(entries[nearest])
+                            }
                         }
+                        change.consume()
+                        if (!change.pressed) break
                     }
-                    change.consume()
-                    if (!change.pressed) break
+                    if (!moved) {
+                        // A tap rolls to the extension under the finger.
+                        val centerY = size.height / 2f
+                        val tapped = entries.indices.minByOrNull { i ->
+                            val slot = ShelfModel.drumSlot(i, scroll.value, DRUM_STEP_DEGREES, radiusPx)
+                            if (slot.visible) abs(centerY + slot.y - down.position.y) else Float.MAX_VALUE
+                        } ?: picked
+                        picked = tapped
+                        onSelectNow(entries[tapped])
+                    }
+                    dragging = false
+                    scope.launch {
+                        scroll.animateTo(picked.toFloat(), spring(dampingRatio = 0.8f, stiffness = 400f))
+                    }
                 }
-                if (!moved) {
-                    val idx = (down.position.y / stepPx).toInt().coerceIn(0, entries.lastIndex)
-                    onSelectNow(entries[idx])
-                }
-            }
-        },
+            },
     ) {
-        entries.forEach { f ->
-            val on = f == selected
+        // A faint frame marks the middle, where the chosen extension sits.
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val y0 = size.height / 2f - itemPx / 2f - 2f
+            val y1 = size.height / 2f + itemPx / 2f + 2f
+            listOf(y0, y1).forEach { y ->
+                drawLine(accent.copy(alpha = 0.35f), Offset(0f, y), Offset(size.width, y), strokeWidth = 1.5f)
+            }
+        }
+        val center = ShelfModel.drumNearest(scroll.value, entries.size)
+        entries.forEachIndexed { i, f ->
+            val slot = ShelfModel.drumSlot(i, scroll.value, DRUM_STEP_DEGREES, radiusPx)
+            if (!slot.visible) return@forEachIndexed
+            val on = i == center
             Surface(
                 shape = RoundedCornerShape(50),
-                color = if (on) MaterialTheme.colorScheme.primary else Color.White.copy(alpha = 0.06f),
-                modifier = Modifier.width(72.dp).height(FORMAT_PILL_HEIGHT),
+                color = if (on) accent else Color.White.copy(alpha = 0.08f),
+                modifier = Modifier
+                    .width(68.dp)
+                    .height(DRUM_ITEM_HEIGHT)
+                    .align(Alignment.TopCenter)
+                    .offset {
+                        IntOffset(0, (radiusPx + slot.y).roundToInt())
+                    }
+                    .graphicsLayer {
+                        scaleY = slot.scale
+                        alpha = 0.25f + 0.75f * slot.scale
+                    },
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     Text(

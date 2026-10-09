@@ -72,17 +72,15 @@ fun TransportBar(
     ) {
         TextButton(onClick = { onSkip(-5000) }, modifier = Modifier.width(SKIP_WIDTH)) { Text("-5s") }
 
-        Surface(shape = CircleShape, color = accent, modifier = Modifier.width(PLAY_WIDTH)) {
-            Text(
-                text = if (playing) "Pause" else "Play",
-                modifier = Modifier
-                    .clickable(onClick = onPlayPause)
-                    .padding(vertical = 14.dp),
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-                color = Color(0xFF06121F),
-                textAlign = TextAlign.Center,
-            )
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier
+                .width(PLAY_WIDTH)
+                .clickable(onClick = onPlayPause)
+                .padding(vertical = 6.dp)
+                .semantics { contentDescription = if (playing) "Pause" else "Play" },
+        ) {
+            PlayGlyph(playing = playing, tint = accent)
         }
 
         TextButton(onClick = { onSkip(5000) }, modifier = Modifier.width(SKIP_WIDTH)) { Text("+5s") }
@@ -109,6 +107,33 @@ private val PLAY_WIDTH = 96.dp
 private val SPEED_WIDTH = 72.dp
 private val REPEAT_WIDTH = 56.dp
 
+/** A play triangle, or two pause bars while playing. */
+@Composable
+private fun PlayGlyph(playing: Boolean, tint: Color) {
+    Canvas(modifier = Modifier.size(44.dp)) {
+        val w = size.width
+        val h = size.height
+        if (playing) {
+            val barW = w * 0.22f
+            val barH = h * 0.70f
+            val top = (h - barH) / 2f
+            val corner = CornerRadius(barW * 0.25f, barW * 0.25f)
+            drawRoundRect(tint, Offset(w * 0.22f, top), Size(barW, barH), corner)
+            drawRoundRect(tint, Offset(w * 0.56f, top), Size(barW, barH), corner)
+        } else {
+            drawPath(
+                Path().apply {
+                    moveTo(w * 0.26f, h * 0.14f)
+                    lineTo(w * 0.86f, h * 0.50f)
+                    lineTo(w * 0.26f, h * 0.86f)
+                    close()
+                },
+                tint,
+            )
+        }
+    }
+}
+
 /** A Spotify-style repeat button, icon only: off, all loops, or one loop. */
 @Composable
 private fun LoopModeButton(
@@ -124,17 +149,15 @@ private fun LoopModeButton(
         LoopMode.ALL -> "Repeat all loops"
         LoopMode.ONE -> "Repeat this loop"
     }
-    Surface(
-        shape = RoundedCornerShape(50),
-        color = if (active) accent.copy(alpha = 0.22f) else Color.White.copy(alpha = 0.06f),
-        modifier = Modifier.width(REPEAT_WIDTH).semantics { contentDescription = description },
+    Box(
+        modifier = Modifier
+            .width(REPEAT_WIDTH)
+            .clickable(onClick = onClick)
+            .padding(vertical = 10.dp)
+            .semantics { contentDescription = description },
+        contentAlignment = Alignment.Center,
     ) {
-        Box(
-            modifier = Modifier.clickable(onClick = onClick).padding(vertical = 10.dp),
-            contentAlignment = Alignment.Center,
-        ) {
-            RepeatGlyph(tint = tint, one = mode == LoopMode.ONE)
-        }
+        RepeatGlyph(tint = tint, one = mode == LoopMode.ONE)
     }
 }
 
@@ -146,19 +169,20 @@ private fun LoopModeButton(
 @Composable
 private fun RepeatGlyph(tint: Color, one: Boolean) {
     val measurer = rememberTextMeasurer()
-    Canvas(modifier = Modifier.size(width = 26.dp, height = 22.dp)) {
+    // Wide and tall enough that the "1" sits in a clear gap between the arms.
+    Canvas(modifier = Modifier.size(width = 34.dp, height = 26.dp)) {
         val w = size.width
         val h = size.height
         val stroke = 2.2.dp.toPx()
         val head = 4.5.dp.toPx()
-        val left = w * 0.14f
-        val right = w * 0.86f
-        val top = h * 0.24f
-        val bottom = h * 0.76f
+        val left = w * 0.10f
+        val right = w * 0.90f
+        val top = h * 0.16f
+        val bottom = h * 0.84f
         val r = h * 0.18f
 
         val topArm = Path().apply {
-            moveTo(left, h * 0.58f)
+            moveTo(left, h * 0.55f)
             lineTo(left, top + r)
             quadraticTo(left, top, left + r, top)
             lineTo(right - head * 1.2f, top)
@@ -175,7 +199,7 @@ private fun RepeatGlyph(tint: Color, one: Boolean) {
         )
 
         val bottomArm = Path().apply {
-            moveTo(right, h * 0.42f)
+            moveTo(right, h * 0.45f)
             lineTo(right, bottom - r)
             quadraticTo(right, bottom, right - r, bottom)
             lineTo(left + head * 1.2f, bottom)
@@ -194,7 +218,7 @@ private fun RepeatGlyph(tint: Color, one: Boolean) {
         if (one) {
             val text = measurer.measure(
                 "1",
-                TextStyle(fontSize = 10.sp, fontWeight = FontWeight.Bold, color = tint),
+                TextStyle(fontSize = 12.sp, fontWeight = FontWeight.Bold, color = tint),
             )
             drawText(
                 text,
@@ -214,8 +238,7 @@ private fun SpeedControl(
 ) {
     val tempoNow by rememberUpdatedState(tempo)
     Surface(
-        shape = RoundedCornerShape(50),
-        color = Color.White.copy(alpha = 0.06f),
+        color = Color.Transparent,
         modifier = Modifier.width(SPEED_WIDTH).onboardingTarget(onboarding, "speed"),
     ) {
         Column(

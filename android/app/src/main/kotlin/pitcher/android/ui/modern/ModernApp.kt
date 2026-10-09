@@ -2,6 +2,7 @@ package pitcher.android.ui.modern
 
 import android.content.Intent
 import android.net.Uri
+import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -33,6 +34,12 @@ fun ModernApp(
         val uri = incomingUri ?: return@LaunchedEffect
         vm.import(uri) {}
         onIncomingConsumed()
+    }
+
+    LaunchedEffect(vm.popup) {
+        val text = vm.popup ?: return@LaunchedEffect
+        Toast.makeText(context, text, Toast.LENGTH_SHORT).show()
+        vm.consumePopup()
     }
 
     LaunchedEffect(vm.shareUri) {

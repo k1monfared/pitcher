@@ -6,6 +6,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onRoot
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.takahirom.roborazzi.captureRoboImage
+import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -15,7 +16,14 @@ import pitcher.android.data.Bookmark
 import pitcher.android.data.LoopSection
 import pitcher.android.data.Track
 import pitcher.android.data.Variant
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
+import pitcher.android.ui.modern.FormatDrum
 import pitcher.android.ui.modern.LIBRARY_TOUR
+import pitcher.core.ExportFormat
 import pitcher.android.ui.modern.LibraryContent
 import pitcher.android.ui.modern.OnboardingOverlay
 import pitcher.android.ui.modern.OnboardingTargets
@@ -32,6 +40,13 @@ class ScreenshotTest {
 
     @get:Rule
     val compose = createComposeRule()
+
+    // The studio animates every frame while playing, so the test clock is
+    // driven by hand; otherwise Compose never goes idle.
+    @Before
+    fun pauseClock() {
+        compose.mainClock.autoAdvance = false
+    }
 
     private val track = Track(
         id = 1,
@@ -144,12 +159,34 @@ class ScreenshotTest {
         compose.onRoot().captureRoboImage("build/screenshots/13-modern-library-tour.png")
     }
 
+    @Test
+    @Config(qualifiers = "w411dp-h891dp-xxhdpi")
+    fun modernStudioUnkeptPitch() {
+        compose.setContent {
+            ModernTheme { StudioSample(cents = 250) }
+        }
+        compose.onRoot().captureRoboImage("build/screenshots/14-modern-studio-new-pitch.png")
+    }
+
+    @Test
+    @Config(qualifiers = "w411dp-h891dp-xxhdpi")
+    fun formatKnob() {
+        compose.setContent {
+            ModernTheme {
+                Box(modifier = Modifier.background(Color(0xFF08080B)).padding(24.dp)) {
+                    FormatDrum(selected = ExportFormat.Mp3, onSelect = {})
+                }
+            }
+        }
+        compose.onRoot().captureRoboImage("build/screenshots/15-format-knob.png")
+    }
+
     @Composable
-    private fun StudioSample(onboarding: OnboardingTargets? = null) {
+    private fun StudioSample(onboarding: OnboardingTargets? = null, cents: Int = -600) {
         StudioContent(
             title = "Nava Sol Darya",
             artist = "Tasnife Yad Bad",
-            cents = -600,
+            cents = cents,
             snap = false,
             peaks = peaks,
             positionMs = 48_000,
@@ -161,8 +198,6 @@ class ScreenshotTest {
             playing = true,
             tempo = 1f,
             variants = variants,
-            saving = false,
-            statusMessage = null,
             onCents = {},
             onSnapToggle = {},
             onSeekMs = {},
@@ -180,15 +215,15 @@ class ScreenshotTest {
             onTempo = {},
             onAddBookmark = {},
             onSelectPitch = {},
-            onSavePitch = {},
-            onOpenRender = {},
-            onRenderVariant = {},
+            onKeepPitch = {},
+            onOpenFile = {},
             onRenameVariant = { _, _ -> },
             onShareVariant = {},
             onDeleteVariant = {},
             onOpenLibrary = {},
             onOpenSettings = {},
             follow = true,
+            busyIds = setOf(2L),
             onboarding = onboarding,
         )
     }

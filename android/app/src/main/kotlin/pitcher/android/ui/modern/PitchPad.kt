@@ -66,6 +66,7 @@ fun PitchPad(
     onOpenTuner: () -> Unit,
     modifier: Modifier = Modifier,
     hapticsEnabled: Boolean = true,
+    caption: String? = null,
     onboarding: OnboardingTargets? = null,
 ) {
     val density = LocalDensity.current
@@ -217,6 +218,14 @@ fun PitchPad(
             contentAlignment = Alignment.Center,
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                if (caption != null) {
+                    Text(
+                        caption,
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                    )
+                }
                 Box(
                     modifier = Modifier
                         .onboardingTarget(onboarding, "cents")

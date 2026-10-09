@@ -72,8 +72,7 @@ fun StudioScreen(
         playing = vm.isPlaying,
         tempo = vm.tempo,
         variants = vm.variants,
-        saving = vm.exporting,
-        statusMessage = vm.exportMessage,
+        busyIds = vm.pitchWork.keys.toSet(),
         follow = vm.followPlayhead,
         onFollowChange = { vm.changeFollowPlayhead(it) },
         onCents = { vm.setPitchCents(it) },
@@ -97,17 +96,16 @@ fun StudioScreen(
         onSelectPitch = { variant ->
             if (variant == null) vm.selectOriginal() else vm.selectVariant(variant)
         },
-        onSavePitch = { vm.savePitch() },
-        onOpenRender = onOpenExport,
-        onRenderVariant = { vm.renderVariant(it) },
+        onKeepPitch = { vm.keepPitch() },
+        onOpenFile = onOpenExport,
         onRenameVariant = { v, name -> vm.renameVariant(v, name) },
         onShareVariant = { vm.shareVariant(it) },
         onDeleteVariant = { vm.deleteVariant(it) },
+        onCancelVariant = { vm.cancelPitch(it.id) },
         onOpenLibrary = onOpenLibrary,
         onOpenSettings = onOpenSettings,
         onOpenTuner = onOpenTuner,
         onOpenTimeline = onOpenTimeline,
-        onCancelRender = { vm.cancelExport() },
         hapticsEnabled = vm.hapticsEnabled,
         forceSpeedHud = forceSpeedHud,
         onboarding = onboarding,
@@ -130,8 +128,6 @@ fun StudioContent(
     playing: Boolean,
     tempo: Float,
     variants: List<Variant>,
-    saving: Boolean,
-    statusMessage: String?,
     onCents: (Int) -> Unit,
     onSnapToggle: () -> Unit,
     onSeekMs: (Long) -> Unit,
@@ -149,17 +145,17 @@ fun StudioContent(
     onTempo: (Float) -> Unit,
     onAddBookmark: () -> Unit,
     onSelectPitch: (Variant?) -> Unit,
-    onSavePitch: () -> Unit,
-    onOpenRender: () -> Unit,
-    onRenderVariant: (Variant) -> Unit,
+    onKeepPitch: () -> Unit,
+    onOpenFile: () -> Unit,
     onRenameVariant: (Variant, String) -> Unit,
     onShareVariant: (Variant) -> Unit,
     onDeleteVariant: (Variant) -> Unit,
     onOpenLibrary: () -> Unit,
     onOpenSettings: () -> Unit,
+    busyIds: Set<Long> = emptySet(),
+    onCancelVariant: (Variant) -> Unit = {},
     follow: Boolean = false,
     onFollowChange: (Boolean) -> Unit = {},
-    onCancelRender: () -> Unit = {},
     onCommitLoopEdge: (Long) -> Unit = {},
     onCommitBookmark: (Long) -> Unit = {},
     onOpenTuner: () -> Unit = {},
@@ -200,6 +196,7 @@ fun StudioContent(
                 onCents = onCents,
                 onOpenTuner = onOpenTuner,
                 hapticsEnabled = hapticsEnabled,
+                caption = intervalWords(cents),
                 onboarding = onboarding,
                 modifier = Modifier.weight(1f).fillMaxWidth(),
             )
@@ -209,16 +206,8 @@ fun StudioContent(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(
-                    intervalWords(cents),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f, fill = false),
-                )
+                TextButton(onClick = onAddBookmark) { Text("bookmark") }
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    TextButton(onClick = onAddBookmark) { Text("bookmark") }
                     ToggleChip(
                         label = "follow",
                         on = follow,
@@ -253,6 +242,7 @@ fun StudioContent(
                 onRenameBookmark = onRenameBookmark,
                 onDeleteBookmark = onDeleteBookmark,
                 playing = playing,
+                tempo = tempo,
                 follow = follow,
                 onFollowChange = onFollowChange,
                 onboarding = onboarding,
@@ -277,35 +267,17 @@ fun StudioContent(
                 variants = variants,
                 faderCents = cents,
                 accent = accent,
+                busyIds = busyIds,
                 onSelectPitch = onSelectPitch,
-                onSavePitch = onSavePitch,
-                onOpenRender = onOpenRender,
-                onRenderVariant = onRenderVariant,
+                onKeepPitch = onKeepPitch,
+                onOpenFile = onOpenFile,
                 onRenameVariant = onRenameVariant,
                 onShareVariant = onShareVariant,
                 onDeleteVariant = onDeleteVariant,
-                saving = saving,
+                onCancelVariant = onCancelVariant,
                 onboarding = onboarding,
                 modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
             )
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.Center,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    statusMessage ?: if (saving) "rendering..." else "",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.secondary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f, fill = false),
-                )
-                if (saving) {
-                    TextButton(onClick = onCancelRender) { Text("cancel") }
-                }
-            }
 
             Row(
                 modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
@@ -335,27 +307,17 @@ private fun ToggleChip(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    // No background: on reads as the accent colour and bold, off as muted.
     val interaction = remember { MutableInteractionSource() }
-    Surface(
-        modifier = modifier.clickable(
-            interactionSource = interaction,
-            indication = null,
-            onClick = onClick,
-        ),
-        shape = RoundedCornerShape(50),
-        color = if (on) {
-            MaterialTheme.colorScheme.primary.copy(alpha = 0.30f)
-        } else {
-            Color.White.copy(alpha = 0.06f)
-        },
-    ) {
-        Text(
-            label,
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-            style = MaterialTheme.typography.labelLarge,
-            color = if (on) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    }
+    Text(
+        label,
+        modifier = modifier
+            .clickable(interactionSource = interaction, indication = null, onClick = onClick)
+            .padding(horizontal = 10.dp, vertical = 10.dp),
+        style = MaterialTheme.typography.labelLarge,
+        fontWeight = if (on) FontWeight.Bold else FontWeight.Normal,
+        color = if (on) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+    )
 }
 
 @Composable
@@ -455,6 +417,10 @@ fun intervalWords(cents: Int): String {
     val whole = kotlin.math.round(semis).toInt()
     val dir = if (cents < 0) "down" else "up"
     val name = INTERVALS[whole.coerceIn(0, INTERVALS.size - 1)]
-    val exact = if (kotlin.math.abs(semis - whole) < 0.05) name else "%.2f semitones".format(semis)
-    return "$dir ${if (whole == 0) "a fraction of a semitone" else "a $exact"}"
+    return when {
+        kotlin.math.abs(semis - whole) < 0.05 && whole in 1 until INTERVALS.size ->
+            "$dir ${if (name.first() in "aeiou") "an" else "a"} $name"
+        semis < 1.0 -> "$dir a fraction of a semitone"
+        else -> "$dir %.2f semitones".format(semis)
+    }
 }
