@@ -103,7 +103,8 @@ val MAIN_TOUR: List<OnboardingStep> = listOf(
     OnboardingStep(
         "save",
         "Keep a pitch",
-        "Tap + render to keep the current pitch. Long-press a pitch to rename or share it.",
+        "Tap + save to keep the current pitch. Tap a pitch to hear it, tap it again to " +
+            "save it as a file. Long-press a pitch to rename, share, or delete it.",
     ),
     OnboardingStep(
         "timeline",

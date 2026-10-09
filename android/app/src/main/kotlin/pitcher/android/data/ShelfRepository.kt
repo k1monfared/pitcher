@@ -5,6 +5,7 @@ import android.content.Context
 import android.database.Cursor
 import android.database.sqlite.SQLiteDatabase
 import java.io.File
+import pitcher.core.RenderPlan
 
 class ShelfRepository(
     context: Context,
@@ -148,6 +149,54 @@ class ShelfRepository(
         return db().rawQuery(sql, arrayOf(trackId.toString())).use { c ->
             c.mapAll { readVariant(it) }
         }
+    }
+
+    /** Keeps a pitch on the shelf without rendering a file. */
+    fun addPitch(trackId: Long, cents: Int, name: String? = null): Long {
+        val id = addVariantFull(
+            trackId,
+            VariantSpec(
+                cents = cents,
+                formant = false,
+                engine = "wsola",
+                pitchQuality = "quality",
+                section = null,
+                outputPath = "",
+                outputFormat = null,
+            ),
+        )
+        name?.trim()?.takeIf { it.isNotEmpty() }?.let { renameVariant(id, it) }
+        return id
+    }
+
+    fun addRender(variantId: Long, uri: String, format: String, fileName: String, segments: String): Long {
+        val values = ContentValues().apply {
+            put("variant_id", variantId)
+            put("uri", uri)
+            put("format", format)
+            put("file_name", fileName.trim())
+            put("segments", segments)
+        }
+        return db().insert("renders", null, values)
+    }
+
+    fun listRenders(variantId: Long): List<RenderPlan.Record> {
+        val sql = "SELECT id, uri, format, file_name, segments FROM renders WHERE variant_id = ? ORDER BY id"
+        return db().rawQuery(sql, arrayOf(variantId.toString())).use { c ->
+            c.mapAll {
+                RenderPlan.Record(
+                    id = it.getLong(0),
+                    uri = it.getString(1),
+                    format = it.getString(2),
+                    fileName = it.getString(3),
+                    segments = it.getString(4),
+                )
+            }
+        }
+    }
+
+    fun deleteRender(id: Long) {
+        db().delete("renders", "id = ?", arrayOf(id.toString()))
     }
 
     fun findVariantByCents(trackId: Long, cents: Int): Variant? {
@@ -325,6 +374,7 @@ class ShelfRepository(
         targetHz = c.getDoubleOrNull(14),
         favorite = c.getInt(15) != 0,
         createdAt = c.getString(16),
+        renderCount = c.getInt(17),
     )
 
     private fun readBookmark(c: Cursor) = Bookmark(
@@ -349,7 +399,8 @@ class ShelfRepository(
         const val VARIANT_COLUMNS =
             "id, track_id, name, cents, formant, engine, pitch_quality, section_start, " +
                 "section_end, output_path, output_format, src_note, src_hz, " +
-                "target_note, target_hz, favorite, created_at"
+                "target_note, target_hz, favorite, created_at, " +
+                "(SELECT COUNT(*) FROM renders r WHERE r.variant_id = variants.id)"
         const val LOOP_COLUMNS =
             "id, track_id, start_ms, end_ms, name, enabled, created_at"
     }

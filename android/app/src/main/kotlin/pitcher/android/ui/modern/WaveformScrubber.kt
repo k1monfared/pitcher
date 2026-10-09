@@ -43,8 +43,13 @@ import androidx.compose.ui.input.pointer.PointerId
 import androidx.compose.ui.input.pointer.PointerInputChange
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -52,6 +57,7 @@ import kotlin.math.abs
 import kotlin.math.roundToInt
 import pitcher.android.data.Bookmark
 import pitcher.android.data.LoopSection
+import pitcher.core.ChartLabels
 import pitcher.core.Timeline
 import pitcher.core.WaveView
 
@@ -59,6 +65,9 @@ private val BOOKMARK_GOLD = Color(0xFFFFD166)
 
 /** Touch radius for grabbing a loop edge or a bookmark pin. */
 private val GRAB_RADIUS = 24.dp
+
+/** Where the playhead sits across a zoomed view while following. */
+private const val FOLLOW_ANCHOR = 0.75
 
 /**
  * The song chart. A loop lane on top (drag empty space to make a loop, tap a
@@ -90,9 +99,18 @@ fun WaveformScrubber(
     modifier: Modifier = Modifier,
     onCommitLoopEdge: (Long) -> Unit = {},
     onCommitBookmark: (Long) -> Unit = {},
+    playing: Boolean = false,
+    follow: Boolean = false,
+    onFollowChange: (Boolean) -> Unit = {},
     onboarding: OnboardingTargets? = null,
 ) {
     var view by remember { mutableStateOf<WaveView.Window?>(null) }
+    // Where the finger is while scrubbing the wave. The playhead is drawn here
+    // and playback only moves when the finger lifts.
+    var scrubMs by remember { mutableStateOf<Long?>(null) }
+    val textMeasurer = rememberTextMeasurer()
+    val followNow by rememberUpdatedState(follow)
+    val onFollowChangeNow by rememberUpdatedState(onFollowChange)
     var laneStart by remember { mutableLongStateOf(0L) }
     var laneEnd by remember { mutableLongStateOf(0L) }
     var laneActive by remember { mutableStateOf(false) }
@@ -118,9 +136,19 @@ fun WaveformScrubber(
         view = null
         laneActive = false
         bubbleMs = null
+        scrubMs = null
+    }
+
+    // Following keeps the playhead three quarters across a zoomed view, so a
+    // quarter of the view shows what is coming.
+    LaunchedEffect(positionMs, follow, playing) {
+        val v = view ?: return@LaunchedEffect
+        if (!follow || !playing || scrubMs != null || durationMs <= 0) return@LaunchedEffect
+        WaveView.followAt(v, positionMs.toDouble() / durationMs, FOLLOW_ANCHOR)?.let { view = it }
     }
 
     val span = view ?: WaveView.Window(0.0, 1.0)
+    val shownMs = scrubMs ?: positionMs
     val spanNow by rememberUpdatedState(span)
 
     fun xToMs(x: Float, width: Float): Long {
@@ -236,6 +264,9 @@ fun WaveformScrubber(
                 val h = size.height
                 val barTop = 6f
                 val barH = h - 12f
+                val corner = CornerRadius(2.dp.toPx(), 2.dp.toPx())
+                val edgeW = 3.dp.toPx()
+                val pad = 6.dp.toPx()
                 loops.forEach { loop ->
                     val x0 = msToX(loop.startMs, w)
                     val x1 = msToX(loop.endMs, w)
@@ -245,14 +276,53 @@ fun WaveformScrubber(
                         selected -> accent
                         else -> accent.copy(alpha = 0.55f)
                     }
+                    val barW = (x1 - x0).coerceAtLeast(4f)
                     drawRoundRect(
                         color = color,
                         topLeft = Offset(x0, barTop),
-                        size = Size((x1 - x0).coerceAtLeast(4f), barH),
-                        cornerRadius = CornerRadius(barH / 2f, barH / 2f),
+                        size = Size(barW, barH),
+                        cornerRadius = corner,
                     )
-                    listOf(x0, x1).forEach { x ->
-                        drawCircle(color = color, radius = 9f, center = Offset(x, barTop + barH / 2f))
+                    // Square edge posts mark exactly where the loop starts and ends.
+                    val post = if (loop.enabled) Color.White.copy(alpha = 0.9f) else Color.White.copy(alpha = 0.4f)
+                    drawRect(post, topLeft = Offset(x0, barTop - 3f), size = Size(edgeW, barH + 6f))
+                    drawRect(post, topLeft = Offset(x1 - edgeW, barTop - 3f), size = Size(edgeW, barH + 6f))
+
+                    val name = loop.name?.takeIf { it.isNotBlank() }
+                    if (name != null) {
+                        val style = TextStyle(
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = if (loop.enabled) Color(0xFF06121F) else Color.White.copy(alpha = 0.7f),
+                        )
+                        val available = barW - 2 * pad - 2 * edgeW
+                        val full = textMeasurer.measure(name, style, maxLines = 1)
+                        val minimal = textMeasurer.measure(name.take(1) + "…", style, maxLines = 1)
+                        val fit = ChartLabels.fit(
+                            available,
+                            full.size.width.toFloat(),
+                            minimal.size.width.toFloat(),
+                        )
+                        val layout = when (fit) {
+                            ChartLabels.Fit.FULL -> full
+                            ChartLabels.Fit.ELLIPSIZED -> textMeasurer.measure(
+                                name,
+                                style,
+                                overflow = TextOverflow.Ellipsis,
+                                maxLines = 1,
+                                constraints = Constraints(maxWidth = available.toInt().coerceAtLeast(0)),
+                            )
+                            ChartLabels.Fit.NONE -> null
+                        }
+                        layout?.let {
+                            drawText(
+                                it,
+                                topLeft = Offset(
+                                    x0 + edgeW + pad,
+                                    barTop + (barH - it.size.height) / 2f,
+                                ),
+                            )
+                        }
                     }
                 }
                 if (laneActive) {
@@ -262,7 +332,7 @@ fun WaveformScrubber(
                         color = accent.copy(alpha = 0.4f),
                         topLeft = Offset(x0, barTop),
                         size = Size((x1 - x0).coerceAtLeast(4f), barH),
-                        cornerRadius = CornerRadius(barH / 2f, barH / 2f),
+                        cornerRadius = corner,
                     )
                 }
             }
@@ -356,6 +426,11 @@ fun WaveformScrubber(
                         detectTransformGestures { centroid, pan, zoom, _ ->
                             val w = view ?: WaveView.Window(0.0, 1.0)
                             val s = w.end - w.start
+                            // Panning by hand means the user wants to look
+                            // elsewhere, so stop following the playhead.
+                            if (zoom == 1f && pan.x != 0f && view != null && followNow) {
+                                onFollowChangeNow(false)
+                            }
                             val panFrac = -(pan.x / size.width.toFloat()) * s
                             var next = WaveView.panBy(w, panFrac)
                             if (zoom != 1f) {
@@ -378,15 +453,15 @@ fun WaveformScrubber(
                     .pointerInput(Unit) {
                         detectDragGesturesAfterLongPress(
                             onDragStart = { off ->
-                                bubbleMs = xToMs(off.x, size.width.toFloat())
+                                scrubMs = xToMs(off.x, size.width.toFloat())
                             },
                             onDragEnd = {
-                                bubbleMs?.let { onSeekNow(it) }
-                                bubbleMs = null
+                                scrubMs?.let { onSeekNow(it) }
+                                scrubMs = null
                             },
-                            onDragCancel = { bubbleMs = null },
+                            onDragCancel = { scrubMs = null },
                         ) { change, _ ->
-                            bubbleMs = xToMs(change.position.x, size.width.toFloat())
+                            scrubMs = xToMs(change.position.x, size.width.toFloat())
                             change.consume()
                         }
                     }
@@ -404,7 +479,7 @@ fun WaveformScrubber(
                             while (true) {
                                 val event = awaitPointerEvent()
                                 if (event.changes.size > 1) {
-                                    if (scrubbing) bubbleMs = null
+                                    if (scrubbing) scrubMs = null
                                     return@awaitEachGesture
                                 }
                                 val change = event.changes.firstOrNull { it.id == down.id }
@@ -418,11 +493,11 @@ fun WaveformScrubber(
                                 }
                                 if (scrubbing) {
                                     val ms = xToMs(change.position.x, size.width.toFloat())
-                                    bubbleMs = ms
+                                    scrubMs = ms
                                     change.consume()
                                     if (!change.pressed) {
                                         onSeekNow(ms)
-                                        bubbleMs = null
+                                        scrubMs = null
                                         return@awaitEachGesture
                                     }
                                 }
@@ -450,7 +525,7 @@ fun WaveformScrubber(
                         if (idx >= n) break
                         val x = i * step
                         val barH = (peaks[idx] * mid * 0.9f).coerceAtLeast(1f)
-                        val played = idx.toFloat() / n <= positionMs.toFloat() / durationMs.coerceAtLeast(1)
+                        val played = idx.toFloat() / n <= shownMs.toFloat() / durationMs.coerceAtLeast(1)
                         drawRoundRect(
                             color = if (played) accent.copy(alpha = 0.85f) else Color.White.copy(alpha = 0.28f),
                             topLeft = Offset(x, mid - barH),
@@ -460,16 +535,56 @@ fun WaveformScrubber(
                     }
                 }
 
+                // Bookmark names read bottom to top beside their line, so they
+                // label the wave without crowding the strips above it.
+                val nameStyle = TextStyle(fontSize = 10.sp, fontWeight = FontWeight.Medium, color = BOOKMARK_GOLD)
+                bookmarks.forEach { b ->
+                    val x = msToX((b.t * 1000).toLong(), w)
+                    if (x < 0f || x > w) return@forEach
+                    drawLine(
+                        color = BOOKMARK_GOLD.copy(alpha = 0.35f),
+                        start = Offset(x, 0f),
+                        end = Offset(x, h),
+                        strokeWidth = 1.dp.toPx(),
+                    )
+                    val name = b.name?.takeIf { it.isNotBlank() } ?: return@forEach
+                    val layout = textMeasurer.measure(
+                        name,
+                        nameStyle,
+                        overflow = TextOverflow.Ellipsis,
+                        maxLines = 1,
+                        constraints = Constraints(maxWidth = (h - 8.dp.toPx()).toInt().coerceAtLeast(0)),
+                    )
+                    val pivot = Offset(x + 2.dp.toPx(), h - 4.dp.toPx())
+                    rotate(-90f, pivot) { drawText(layout, topLeft = pivot) }
+                }
+
                 if (durationMs > 0) {
-                    val pf = positionMs.toFloat() / durationMs
+                    val pf = shownMs.toFloat() / durationMs
                     if (pf >= span.start && pf <= span.end) {
-                        val px = msToX(positionMs, w)
+                        val px = msToX(shownMs, w)
                         drawLine(
                             color = Color.White.copy(alpha = 0.9f),
                             start = Offset(px, 2f),
                             end = Offset(px, h - 6f),
                             strokeWidth = 3f,
                         )
+                        val label = textMeasurer.measure(
+                            formatTime(shownMs),
+                            TextStyle(fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = Color.White),
+                        )
+                        val padX = 4.dp.toPx()
+                        val boxW = label.size.width + 2 * padX
+                        val boxH = label.size.height.toFloat()
+                        val boxX = ChartLabels.sideLabelX(px, boxW, w, gap = 3.dp.toPx())
+                        val boxY = h - boxH - 4.dp.toPx()
+                        drawRoundRect(
+                            color = Color(0xCC08080B),
+                            topLeft = Offset(boxX, boxY),
+                            size = Size(boxW, boxH),
+                            cornerRadius = CornerRadius(4.dp.toPx(), 4.dp.toPx()),
+                        )
+                        drawText(label, topLeft = Offset(boxX + padX, boxY))
                     }
                 }
             }

@@ -7,12 +7,15 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -20,6 +23,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
@@ -42,37 +46,39 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import kotlin.math.roundToInt
 import pitcher.android.media.RenderedStore
-import pitcher.android.data.Variant
 import pitcher.android.ui.PitcherViewModel
+import pitcher.core.ChartLabels
 import pitcher.core.ExportFormat
-import pitcher.core.Notes
+import pitcher.core.RenderPlan
 
+private val FORMAT_PILL_HEIGHT = 34.dp
+private val FORMAT_PILL_GAP = 4.dp
+
+/**
+ * Saves the current pitch as a file. The file name follows the pitch until it
+ * is edited. `Save file` turns into `Saved` once a file with this name, format,
+ * and loop set exists, and only comes back when one of those changes. `Share`
+ * shares that file, rendering only if there is none. The two buttons keep
+ * their place while rendering: they read `Saving...` and `Cancel`.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ExportSheet(vm: PitcherViewModel, onDismiss: () -> Unit, onOpenTimeline: () -> Unit = {}) {
     val context = LocalContext.current
-    val ext = vm.exportFormat.extension
     val track = vm.current
-    val initialBase = remember(track?.id) {
-        if (track == null) {
-            ""
-        } else {
-            Notes.downloadFilename(
-                track.title,
-                track.artist,
-                track.sourcePath,
-                null,
-                vm.faderCents,
-                ext,
-            ).removeSuffix(".$ext")
-        }
+    val format = vm.exportFormat
+    val defaultBase = vm.defaultFileBase()
+    var typed by remember(track?.id) { mutableStateOf<String?>(null) }
+    val fileBase = typed ?: defaultBase
+    var match by remember { mutableStateOf<RenderPlan.Record?>(null) }
+    var confirmCancel by remember { mutableStateOf(false) }
+
+    LaunchedEffect(fileBase, format, vm.exportLoopOnly, vm.loops, vm.faderCents, vm.rendersVersion) {
+        match = vm.matchingRender(fileBase)
     }
-    var baseName by remember(track?.id) { mutableStateOf(initialBase) }
-    var renamingPitch by remember { mutableStateOf<Variant?>(null) }
 
     val folderPicker = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocumentTree(),
@@ -97,48 +103,51 @@ fun ExportSheet(vm: PitcherViewModel, onDismiss: () -> Unit, onOpenTimeline: () 
                 .padding(bottom = 32.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Text("Render", style = MaterialTheme.typography.headlineSmall)
-
-            val selectedVariant = vm.selectedVariant
-            if (selectedVariant != null) {
-                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    TextButton(onClick = { renamingPitch = selectedVariant }) { Text("rename pitch") }
-                    TextButton(onClick = { vm.deleteVariant(selectedVariant) }) { Text("delete pitch") }
-                }
+            val pitch = vm.selectedVariant
+            val cents = vm.faderCents
+            val centsText = if (cents >= 0) "+${cents}c" else "${cents}c"
+            Column {
+                Text("Save as a file", style = MaterialTheme.typography.headlineSmall)
+                Text(
+                    listOfNotNull(pitch?.name?.takeIf { it.isNotBlank() }, centsText).joinToString(" · "),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
 
             val folder = vm.effectiveFolder()
-            val songFolder = track?.saveFolder
-            Text(
-                "Save to ${RenderedStore.folderLabel(folder)}" + if (folder == null) " (default)" else "",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.clickable { folderPicker.launch(null) },
-            )
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    "Tap the address to change the folder for this song. Set a default in Settings.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.weight(1f),
+                    "Folder: ${RenderedStore.folderLabel(folder)}" + if (folder == null) " (default)" else "",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f).clickable { folderPicker.launch(null) },
                 )
-                if (songFolder != null) {
+                if (track?.saveFolder != null) {
                     TextButton(onClick = { vm.setSongFolder(null) }) { Text("use default") }
+                } else {
+                    TextButton(onClick = { folderPicker.launch(null) }) { Text("change") }
                 }
             }
 
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(verticalAlignment = Alignment.Top) {
                 OutlinedTextField(
-                    value = baseName,
-                    onValueChange = { baseName = it },
+                    value = fileBase,
+                    onValueChange = { typed = it },
                     label = { Text("File name") },
-                    singleLine = true,
+                    suffix = { Text(".${format.extension}") },
                     modifier = Modifier.weight(1f),
                 )
-                FormatToken(
-                    selected = vm.exportFormat,
+                FormatPills(
+                    selected = format,
                     onSelect = { vm.changeExportFormat(it) },
+                    modifier = Modifier.padding(start = 12.dp, top = 6.dp),
                 )
+            }
+            if (typed != null && typed != defaultBase) {
+                TextButton(onClick = { typed = null }) { Text("use the default name") }
             }
 
             val hasEnabledLoops = vm.loops.any { it.enabled }
@@ -157,47 +166,63 @@ fun ExportSheet(vm: PitcherViewModel, onDismiss: () -> Unit, onOpenTimeline: () 
                         enabled = hasEnabledLoops,
                     )
                     Text(
-                        if (hasEnabledLoops) "Render only the enabled loops" else "No loops to render",
+                        if (hasEnabledLoops) "Only the enabled loops" else "No loops to render",
                         style = MaterialTheme.typography.bodyMedium,
                     )
                 }
                 TextButton(onClick = onOpenTimeline) { Text("edit loops") }
             }
 
-            var confirmCancel by remember { mutableStateOf(false) }
-            if (vm.exporting) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    Button(
-                        onClick = {},
-                        enabled = false,
-                        modifier = Modifier.weight(2f),
-                    ) {
-                        Text("Rendering...")
-                    }
-                    OutlinedButton(
-                        onClick = { confirmCancel = true },
-                        modifier = Modifier.weight(1f),
-                    ) {
-                        Text("Cancel")
-                    }
-                }
-            } else {
+            // One fixed line, so the buttons below never move.
+            val status = when {
+                vm.exporting -> vm.exportMessage ?: "rendering..."
+                match != null -> "Saved in ${RenderedStore.folderLabel(folder)}"
+                else -> vm.exportMessage?.takeIf { it.startsWith("render failed") || it == "cancelled" } ?: ""
+            }
+            Text(
+                status,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.secondary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.fillMaxWidth().height(18.dp),
+            )
+
+            val saving = vm.exporting && vm.renderAction == PitcherViewModel.RenderAction.SAVE
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
                 Button(
-                    onClick = { vm.renderAs(baseName.trim().ifEmpty { null }) },
-                    modifier = Modifier.fillMaxWidth(),
+                    onClick = { vm.saveFile(fileBase) },
+                    enabled = !vm.exporting && match == null && fileBase.isNotBlank(),
+                    modifier = Modifier.weight(1f).height(48.dp),
                 ) {
-                    Text("Save file")
+                    Box(contentAlignment = Alignment.Center) {
+                        if (saving) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                                Text("Saving...")
+                            }
+                        } else {
+                            Text(if (match != null) "Saved" else "Save file")
+                        }
+                    }
                 }
                 OutlinedButton(
-                    onClick = { vm.shareAs(baseName.trim().ifEmpty { null }) },
-                    modifier = Modifier.fillMaxWidth(),
+                    onClick = {
+                        if (vm.exporting) confirmCancel = true else vm.shareFile(fileBase)
+                    },
+                    enabled = vm.exporting || fileBase.isNotBlank(),
+                    modifier = Modifier.weight(1f).height(48.dp),
                 ) {
-                    Text("Share")
+                    Text(if (vm.exporting) "Cancel" else "Share")
                 }
             }
+
             if (confirmCancel) {
                 AlertDialog(
                     onDismissRequest = { confirmCancel = false },
@@ -214,106 +239,70 @@ fun ExportSheet(vm: PitcherViewModel, onDismiss: () -> Unit, onOpenTimeline: () 
                     },
                 )
             }
-            vm.exportMessage?.let {
-                Text(
-                    it,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.secondary,
-                    maxLines = 1,
-                )
-            }
         }
-    }
-
-    renamingPitch?.let { variant ->
-        var text by remember(variant.id) { mutableStateOf(variant.name ?: "") }
-        AlertDialog(
-            onDismissRequest = { renamingPitch = null },
-            title = { Text("Name this pitch") },
-            text = {
-                OutlinedTextField(
-                    value = text,
-                    onValueChange = { text = it },
-                    singleLine = true,
-                    label = { Text("Name") },
-                )
-            },
-            confirmButton = {
-                TextButton(onClick = {
-                    vm.renameVariant(variant, text)
-                    renamingPitch = null
-                }) { Text("Save") }
-            },
-            dismissButton = {
-                TextButton(onClick = { renamingPitch = null }) { Text("Cancel") }
-            },
-        )
     }
 }
 
+/**
+ * Every format as its own pill in a column. Tap a pill, or press and slide:
+ * the choice follows the finger one pill at a time, like the speed control.
+ */
 @Composable
-private fun FormatToken(selected: ExportFormat, onSelect: (ExportFormat) -> Unit) {
+private fun FormatPills(
+    selected: ExportFormat,
+    onSelect: (ExportFormat) -> Unit,
+    modifier: Modifier = Modifier,
+) {
     val entries = ExportFormat.entries
-    val index = entries.indexOf(selected).coerceAtLeast(0)
     val current by rememberUpdatedState(selected)
-    Surface(
-        shape = RoundedCornerShape(12.dp),
-        color = Color.White.copy(alpha = 0.06f),
-        modifier = Modifier
-            .padding(start = 8.dp)
-            .pointerInput(entries) {
-                val stepPx = 28f * density
-                awaitEachGesture {
-                    val down = awaitFirstDown()
-                    var emitted = entries.indexOf(current)
-                    var accum = 0f
-                    var lastY = down.position.y
-                    while (true) {
-                        val event = awaitPointerEvent()
-                        val change = event.changes.firstOrNull { it.id == down.id } ?: break
-                        accum += change.position.y - lastY
-                        lastY = change.position.y
-                        while (accum >= stepPx) {
-                            accum -= stepPx
-                            emitted = (emitted + 1).coerceAtMost(entries.lastIndex)
-                            onSelect(entries[emitted])
+    val onSelectNow by rememberUpdatedState(onSelect)
+    Column(
+        verticalArrangement = Arrangement.spacedBy(FORMAT_PILL_GAP),
+        modifier = modifier.pointerInput(Unit) {
+            val stepPx = (FORMAT_PILL_HEIGHT + FORMAT_PILL_GAP).toPx()
+            awaitEachGesture {
+                val down = awaitFirstDown()
+                val startIndex = entries.indexOf(current)
+                var moved = false
+                var picked = startIndex
+                while (true) {
+                    val event = awaitPointerEvent()
+                    val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                    val dy = change.position.y - down.position.y
+                    if (!moved && kotlin.math.abs(dy) > viewConfiguration.touchSlop) moved = true
+                    if (moved) {
+                        val idx = ChartLabels.slideIndex(startIndex, dy, stepPx, entries.size)
+                        if (idx != picked) {
+                            picked = idx
+                            onSelectNow(entries[idx])
                         }
-                        while (accum <= -stepPx) {
-                            accum += stepPx
-                            emitted = (emitted - 1).coerceAtLeast(0)
-                            onSelect(entries[emitted])
-                        }
-                        change.consume()
-                        if (!change.pressed) break
                     }
+                    change.consume()
+                    if (!change.pressed) break
                 }
-            },
+                if (!moved) {
+                    val idx = (down.position.y / stepPx).toInt().coerceIn(0, entries.lastIndex)
+                    onSelectNow(entries[idx])
+                }
+            }
+        },
     ) {
-        Column(
-            modifier = Modifier.width(72.dp).padding(vertical = 6.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            val previous = entries.getOrNull(index - 1)
-            val next = entries.getOrNull(index + 1)
-            Text(
-                previous?.id ?: " ",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f),
-                maxLines = 1,
-            )
-            Text(
-                selected.id,
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary,
-                maxLines = 1,
-            )
-            Text(
-                next?.id ?: " ",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f),
-                maxLines = 1,
-            )
+        entries.forEach { f ->
+            val on = f == selected
+            Surface(
+                shape = RoundedCornerShape(50),
+                color = if (on) MaterialTheme.colorScheme.primary else Color.White.copy(alpha = 0.06f),
+                modifier = Modifier.width(72.dp).height(FORMAT_PILL_HEIGHT),
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Text(
+                        f.extension,
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = if (on) FontWeight.Bold else FontWeight.Normal,
+                        color = if (on) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
         }
     }
 }

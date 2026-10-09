@@ -82,6 +82,25 @@ internal class ShelfDb(
         db.execSQL("CREATE INDEX idx_variants_track ON variants(track_id)")
         db.execSQL("CREATE INDEX idx_bookmarks_track ON bookmarks(track_id)")
         db.execSQL("CREATE INDEX idx_loops_track ON loops(track_id)")
+        createRenders(db)
+    }
+
+    /** Rendered files of a saved pitch: one row per saved name, format, and loop set. */
+    private fun createRenders(db: SQLiteDatabase) {
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS renders (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                variant_id INTEGER NOT NULL REFERENCES variants(id) ON DELETE CASCADE,
+                uri TEXT NOT NULL,
+                format TEXT NOT NULL,
+                file_name TEXT NOT NULL,
+                segments TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL DEFAULT (datetime('now'))
+            )
+            """.trimIndent(),
+        )
+        db.execSQL("CREATE INDEX IF NOT EXISTS idx_renders_variant ON renders(variant_id)")
     }
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
@@ -104,9 +123,25 @@ internal class ShelfDb(
             )
             db.execSQL("CREATE INDEX IF NOT EXISTS idx_loops_track ON loops(track_id)")
         }
+        if (oldVersion < 3) {
+            createRenders(db)
+            // Before v3 a pitch held at most one file in output_path. Its file
+            // name was not stored, so the next save with any name renders anew.
+            db.execSQL(
+                """
+                INSERT INTO renders (variant_id, uri, format, file_name, segments)
+                SELECT id, output_path, IFNULL(output_format, ''), '',
+                       CASE WHEN section_start IS NULL THEN ''
+                            ELSE CAST(CAST(section_start * 1000 AS INTEGER) AS TEXT) || '-' ||
+                                 CAST(CAST(section_end * 1000 AS INTEGER) AS TEXT) END
+                FROM variants
+                WHERE output_path LIKE 'content://%' OR output_path LIKE 'file://%'
+                """.trimIndent(),
+            )
+        }
     }
 
     companion object {
-        const val VERSION = 2
+        const val VERSION = 3
     }
 }

@@ -52,6 +52,18 @@ object WaveView {
         return clamp(start, start + span, 1.0)
     }
 
+    /**
+     * Scrolls continuously so the playhead sits at [anchor] of the view (0.75
+     * leaves a quarter of the view ahead of it), clamped to the track.
+     */
+    fun followAt(window: Window?, playFrac: Double, anchor: Double): Window? {
+        if (window == null) return null
+        val span = window.end - window.start
+        if (span >= 1.0) return null
+        val start = playFrac - anchor * span
+        return clamp(start, start + span, 1.0)
+    }
+
     fun fracToTime(window: Window, frac: Double, duration: Double): Double =
         (window.start + frac * (window.end - window.start)) * duration
 

@@ -1,9 +1,9 @@
 package pitcher.android.ui.modern
 
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -72,9 +72,10 @@ fun StudioScreen(
         playing = vm.isPlaying,
         tempo = vm.tempo,
         variants = vm.variants,
-        selectedVariantId = vm.selectedVariantId,
         saving = vm.exporting,
         statusMessage = vm.exportMessage,
+        follow = vm.followPlayhead,
+        onFollowChange = { vm.changeFollowPlayhead(it) },
         onCents = { vm.setPitchCents(it) },
         onSnapToggle = { snap = !snap },
         onSeekMs = { vm.seekTo(it) },
@@ -83,7 +84,6 @@ fun StudioScreen(
         onCommitLoopEdge = { vm.commitLoopEdge(it) },
         onMoveBookmark = { id, ms -> vm.previewBookmark(id, ms / 1000.0) },
         onCommitBookmark = { vm.commitBookmark(it) },
-        onSelectOriginal = { vm.selectOriginal() },
         onSelectLoop = { vm.selectLoop(it) },
         onRenameLoop = { id, name -> vm.renameLoop(id, name) },
         onDeleteLoop = { vm.deleteLoop(it) },
@@ -94,17 +94,16 @@ fun StudioScreen(
         onSkip = { delta -> vm.seekTo(vm.positionMs + delta) },
         onTempo = { vm.changeTempo(it) },
         onAddBookmark = { vm.addBookmark(null) },
-        onOpenPitch = { variant ->
-            if (variant != null) vm.selectVariant(variant)
-            onOpenExport()
+        onSelectPitch = { variant ->
+            if (variant == null) vm.selectOriginal() else vm.selectVariant(variant)
         },
-        onRenderCurrent = { vm.renderAndKeep(null) },
-        onRenderVariant = { vm.renderAndKeepVariant(it) },
+        onSavePitch = { vm.savePitch() },
+        onOpenRender = onOpenExport,
+        onRenderVariant = { vm.renderVariant(it) },
         onRenameVariant = { v, name -> vm.renameVariant(v, name) },
         onShareVariant = { vm.shareVariant(it) },
         onDeleteVariant = { vm.deleteVariant(it) },
         onOpenLibrary = onOpenLibrary,
-        onOpenExport = onOpenExport,
         onOpenSettings = onOpenSettings,
         onOpenTuner = onOpenTuner,
         onOpenTimeline = onOpenTimeline,
@@ -131,7 +130,6 @@ fun StudioContent(
     playing: Boolean,
     tempo: Float,
     variants: List<Variant>,
-    selectedVariantId: Long?,
     saving: Boolean,
     statusMessage: String?,
     onCents: (Int) -> Unit,
@@ -150,19 +148,20 @@ fun StudioContent(
     onSkip: (Long) -> Unit,
     onTempo: (Float) -> Unit,
     onAddBookmark: () -> Unit,
-    onOpenPitch: (Variant?) -> Unit,
-    onRenderCurrent: () -> Unit,
+    onSelectPitch: (Variant?) -> Unit,
+    onSavePitch: () -> Unit,
+    onOpenRender: () -> Unit,
     onRenderVariant: (Variant) -> Unit,
     onRenameVariant: (Variant, String) -> Unit,
     onShareVariant: (Variant) -> Unit,
     onDeleteVariant: (Variant) -> Unit,
     onOpenLibrary: () -> Unit,
-    onOpenExport: () -> Unit,
     onOpenSettings: () -> Unit,
+    follow: Boolean = false,
+    onFollowChange: (Boolean) -> Unit = {},
     onCancelRender: () -> Unit = {},
     onCommitLoopEdge: (Long) -> Unit = {},
     onCommitBookmark: (Long) -> Unit = {},
-    onSelectOriginal: () -> Unit = {},
     onOpenTuner: () -> Unit = {},
     onOpenTimeline: () -> Unit = {},
     hapticsEnabled: Boolean = true,
@@ -214,12 +213,20 @@ fun StudioContent(
                     intervalWords(cents),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false),
                 )
-                Row {
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     TextButton(onClick = onAddBookmark) { Text("bookmark") }
-                    SnapChip(
+                    ToggleChip(
+                        label = "follow",
+                        on = follow,
+                        onClick = { onFollowChange(!follow) },
+                    )
+                    ToggleChip(
+                        label = "snap",
                         on = snap,
-                        accent = accent,
                         onClick = onSnapToggle,
                         modifier = Modifier.onboardingTarget(onboarding, "snap"),
                     )
@@ -245,6 +252,9 @@ fun StudioContent(
                 onDeleteLoop = onDeleteLoop,
                 onRenameBookmark = onRenameBookmark,
                 onDeleteBookmark = onDeleteBookmark,
+                playing = playing,
+                follow = follow,
+                onFollowChange = onFollowChange,
                 onboarding = onboarding,
                 modifier = Modifier.fillMaxWidth(),
             )
@@ -265,12 +275,11 @@ fun StudioContent(
 
             PitchShelf(
                 variants = variants,
-                selectedVariantId = selectedVariantId,
                 faderCents = cents,
                 accent = accent,
-                onOpenPitch = onOpenPitch,
-                onSelectOriginal = onSelectOriginal,
-                onRenderCurrent = onRenderCurrent,
+                onSelectPitch = onSelectPitch,
+                onSavePitch = onSavePitch,
+                onOpenRender = onOpenRender,
                 onRenderVariant = onRenderVariant,
                 onRenameVariant = onRenameVariant,
                 onShareVariant = onShareVariant,
@@ -280,23 +289,21 @@ fun StudioContent(
                 modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
             )
 
-            if (statusMessage != null || saving) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.Center,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        statusMessage ?: "rendering...",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.secondary,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f, fill = false),
-                    )
-                    if (saving) {
-                        TextButton(onClick = onCancelRender) { Text("cancel") }
-                    }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    statusMessage ?: if (saving) "rendering..." else "",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.secondary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false),
+                )
+                if (saving) {
+                    TextButton(onClick = onCancelRender) { Text("cancel") }
                 }
             }
 
@@ -322,13 +329,13 @@ fun StudioContent(
 }
 
 @Composable
-private fun SnapChip(
+private fun ToggleChip(
+    label: String,
     on: Boolean,
-    accent: Color,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val interaction = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+    val interaction = remember { MutableInteractionSource() }
     Surface(
         modifier = modifier.clickable(
             interactionSource = interaction,
@@ -343,8 +350,8 @@ private fun SnapChip(
         },
     ) {
         Text(
-            "snap",
-            modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+            label,
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
             style = MaterialTheme.typography.labelLarge,
             color = if (on) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -395,7 +402,7 @@ private fun StudioTopBar(
 private fun GearButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
     Surface(
         modifier = modifier.clickable(onClick = onClick),
-        shape = androidx.compose.foundation.shape.CircleShape,
+        shape = CircleShape,
         color = Color.White.copy(alpha = 0.06f),
     ) {
         androidx.compose.foundation.Canvas(modifier = Modifier.padding(9.dp).size(20.dp)) {

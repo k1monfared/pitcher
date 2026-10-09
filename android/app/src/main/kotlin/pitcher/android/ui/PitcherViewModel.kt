@@ -28,7 +28,6 @@ import pitcher.android.data.LoopSection
 import pitcher.android.data.ShelfRepository
 import pitcher.android.data.Track
 import pitcher.android.data.Variant
-import pitcher.android.data.VariantSpec
 import pitcher.android.media.AudioRenderer
 import pitcher.android.media.MediaImporter
 import pitcher.android.media.Notifications
@@ -41,6 +40,7 @@ import pitcher.core.LoopMode
 import pitcher.core.LoopPlayback
 import pitcher.core.Notes
 import pitcher.core.PcmConcat
+import pitcher.core.RenderPlan
 import pitcher.core.Timeline
 import pitcher.core.Tuner
 import pitcher.core.Waveform
@@ -108,6 +108,8 @@ class PitcherViewModel(app: Application) : AndroidViewModel(app) {
         private set
     var hapticsEnabled by mutableStateOf(true)
         private set
+    var followPlayhead by mutableStateOf(true)
+        private set
     var onboardingActive by mutableStateOf(false)
         private set
     var storageImportsBytes by mutableStateOf(0L)
@@ -152,6 +154,7 @@ class PitcherViewModel(app: Application) : AndroidViewModel(app) {
     init {
         keepScreenOn = prefs.getBoolean("keep_screen_on", true)
         hapticsEnabled = prefs.getBoolean("haptics", true)
+        followPlayhead = prefs.getBoolean("follow_playhead", true)
         onboardingActive = !prefs.getBoolean("onboarding_done", false)
         defaultFolder = prefs.getString("default_folder", null)
         refreshTracks()
@@ -423,81 +426,116 @@ class PitcherViewModel(app: Application) : AndroidViewModel(app) {
         return enabled.takeIf { it.isNotEmpty() }?.map { it.startMs to it.endMs }
     }
 
+    /** Which button started the render in flight, so the sheet labels the right one. */
+    var renderAction by mutableStateOf<RenderAction?>(null)
+        private set
+
+    /** Bumps when a render is recorded, so the sheet re-checks what is saved. */
+    var rendersVersion by mutableStateOf(0)
+        private set
+
+    enum class RenderAction { SAVE, SHARE }
+
+    /** Keeps the current pitch on the shelf without rendering. */
+    fun savePitch() {
+        val track = current ?: return
+        if (faderCents == 0 || repo.findVariantByCents(track.id, faderCents) != null) return
+        repo.addPitch(track.id, faderCents)
+        refreshVariants()
+    }
+
+    private fun refreshVariants() {
+        current?.let { variants = repo.listVariants(it.id) }
+    }
+
+    /** The key of the ranges the next render covers: empty for the whole track. */
+    fun currentSegmentsKey(): String = RenderPlan.segmentsKey(renderSegments())
+
+    /** The default file name, without extension, for [cents] and an optional pitch name. */
+    fun defaultFileBase(cents: Int = faderCents, name: String? = selectedVariant?.name): String {
+        val track = current ?: return ""
+        val ext = exportFormat.extension
+        val base = Notes.downloadFilename(track.title, track.artist, track.sourcePath, name, cents, ext)
+            .removeSuffix(".$ext")
+        return if (renderSegments() != null) "$base - loops" else base
+    }
+
     /**
-     * Renders the current pitch into the library folder (Music/pitcher) and
-     * keeps it. Renders are slow, so the file is saved right away and is not
-     * lost if it is never shared.
+     * The saved file that already matches the current pitch, [fileBase], format,
+     * and loop set, if it still exists. A file deleted outside the app is
+     * forgotten here so it can be saved again.
      */
-    fun renderAndKeep(name: String?) {
-        startRender {
-            renderToLibrary(faderCents, label = name)
-            current?.let { variants = repo.listVariants(it.id) }
-            exportMessage = savedMessage()
+    suspend fun matchingRender(fileBase: String): RenderPlan.Record? {
+        val track = current ?: return null
+        val variant = repo.findVariantByCents(track.id, faderCents) ?: return null
+        val match = RenderPlan.reusable(
+            repo.listRenders(variant.id),
+            exportFormat.id,
+            fileBase,
+            currentSegmentsKey(),
+        ) ?: return null
+        val present = withContext(Dispatchers.IO) {
+            RenderedStore.isPresent(getApplication(), match.uri)
+        }
+        if (!present) {
+            repo.deleteRender(match.id)
+            refreshVariants()
+            return null
+        }
+        return match
+    }
+
+    /** Saves the current pitch as [fileBase] unless that exact file is already saved. */
+    fun saveFile(fileBase: String) {
+        startRender(RenderAction.SAVE) {
+            if (matchingRender(fileBase) != null) {
+                exportMessage = "already saved"
+                return@startRender
+            }
+            renderAndRecord(faderCents, fileBase, notify = false)
+            exportMessage = "saved to ${RenderedStore.folderLabel(effectiveFolder())}"
         }
     }
 
-    /** Renders a specific saved pitch into the library. */
-    fun renderAndKeepVariant(variant: Variant) {
-        startRender {
-            renderToLibrary(variant.cents, label = variant.name)
-            current?.let { variants = repo.listVariants(it.id) }
-            exportMessage = savedMessage()
+    /** Shares the saved file for [fileBase], rendering it first only when there is none. */
+    fun shareFile(fileBase: String) {
+        startRender(RenderAction.SHARE) {
+            val uri = matchingRender(fileBase)?.uri ?: renderAndRecord(faderCents, fileBase, notify = false)
+            shareUri = Uri.parse(uri)
+            exportMime = exportFormat.mime
+            exportMessage = "ready to share"
         }
     }
 
-    /** Renders the current pitch using an explicit full file base name. */
-    fun renderAs(baseName: String?) {
-        startRender {
-            renderToLibrary(faderCents, label = null, fileBase = baseName, notify = false)
-            current?.let { variants = repo.listVariants(it.id) }
-            exportMessage = savedMessage()
+    /** Renders a saved pitch with its default name, from the shelf's menu. */
+    fun renderVariant(variant: Variant) {
+        setPitchCents(variant.cents)
+        val base = defaultFileBase(variant.cents, variant.name)
+        startRender(RenderAction.SAVE) {
+            if (matchingRender(base) != null) {
+                exportMessage = "already saved"
+                return@startRender
+            }
+            renderAndRecord(variant.cents, base, notify = true)
+            exportMessage = "saved to ${RenderedStore.folderLabel(effectiveFolder())}"
         }
     }
 
-    /** Renders with an explicit full base name, then shares it. */
-    fun shareAs(baseName: String?) {
-        startRender {
-            val uri = renderToLibrary(faderCents, label = null, fileBase = baseName, notify = false)
-            current?.let { variants = repo.listVariants(it.id) }
-            if (uri != null) {
-                shareUri = Uri.parse(uri)
-                exportMime = exportFormat.mime
-                exportMessage = "ready to share"
-            } else {
-                exportMessage = "render failed"
-            }
-        }
-    }
-
-    private fun savedMessage(): String {
-        val what = if (renderSegments() != null) "loops saved" else "saved"
-        return "$what to ${RenderedStore.folderLabel(effectiveFolder())}"
-    }
-
-    /** Ensures the current pitch is rendered, then opens the share sheet. */
-    fun exportCurrent(name: String?) {
-        startRender {
-            val track = current!!
-            val format = exportFormat
-            val hasLoops = renderSegments() != null
-            val existing = if (hasLoops) {
-                null
-            } else {
-                repo.findVariant(track.id, faderCents, true, null, format.id)
-            }
-            val uri = if (existing != null && RenderedStore.exists(existing.outputPath)) {
-                existing.outputPath
-            } else {
-                renderToLibrary(faderCents, label = name, notify = false)
-            }
-            current?.let { variants = repo.listVariants(it.id) }
-            if (uri != null) {
-                shareUri = Uri.parse(uri)
-                exportMime = format.mime
-                exportMessage = "ready to share"
-            } else {
-                exportMessage = "render failed"
-            }
+    /** Shares a saved pitch's newest file, rendering it with its default name if it has none. */
+    fun shareVariant(variant: Variant) {
+        setPitchCents(variant.cents)
+        val base = defaultFileBase(variant.cents, variant.name)
+        startRender(RenderAction.SHARE) {
+            val newest = repo.listRenders(variant.id)
+                .filter { it.segments == currentSegmentsKey() }
+                .maxByOrNull { it.id }
+                ?.takeIf {
+                    withContext(Dispatchers.IO) { RenderedStore.isPresent(getApplication(), it.uri) }
+                }
+            val uri = newest?.uri ?: renderAndRecord(variant.cents, base, notify = false)
+            shareUri = Uri.parse(uri)
+            exportMime = ExportFormat.parse(newest?.format ?: exportFormat.id)?.mime ?: "audio/*"
+            exportMessage = "ready to share"
         }
     }
 
@@ -506,9 +544,10 @@ class PitcherViewModel(app: Application) : AndroidViewModel(app) {
      * can abort it. Renders are CPU-bound and do not suspend, so the job is
      * cancelled together with the [renderCancelled] flag the renderer polls.
      */
-    private fun startRender(block: suspend () -> Unit) {
+    private fun startRender(action: RenderAction, block: suspend () -> Unit) {
         if (exporting || current == null) return
         exporting = true
+        renderAction = action
         renderCancelled = false
         renderJob = viewModelScope.launch {
             exportMessage = "rendering ${exportFormat.id}..."
@@ -520,6 +559,7 @@ class PitcherViewModel(app: Application) : AndroidViewModel(app) {
                 exportMessage = "render failed: ${reasonOf(e)}"
             } finally {
                 exporting = false
+                renderAction = null
                 renderJob = null
             }
         }
@@ -533,36 +573,20 @@ class PitcherViewModel(app: Application) : AndroidViewModel(app) {
         exportMessage = "cancelling..."
     }
 
-    fun shareVariant(variant: Variant) {
-        if (RenderedStore.exists(variant.outputPath)) {
-            shareUri = Uri.parse(variant.outputPath)
-            exportMime = ExportFormat.parse(variant.outputFormat ?: "")?.mime ?: "audio/*"
-            exportMessage = "ready to share"
-        } else {
-            setPitchCents(variant.cents)
-            exportCurrent(variant.name)
-        }
-    }
-
     /**
-     * Renders and saves a file, returning its URI. [label] is the pitch's name
-     * on the shelf and in the default file name; [fileBase], when given, is the
-     * full file name typed in the render sheet and never renames the pitch.
-     * Whole-track renders keep the shelf's pitch pointing at the new file. Loop
-     * renders are saved as files only, so they never replace a full render.
+     * Renders [cents] to a file named [fileBase], saves it to the song's folder,
+     * keeps the pitch on the shelf, and records the file against it so the same
+     * name, format, and loop set is never rendered twice. Returns the file URI.
      */
-    private suspend fun renderToLibrary(
-        cents: Int,
-        label: String?,
-        fileBase: String? = null,
-        notify: Boolean = true,
-    ): String? {
-        val track = current ?: return null
+    private suspend fun renderAndRecord(cents: Int, fileBase: String, notify: Boolean): String {
+        val track = current ?: error("no song open")
         val format = exportFormat
         val segments = renderSegments()
+        val segmentsKey = RenderPlan.segmentsKey(segments)
         val app = getApplication<Application>()
         val folder = effectiveFolder()
-        return withContext(Dispatchers.IO) {
+        val name = fileBase.trim().ifEmpty { defaultFileBase(cents, null) }
+        val uri = withContext(Dispatchers.IO) {
             val tmpDir = File(app.cacheDir, "renders").apply { mkdirs() }
             val ext = format.extension
             val tmp = File(tmpDir, "render-${System.nanoTime()}.$ext")
@@ -575,52 +599,26 @@ class PitcherViewModel(app: Application) : AndroidViewModel(app) {
                     segments = segments,
                     cancelled = { renderCancelled },
                 )
-                val displayName = if (!fileBase.isNullOrBlank()) {
-                    "${fileBase.trim()}.$ext"
-                } else {
-                    Notes.downloadFilename(
-                        track.title,
-                        track.artist,
-                        track.sourcePath,
-                        label,
-                        cents,
-                        ext,
-                    )
-                }
-                val uri = RenderedStore.save(app, folder, displayName, format.mime, tmp)
+                val displayName = "$name.$ext"
+                val saved = RenderedStore.save(app, folder, displayName, format.mime, tmp)
                 if (notify) {
                     Notifications.saved(
                         app,
                         (System.nanoTime() and 0x7FFFFFFF).toInt(),
                         "Saved $displayName",
-                        RenderedStore.openIntent(app, uri, folder),
+                        RenderedStore.openIntent(app, saved, folder),
                     )
                 }
-                if (segments == null) {
-                    val existing = repo.findVariantByCents(track.id, cents)
-                    if (existing != null) {
-                        repo.updateVariantFile(existing.id, uri, format.id)
-                    } else {
-                        repo.addVariantFull(
-                            track.id,
-                            VariantSpec(
-                                cents = cents,
-                                formant = false,
-                                engine = "wsola",
-                                pitchQuality = "quality",
-                                section = null,
-                                outputPath = uri,
-                                outputFormat = format.id,
-                                targetNote = label?.takeIf { it.isNotBlank() },
-                            ),
-                        )
-                    }
-                }
-                uri
+                saved
             } finally {
                 tmp.delete()
             }
         }
+        val variantId = repo.findVariantByCents(track.id, cents)?.id ?: repo.addPitch(track.id, cents)
+        repo.addRender(variantId, uri, format.id, name, segmentsKey)
+        refreshVariants()
+        rendersVersion++
+        return uri
     }
 
     private fun reasonOf(e: Throwable): String = when (e) {
@@ -640,6 +638,11 @@ class PitcherViewModel(app: Application) : AndroidViewModel(app) {
     fun changeHaptics(value: Boolean) {
         hapticsEnabled = value
         prefs.edit().putBoolean("haptics", value).apply()
+    }
+
+    fun changeFollowPlayhead(value: Boolean) {
+        followPlayhead = value
+        prefs.edit().putBoolean("follow_playhead", value).apply()
     }
 
     /** Reopens the guided tour, e.g. from the settings sheet. */
@@ -789,10 +792,8 @@ class PitcherViewModel(app: Application) : AndroidViewModel(app) {
         current?.let { variants = repo.listVariants(it.id) }
     }
 
+    /** Removes a pitch from the shelf. Files it rendered stay in their folder. */
     fun deleteVariant(variant: Variant) {
-        if (RenderedStore.exists(variant.outputPath)) {
-            RenderedStore.delete(getApplication(), variant.outputPath)
-        }
         repo.deleteVariant(variant.id)
         variants = variants.filterNot { it.id == variant.id }
     }

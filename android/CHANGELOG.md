@@ -2,6 +2,34 @@
 
 ## Unreleased
 
+Saving pitches and files, reworked:
+
+- `+ save` keeps the current pitch on the shelf without rendering. Tapping a
+  pitch plays it, and tapping the playing pitch again opens the render sheet.
+  `render` at the end of the shelf opens it too. Saving a file also keeps its
+  pitch.
+- Pitches remember every file saved from them (name, format, and loop set).
+  `Save file` reads `Saved` until one of those changes, and `Share` shares that
+  file instead of rendering a new one. A file deleted outside the app can be
+  saved again.
+- The render sheet's buttons keep their place: during a render they read
+  `Saving...` and `Cancel`. Formats are separate pills, tapped or slid, and the
+  choice follows the finger. The extension shows at the end of the name.
+- Deleting a pitch keeps the files it rendered.
+
+Chart and transport:
+
+- Scrubbing the wave moves the playhead under the finger and seeks on release.
+- The playhead carries its time at the bottom of the wave, on its right, or on
+  its left near the right edge.
+- `follow` keeps the playhead three quarters across a zoomed view. Panning by
+  hand turns it off.
+- Loop names show inside their bars when at least one letter fits. Bookmark
+  names run up the wave beside their line. Loops have square ends with edge
+  posts.
+- The repeat button is an icon with clear arrows. `play speed` reads `speed`,
+  and the transport buttons have fixed widths.
+
 Usability fixes for the studio.
 
 - Loop edges and bookmark pins can be grabbed at any zoom. The touch radius was

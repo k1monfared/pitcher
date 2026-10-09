@@ -109,6 +109,12 @@ object RenderedStore {
         return path.ifBlank { docId.substringBefore(':') }
     }
 
+    /** Whether a saved file can still be opened; false once deleted outside the app. */
+    fun isPresent(context: Context, uriString: String): Boolean =
+        exists(uriString) && runCatching {
+            context.contentResolver.openFileDescriptor(Uri.parse(uriString), "r")?.use { true } ?: false
+        }.getOrDefault(false)
+
     fun exists(uriString: String): Boolean =
         uriString.startsWith("content://") || uriString.startsWith("file://")
 }

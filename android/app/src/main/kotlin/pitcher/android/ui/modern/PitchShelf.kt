@@ -1,5 +1,6 @@
 package pitcher.android.ui.modern
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
@@ -7,6 +8,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -34,26 +36,35 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import pitcher.android.data.Variant
-import pitcher.android.media.RenderedStore
 
+private fun signed(cents: Int) = if (cents >= 0) "+${cents}c" else "${cents}c"
+
+/**
+ * The pitch shelf: the original, every kept pitch, `+ save` to keep the
+ * current pitch, and `render` to save it as a file. Tapping a pitch plays it;
+ * tapping the pitch that is already playing opens the render sheet. Long-press
+ * a pitch for render, share, rename, and delete. Every card has the same size
+ * so nothing shifts while rendering.
+ */
 @Composable
 fun PitchShelf(
     variants: List<Variant>,
-    selectedVariantId: Long?,
     faderCents: Int,
     accent: Color,
-    onOpenPitch: (Variant?) -> Unit,
-    onRenderCurrent: () -> Unit,
+    onSelectPitch: (Variant?) -> Unit,
+    onSavePitch: () -> Unit,
+    onOpenRender: () -> Unit,
     onRenderVariant: (Variant) -> Unit,
     onRenameVariant: (Variant, String) -> Unit,
     onShareVariant: (Variant) -> Unit,
     onDeleteVariant: (Variant) -> Unit,
     saving: Boolean = false,
     modifier: Modifier = Modifier,
-    onSelectOriginal: () -> Unit = {},
     onboarding: OnboardingTargets? = null,
 ) {
     var renaming by remember { mutableStateOf<Variant?>(null) }
+    val selected = variants.firstOrNull { it.cents == faderCents }
+    val canSave = faderCents != 0 && selected == null
 
     LazyRow(
         modifier = modifier,
@@ -65,29 +76,23 @@ fun PitchShelf(
                 label = "original",
                 sub = "+0c",
                 selected = faderCents == 0,
-                saved = true,
                 accent = accent,
-                onClick = onSelectOriginal,
-                menuItems = emptyList(),
+                onClick = { onSelectPitch(null) },
             )
         }
         items(variants, key = { it.id }) { v ->
+            val isSelected = v.id == selected?.id
             PitchCard(
-                label = v.name?.takeIf { it.isNotBlank() }
-                    ?: (if (v.cents >= 0) "+${v.cents}c" else "${v.cents}c"),
-                sub = if (v.name?.isNotBlank() == true) {
-                    (if (v.cents >= 0) "+${v.cents}c" else "${v.cents}c")
-                } else {
-                    null
-                },
-                selected = v.id == selectedVariantId,
-                saved = RenderedStore.exists(v.outputPath),
+                label = v.name?.takeIf { it.isNotBlank() } ?: signed(v.cents),
+                sub = if (v.name?.isNotBlank() == true) signed(v.cents) else null,
+                badge = if (v.renderCount > 0) "file" else null,
+                selected = isSelected,
                 accent = accent,
-                onClick = { onOpenPitch(v) },
+                onClick = { if (isSelected) onOpenRender() else onSelectPitch(v) },
                 menuItems = listOf(
-                    "+ render" to { onRenderVariant(v) },
-                    "rename" to { renaming = v },
+                    "save file" to { onRenderVariant(v) },
                     "share" to { onShareVariant(v) },
+                    "rename" to { renaming = v },
                     "delete" to { onDeleteVariant(v) },
                 ),
             )
@@ -95,16 +100,25 @@ fun PitchShelf(
         item {
             Box(modifier = Modifier.onboardingTarget(onboarding, "save")) {
                 PitchCard(
-                    label = "+ render",
-                    sub = (if (faderCents >= 0) "+${faderCents}c" else "${faderCents}c"),
+                    label = "+ save",
+                    sub = signed(faderCents),
                     selected = false,
-                    saved = false,
-                    saving = saving,
+                    enabled = canSave,
                     accent = accent,
-                    onClick = { onOpenPitch(null) },
-                    menuItems = listOf("+ render" to onRenderCurrent),
+                    onClick = onSavePitch,
                 )
             }
+        }
+        item {
+            PitchCard(
+                label = "render",
+                sub = signed(faderCents),
+                selected = false,
+                outlined = true,
+                busy = saving,
+                accent = accent,
+                onClick = onOpenRender,
+            )
         }
     }
 
@@ -126,67 +140,76 @@ private fun PitchCard(
     label: String,
     sub: String?,
     selected: Boolean,
-    saved: Boolean,
-    saving: Boolean = false,
     accent: Color,
     onClick: () -> Unit,
-    menuItems: List<Pair<String, () -> Unit>>,
+    badge: String? = null,
+    enabled: Boolean = true,
+    outlined: Boolean = false,
+    busy: Boolean = false,
+    menuItems: List<Pair<String, () -> Unit>> = emptyList(),
 ) {
     var menu by remember { mutableStateOf(false) }
+    val alpha = if (enabled) 1f else 0.38f
 
     Box {
         Surface(
             shape = RoundedCornerShape(16.dp),
-            color = if (selected) accent.copy(alpha = 0.22f) else Color.White.copy(alpha = 0.05f),
+            color = when {
+                selected -> accent.copy(alpha = 0.22f)
+                outlined -> Color.Transparent
+                else -> Color.White.copy(alpha = 0.05f)
+            },
+            border = if (outlined) BorderStroke(1.dp, accent.copy(alpha = 0.6f)) else null,
             modifier = Modifier
                 .width(104.dp)
+                .height(64.dp)
                 .combinedClickable(
+                    enabled = enabled,
                     onClick = onClick,
                     onLongClick = { if (menuItems.isNotEmpty()) menu = true },
                 ),
         ) {
             Column(modifier = Modifier.padding(12.dp)) {
-                if (saving) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    if (busy) {
                         CircularProgressIndicator(
-                            modifier = Modifier.size(14.dp),
+                            modifier = Modifier.size(12.dp),
                             strokeWidth = 2.dp,
                             color = accent,
                         )
-                        Text(
-                            "rendering",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = accent,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
                     }
-                } else {
                     Text(
                         label,
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-                        color = if (selected) accent else MaterialTheme.colorScheme.onSurface,
+                        color = (if (selected || outlined) accent else MaterialTheme.colorScheme.onSurface)
+                            .copy(alpha = alpha),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
-                if (sub != null) {
-                    Text(
-                        sub,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                if (saved) {
-                    Text(
-                        "saved",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.tertiary,
-                    )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    if (sub != null) {
+                        Text(
+                            sub,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = alpha),
+                            maxLines = 1,
+                        )
+                    }
+                    if (badge != null) {
+                        Text(
+                            badge,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.tertiary,
+                        )
+                    }
                 }
             }
         }

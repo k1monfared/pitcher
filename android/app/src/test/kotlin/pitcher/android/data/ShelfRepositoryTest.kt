@@ -104,6 +104,28 @@ class ShelfRepositoryTest {
     }
 
     @Test
+    fun aSavedPitchHasNoFileUntilRendered() {
+        val id = repo.addPitch(trackId, 300)
+        val v = repo.getVariant(id)!!
+        assertEquals(300, v.cents)
+        assertEquals(0, v.renderCount)
+        assertEquals(id, repo.findVariantByCents(trackId, 300)?.id)
+    }
+
+    @Test
+    fun rendersAttachToAPitchAndCascadeWithIt() {
+        val id = repo.addPitch(trackId, -200)
+        repo.addRender(id, "content://a", "m4a", "Song - -200", "")
+        repo.addRender(id, "content://b", "mp3", "Song - -200", "1000-2000")
+        assertEquals(2, repo.getVariant(id)!!.renderCount)
+        val records = repo.listRenders(id)
+        assertEquals(listOf("m4a", "mp3"), records.map { it.format })
+        assertEquals("1000-2000", records.last().segments)
+        repo.deleteVariant(id)
+        assertTrue(repo.listRenders(id).isEmpty())
+    }
+
+    @Test
     fun deletingTrackCascadesLoopsAndBookmarks() {
         repo.addLoop(trackId, 0, 1000)
         repo.addBookmark(trackId, 1.5, null)

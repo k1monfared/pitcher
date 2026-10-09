@@ -29,10 +29,18 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import kotlin.math.abs
 import kotlin.math.roundToInt
 import pitcher.core.LoopMode
@@ -60,23 +68,24 @@ fun TransportBar(
     Row(
         modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceEvenly,
+        horizontalArrangement = Arrangement.SpaceBetween,
     ) {
-        TextButton(onClick = { onSkip(-5000) }) { Text("-5s") }
+        TextButton(onClick = { onSkip(-5000) }, modifier = Modifier.width(SKIP_WIDTH)) { Text("-5s") }
 
-        Surface(shape = CircleShape, color = accent) {
+        Surface(shape = CircleShape, color = accent, modifier = Modifier.width(PLAY_WIDTH)) {
             Text(
                 text = if (playing) "Pause" else "Play",
                 modifier = Modifier
                     .clickable(onClick = onPlayPause)
-                    .padding(horizontal = 24.dp, vertical = 14.dp),
+                    .padding(vertical = 14.dp),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
                 color = Color(0xFF06121F),
+                textAlign = TextAlign.Center,
             )
         }
 
-        TextButton(onClick = { onSkip(5000) }) { Text("+5s") }
+        TextButton(onClick = { onSkip(5000) }, modifier = Modifier.width(SKIP_WIDTH)) { Text("+5s") }
 
         SpeedControl(
             tempo = tempo,
@@ -95,7 +104,12 @@ fun TransportBar(
     }
 }
 
-/** A Spotify-style repeat button: off, all loops, or one loop. */
+private val SKIP_WIDTH = 56.dp
+private val PLAY_WIDTH = 96.dp
+private val SPEED_WIDTH = 72.dp
+private val REPEAT_WIDTH = 56.dp
+
+/** A Spotify-style repeat button, icon only: off, all loops, or one loop. */
 @Composable
 private fun LoopModeButton(
     mode: LoopMode,
@@ -105,59 +119,88 @@ private fun LoopModeButton(
 ) {
     val active = mode != LoopMode.NONE
     val tint = if (active) accent else MaterialTheme.colorScheme.onSurfaceVariant
+    val description = when (mode) {
+        LoopMode.NONE -> "Repeat off"
+        LoopMode.ALL -> "Repeat all loops"
+        LoopMode.ONE -> "Repeat this loop"
+    }
     Surface(
         shape = RoundedCornerShape(50),
         color = if (active) accent.copy(alpha = 0.22f) else Color.White.copy(alpha = 0.06f),
+        modifier = Modifier.width(REPEAT_WIDTH).semantics { contentDescription = description },
     ) {
-        Row(
-            modifier = Modifier.clickable(onClick = onClick).padding(horizontal = 12.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        Box(
+            modifier = Modifier.clickable(onClick = onClick).padding(vertical = 10.dp),
+            contentAlignment = Alignment.Center,
         ) {
-            Box(contentAlignment = Alignment.Center) {
-                RepeatGlyph(tint = tint)
-                if (mode == LoopMode.ONE) {
-                    Text(
-                        "1",
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = tint,
-                    )
-                }
-            }
-            Text(
-                when (mode) {
-                    LoopMode.NONE -> "repeat"
-                    LoopMode.ALL -> "all loops"
-                    LoopMode.ONE -> "this loop"
-                },
-                style = MaterialTheme.typography.labelLarge,
-                color = tint,
-            )
+            RepeatGlyph(tint = tint, one = mode == LoopMode.ONE)
         }
     }
 }
 
+/**
+ * Two arrows chasing each other round a loop: the top runs right, the bottom
+ * runs left, each with a solid head. A small `1` sits in the middle for
+ * "repeat this loop".
+ */
 @Composable
-private fun RepeatGlyph(tint: Color) {
-    Canvas(modifier = Modifier.size(width = 20.dp, height = 14.dp)) {
+private fun RepeatGlyph(tint: Color, one: Boolean) {
+    val measurer = rememberTextMeasurer()
+    Canvas(modifier = Modifier.size(width = 26.dp, height = 22.dp)) {
         val w = size.width
         val h = size.height
-        val stroke = 2f
-        drawRoundRect(
-            color = tint,
-            topLeft = Offset(stroke / 2, stroke / 2),
-            size = Size(w - stroke, h - stroke),
-            cornerRadius = CornerRadius(4f, 4f),
-            style = Stroke(width = stroke),
-        )
-        val path = Path().apply {
-            moveTo(w * 0.55f, 0f)
-            lineTo(w * 0.55f, 6f)
-            lineTo(w * 0.80f, 3f)
-            close()
+        val stroke = 2.2.dp.toPx()
+        val head = 4.5.dp.toPx()
+        val left = w * 0.14f
+        val right = w * 0.86f
+        val top = h * 0.24f
+        val bottom = h * 0.76f
+        val r = h * 0.18f
+
+        val topArm = Path().apply {
+            moveTo(left, h * 0.58f)
+            lineTo(left, top + r)
+            quadraticTo(left, top, left + r, top)
+            lineTo(right - head * 1.2f, top)
         }
-        drawPath(path, color = tint)
+        drawPath(topArm, tint, style = Stroke(width = stroke, cap = StrokeCap.Round))
+        drawPath(
+            Path().apply {
+                moveTo(right, top)
+                lineTo(right - head * 1.6f, top - head)
+                lineTo(right - head * 1.6f, top + head)
+                close()
+            },
+            tint,
+        )
+
+        val bottomArm = Path().apply {
+            moveTo(right, h * 0.42f)
+            lineTo(right, bottom - r)
+            quadraticTo(right, bottom, right - r, bottom)
+            lineTo(left + head * 1.2f, bottom)
+        }
+        drawPath(bottomArm, tint, style = Stroke(width = stroke, cap = StrokeCap.Round))
+        drawPath(
+            Path().apply {
+                moveTo(left, bottom)
+                lineTo(left + head * 1.6f, bottom - head)
+                lineTo(left + head * 1.6f, bottom + head)
+                close()
+            },
+            tint,
+        )
+
+        if (one) {
+            val text = measurer.measure(
+                "1",
+                TextStyle(fontSize = 10.sp, fontWeight = FontWeight.Bold, color = tint),
+            )
+            drawText(
+                text,
+                topLeft = Offset((w - text.size.width) / 2f, (h - text.size.height) / 2f),
+            )
+        }
     }
 }
 
@@ -173,7 +216,7 @@ private fun SpeedControl(
     Surface(
         shape = RoundedCornerShape(50),
         color = Color.White.copy(alpha = 0.06f),
-        modifier = Modifier.onboardingTarget(onboarding, "speed"),
+        modifier = Modifier.width(SPEED_WIDTH).onboardingTarget(onboarding, "speed"),
     ) {
         Column(
             modifier = Modifier
@@ -210,11 +253,11 @@ private fun SpeedControl(
                         }
                     }
                 }
-                .padding(horizontal = 12.dp, vertical = 8.dp),
+                .padding(vertical = 8.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Text(
-                "play speed",
+                "speed",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

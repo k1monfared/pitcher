@@ -34,6 +34,7 @@ data class Variant(
     val targetHz: Double?,
     val favorite: Boolean,
     val createdAt: String,
+    val renderCount: Int = 0,
 )
 
 data class VariantSpec(
