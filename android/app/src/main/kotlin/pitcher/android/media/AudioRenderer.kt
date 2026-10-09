@@ -5,20 +5,45 @@ import kotlin.coroutines.cancellation.CancellationException
 import pitcher.core.ExportFormat
 import pitcher.core.Mp3Writer
 import pitcher.core.PcmConcat
-import pitcher.core.PitchShifter
+import pitcher.core.WavStream
 import pitcher.core.WavWriter
 
 /**
  * Renders a pitch-shifted file in the requested format. Decodes PCM for a time
- * range (or a list of loop ranges), shifts each channel with the core WSOLA
- * shifter, then encodes. Multiple ranges are concatenated with hard cuts at the
- * PCM level. Falls back to mono (and reports) if memory runs out. A whole-track
- * zero-cent request in the same format is a straight copy of the original.
+ * range (or a list of loop ranges), shifts it with Sonic (the engine live
+ * playback uses), then encodes. Multiple ranges are concatenated with hard cuts
+ * at the PCM level. Falls back to mono (and reports) if memory runs out. A
+ * whole-track request with no change in the same format is a straight copy.
  *
  * [cancelled] is polled during decoding and shifting so a long render can be
  * aborted; when it fires a [CancellationException] is thrown.
  */
 object AudioRenderer {
+
+    /**
+     * Renders a whole song at [cents] to a WAV, streaming from the decoder
+     * through Sonic to the file, so memory use stays flat for any length.
+     */
+    fun prepare(sourcePath: String, target: File, cents: Int, cancelled: () -> Boolean = { false }) {
+        var writer: WavStream? = null
+        var shifter: SonicShifter.Stream? = null
+        try {
+            val ok = PcmDecoder.stream(sourcePath, cancelled) { samples, count, channels, sampleRate ->
+                if (shifter == null) {
+                    shifter = SonicShifter.Stream(sampleRate, channels, cents, speed = 1.0)
+                    writer = WavStream(target, sampleRate, channels)
+                }
+                val w = writer!!
+                shifter!!.feed(samples, count) { s, n -> w.write(s, n) }
+            }
+            if (!ok) error("cannot decode audio")
+            if (cancelled()) throw CancellationException("cancelled")
+            val w = writer ?: error("cannot decode audio")
+            shifter?.finish { s, n -> w.write(s, n) }
+        } finally {
+            writer?.close()
+        }
+    }
 
     fun render(
         sourcePath: String,
@@ -114,12 +139,8 @@ object AudioRenderer {
         speed: Double,
         cancelled: () -> Boolean,
     ): Array<FloatArray> {
-        val channels = decoded.channels
-        return Array(channels.size) { c ->
-            val out = PitchShifter.shift(channels[c], decoded.sampleRate, cents, speed, cancelled)
-            channels[c] = FloatArray(0)
-            out
-        }
+        if (cancelled()) throw CancellationException("cancelled")
+        return SonicShifter.process(decoded.channels, decoded.sampleRate, cents, speed)
     }
 
     private fun writeFormat(target: File, format: ExportFormat, channels: Array<FloatArray>, sampleRate: Int) {

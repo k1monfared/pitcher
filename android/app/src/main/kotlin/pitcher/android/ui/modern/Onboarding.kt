@@ -86,6 +86,12 @@ val MAIN_TOUR: List<OnboardingStep> = listOf(
         "Turn snap on to land on a grid.",
     ),
     OnboardingStep(
+        "tuner",
+        "Find the key",
+        "Detect the note at the playhead or a bookmark, or type one, pick the note you " +
+            "want, and apply the interval to the pitch in one tap.",
+    ),
+    OnboardingStep(
         "wave",
         "Move around the song",
         "Tap to jump, drag to pan, and pinch to zoom.",

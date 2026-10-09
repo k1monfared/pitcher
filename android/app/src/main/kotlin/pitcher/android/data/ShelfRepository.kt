@@ -158,7 +158,7 @@ class ShelfRepository(
             VariantSpec(
                 cents = cents,
                 formant = false,
-                engine = "wsola",
+                engine = "sonic",
                 pitchQuality = "quality",
                 section = null,
                 outputPath = "",

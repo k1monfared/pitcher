@@ -155,6 +155,108 @@ object PcmDecoder {
         }
     }
 
+    /**
+     * Decodes the whole audio track chunk by chunk, handing each chunk to
+     * [onChunk] as interleaved 16-bit samples (count, channels, sample rate).
+     * At most two channels are kept. Nothing is held beyond one chunk.
+     * Returns false if the file has no decodable audio.
+     */
+    fun stream(
+        path: String,
+        cancelled: () -> Boolean = { false },
+        onChunk: (samples: ShortArray, count: Int, channels: Int, sampleRate: Int) -> Unit,
+    ): Boolean {
+        val extractor = MediaExtractor()
+        var codec: MediaCodec? = null
+        try {
+            extractor.setDataSource(path)
+            val trackIndex = firstAudioTrack(extractor) ?: return false
+            extractor.selectTrack(trackIndex)
+            val inputFormat = extractor.getTrackFormat(trackIndex)
+            val mime = inputFormat.getString(MediaFormat.KEY_MIME) ?: return false
+            var sampleRate = if (inputFormat.containsKey(MediaFormat.KEY_SAMPLE_RATE)) {
+                inputFormat.getInteger(MediaFormat.KEY_SAMPLE_RATE)
+            } else {
+                44100
+            }
+            var channels = if (inputFormat.containsKey(MediaFormat.KEY_CHANNEL_COUNT)) {
+                inputFormat.getInteger(MediaFormat.KEY_CHANNEL_COUNT)
+            } else {
+                2
+            }
+            codec = MediaCodec.createDecoderByType(mime)
+            codec.configure(inputFormat, null, null, 0)
+            codec.start()
+
+            val info = MediaCodec.BufferInfo()
+            var inputDone = false
+            var outputDone = false
+            var shorts = ShortArray(0)
+            var out = ShortArray(0)
+            var produced = false
+            while (!outputDone) {
+                if (cancelled()) throw CancellationException("cancelled")
+                if (!inputDone) {
+                    val inIndex = codec.dequeueInputBuffer(10_000)
+                    if (inIndex >= 0) {
+                        val buffer = codec.getInputBuffer(inIndex)!!
+                        val size = extractor.readSampleData(buffer, 0)
+                        if (size < 0) {
+                            codec.queueInputBuffer(inIndex, 0, 0, 0, MediaCodec.BUFFER_FLAG_END_OF_STREAM)
+                            inputDone = true
+                        } else {
+                            codec.queueInputBuffer(inIndex, 0, size, extractor.sampleTime, 0)
+                            extractor.advance()
+                        }
+                    }
+                }
+                val outIndex = codec.dequeueOutputBuffer(info, 10_000)
+                when {
+                    outIndex == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED -> {
+                        val fmt = codec.outputFormat
+                        if (fmt.containsKey(MediaFormat.KEY_CHANNEL_COUNT)) {
+                            channels = fmt.getInteger(MediaFormat.KEY_CHANNEL_COUNT)
+                        }
+                        if (fmt.containsKey(MediaFormat.KEY_SAMPLE_RATE)) {
+                            sampleRate = fmt.getInteger(MediaFormat.KEY_SAMPLE_RATE)
+                        }
+                    }
+                    outIndex >= 0 -> {
+                        val buffer = codec.getOutputBuffer(outIndex)!!
+                        if (info.size > 0) {
+                            buffer.position(info.offset)
+                            buffer.limit(info.offset + info.size)
+                            buffer.order(ByteOrder.LITTLE_ENDIAN)
+                            val ch = channels.coerceAtLeast(1)
+                            val outCh = ch.coerceAtMost(2)
+                            val count = buffer.remaining() / 2
+                            if (shorts.size < count) shorts = ShortArray(count)
+                            buffer.asShortBuffer().get(shorts, 0, count)
+                            val frames = count / ch
+                            if (out.size < frames * outCh) out = ShortArray(frames * outCh)
+                            for (f in 0 until frames) {
+                                for (c in 0 until outCh) out[f * outCh + c] = shorts[f * ch + c]
+                            }
+                            onChunk(out, frames * outCh, outCh, sampleRate)
+                            produced = true
+                        }
+                        codec.releaseOutputBuffer(outIndex, false)
+                        if (info.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM != 0) outputDone = true
+                    }
+                }
+            }
+            return produced
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            return false
+        } finally {
+            runCatching { codec?.stop() }
+            runCatching { codec?.release() }
+            runCatching { extractor.release() }
+        }
+    }
+
     fun decodeMono(path: String, startMs: Long = 0L, endMs: Long = -1L): WindowedAudio? {
         val decoded = decodeChannels(path, startMs, endMs, maxChannels = 1) ?: return null
         return WindowedAudio(decoded.channels[0], decoded.sampleRate)

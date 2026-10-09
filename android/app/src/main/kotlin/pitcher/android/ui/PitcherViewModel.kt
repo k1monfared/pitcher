@@ -518,13 +518,7 @@ class PitcherViewModel(app: Application) : AndroidViewModel(app) {
                 withContext(renderDispatcher) {
                     val part = File(file.path + ".part")
                     try {
-                        AudioRenderer.render(
-                            sourcePath = track.sourcePath,
-                            target = part,
-                            format = ExportFormat.Wav,
-                            cents = cents,
-                            cancelled = { flag.get() },
-                        )
+                        AudioRenderer.prepare(track.sourcePath, part, cents) { flag.get() }
                         if (!part.renameTo(file)) error("could not keep the rendered pitch")
                     } finally {
                         part.delete()

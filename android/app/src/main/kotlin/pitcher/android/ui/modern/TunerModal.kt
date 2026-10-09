@@ -23,6 +23,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import kotlin.math.roundToInt
 import pitcher.android.data.Bookmark
 import pitcher.android.ui.PitcherViewModel
 
@@ -76,7 +77,7 @@ fun TunerModal(vm: PitcherViewModel, onDismiss: () -> Unit) {
             val cents = vm.tunerCents()
             if (cents != null) {
                 Text(
-                    "Interval: %.1f cents (%.2f semitones)".format(cents, cents / 100.0),
+                    "Interval: %.1f cents, %s".format(cents, intervalWords(cents.roundToInt())),
                     style = MaterialTheme.typography.bodyMedium,
                 )
             } else {

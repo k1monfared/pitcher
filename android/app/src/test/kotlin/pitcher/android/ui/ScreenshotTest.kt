@@ -48,6 +48,10 @@ class ScreenshotTest {
         compose.mainClock.autoAdvance = false
     }
 
+    private fun settle() {
+        compose.mainClock.advanceTimeBy(1_000)
+    }
+
     private val track = Track(
         id = 1,
         sourcePath = "/data/imports/nava.m4a",
@@ -103,6 +107,7 @@ class ScreenshotTest {
                 )
             }
         }
+        settle()
         compose.onRoot().captureRoboImage("build/screenshots/11-modern-library.png")
     }
 
@@ -112,6 +117,7 @@ class ScreenshotTest {
         compose.setContent {
             ModernTheme { StudioSample() }
         }
+        settle()
         compose.onRoot().captureRoboImage("build/screenshots/10-modern-studio.png")
     }
 
@@ -127,6 +133,7 @@ class ScreenshotTest {
                 }
             }
         }
+        settle()
         compose.onRoot().captureRoboImage("build/screenshots/12-modern-onboarding.png")
     }
 
@@ -156,6 +163,7 @@ class ScreenshotTest {
                 }
             }
         }
+        settle()
         compose.onRoot().captureRoboImage("build/screenshots/13-modern-library-tour.png")
     }
 
@@ -165,6 +173,7 @@ class ScreenshotTest {
         compose.setContent {
             ModernTheme { StudioSample(cents = 250) }
         }
+        settle()
         compose.onRoot().captureRoboImage("build/screenshots/14-modern-studio-new-pitch.png")
     }
 
@@ -178,6 +187,7 @@ class ScreenshotTest {
                 }
             }
         }
+        settle()
         compose.onRoot().captureRoboImage("build/screenshots/15-format-knob.png")
     }
 

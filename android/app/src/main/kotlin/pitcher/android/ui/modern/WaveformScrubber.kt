@@ -44,6 +44,7 @@ import androidx.compose.ui.input.pointer.PointerId
 import androidx.compose.ui.input.pointer.PointerInputChange
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
@@ -307,12 +308,9 @@ fun WaveformScrubber(
                 loops.forEach { loop ->
                     val x0 = msToX(loop.startMs, w)
                     val x1 = msToX(loop.endMs, w)
+                    // Fill says on or off; the outline says which loop is selected.
                     val selected = loop.id == selectedLoopId
-                    val color = when {
-                        !loop.enabled -> Color.White.copy(alpha = 0.18f)
-                        selected -> accent
-                        else -> accent.copy(alpha = 0.55f)
-                    }
+                    val color = if (loop.enabled) accent.copy(alpha = 0.8f) else Color.White.copy(alpha = 0.18f)
                     val barW = (x1 - x0).coerceAtLeast(4f)
                     drawRoundRect(
                         color = color,
@@ -320,6 +318,16 @@ fun WaveformScrubber(
                         size = Size(barW, barH),
                         cornerRadius = corner,
                     )
+                    if (selected) {
+                        val ring = 2.dp.toPx()
+                        drawRoundRect(
+                            color = Color.White,
+                            topLeft = Offset(x0 - ring, barTop - ring),
+                            size = Size(barW + 2 * ring, barH + 2 * ring),
+                            cornerRadius = corner,
+                            style = Stroke(width = ring),
+                        )
+                    }
                     // Square edge posts mark exactly where the loop starts and ends.
                     val post = if (loop.enabled) Color.White.copy(alpha = 0.9f) else Color.White.copy(alpha = 0.4f)
                     drawRect(post, topLeft = Offset(x0, barTop - 3f), size = Size(edgeW, barH + 6f))

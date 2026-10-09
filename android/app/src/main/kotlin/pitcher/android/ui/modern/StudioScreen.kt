@@ -206,7 +206,13 @@ fun StudioContent(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                TextButton(onClick = onAddBookmark) { Text("bookmark") }
+                Row {
+                    TextButton(onClick = onAddBookmark) { Text("bookmark") }
+                    TextButton(
+                        onClick = onOpenTuner,
+                        modifier = Modifier.onboardingTarget(onboarding, "tuner"),
+                    ) { Text("tuner") }
+                }
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     ToggleChip(
                         label = "follow",
