@@ -56,6 +56,13 @@ class LoopPlaybackTest {
     }
 
     @Test
+    fun aLoopEndingAtTheTrackEndRestartsWhenPlaybackEnds() {
+        val tail = Timeline.Loop(id = 3, startMs = 8000, endMs = 10_000)
+        assertEquals(8000L, LoopPlayback.seekTarget(listOf(tail), LoopMode.ONE, 10_000, 3))
+        assertEquals(1000L, LoopPlayback.seekTarget(listOf(a, tail), LoopMode.ALL, 10_000, null))
+    }
+
+    @Test
     fun allIgnoresDisabledLoops() {
         val disabledB = b.copy(enabled = false)
         assertEquals(1000L, LoopPlayback.seekTarget(listOf(a, disabledB), LoopMode.ALL, 2000, null))

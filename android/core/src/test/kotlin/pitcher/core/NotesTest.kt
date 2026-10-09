@@ -10,6 +10,22 @@ private const val EPS = 1e-6
 class NotesTest {
 
     @Test
+    fun noteTextKeepsTheCentsOffset() {
+        val sharp = Notes.midiToHz(69.37)
+        assertEquals("A4+37", Notes.hzToNoteText(sharp))
+        val flat = Notes.midiToHz(61.0 - 0.12)
+        assertEquals("C#4-12", Notes.hzToNoteText(flat))
+        assertEquals("A4", Notes.hzToNoteText(440.0))
+    }
+
+    @Test
+    fun noteTextRoundTripsThroughNoteToHz() {
+        val hz = Notes.midiToHz(64.23)
+        val back = Notes.noteToHz(Notes.hzToNoteText(hz))!!
+        assertEquals(0.0, Notes.centsBetweenHz(hz, back), 0.6)
+    }
+
+    @Test
     fun ratioFromCentsZeroIsOne() {
         assertEquals(1.0, Notes.ratioFromCents(0), EPS)
     }

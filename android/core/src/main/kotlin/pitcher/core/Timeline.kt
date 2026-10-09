@@ -1,5 +1,7 @@
 package pitcher.core
 
+import kotlin.math.abs
+
 /**
  * Pure timeline rules for loop sections: they stay sorted by start and never
  * overlap. Edges are clamped against their neighbours and a minimum length.
@@ -15,7 +17,40 @@ object Timeline {
         val enabled: Boolean = true,
     )
 
+    data class Edge(val loopId: Long, val isStart: Boolean)
+
     fun sorted(loops: List<Loop>): List<Loop> = loops.sortedBy { it.startMs }
+
+    /**
+     * The loop edge nearest to [touchMs], if it is within [toleranceMs]. Callers
+     * convert their touch radius from pixels to milliseconds at the current zoom.
+     */
+    fun edgeAt(loops: List<Loop>, touchMs: Long, toleranceMs: Long): Edge? {
+        var best: Edge? = null
+        var bestDist = Long.MAX_VALUE
+        for (loop in loops) {
+            val toStart = abs(loop.startMs - touchMs)
+            val toEnd = abs(loop.endMs - touchMs)
+            if (toStart < bestDist) {
+                bestDist = toStart
+                best = Edge(loop.id, isStart = true)
+            }
+            if (toEnd < bestDist) {
+                bestDist = toEnd
+                best = Edge(loop.id, isStart = false)
+            }
+        }
+        return best?.takeIf { bestDist <= toleranceMs }
+    }
+
+    fun loopAt(loops: List<Loop>, ms: Long): Loop? =
+        loops.firstOrNull { ms >= it.startMs && ms < it.endMs }
+
+    /** Index of the time nearest to [touchMs] within [toleranceMs], or null. */
+    fun nearestIndex(timesMs: List<Long>, touchMs: Long, toleranceMs: Long): Int? {
+        val idx = timesMs.indices.minByOrNull { abs(timesMs[it] - touchMs) } ?: return null
+        return idx.takeIf { abs(timesMs[it] - touchMs) <= toleranceMs }
+    }
 
     fun active(loops: List<Loop>): List<Loop> = sorted(loops).filter { it.enabled }
 

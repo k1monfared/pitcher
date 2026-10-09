@@ -7,6 +7,18 @@ import org.junit.Test
 class PitchGestureTest {
 
     @Test
+    fun releaseAfterHoldingStillDoesNotFling() {
+        assertEquals(0.0, PitchGesture.releaseVelocity(900.0, idleMs = 200), 1e-9)
+        assertEquals(0.0, PitchGesture.releaseVelocity(-900.0, idleMs = PitchGesture.RELEASE_IDLE_MS + 1), 1e-9)
+    }
+
+    @Test
+    fun releaseWhileMovingKeepsTheVelocity() {
+        assertEquals(900.0, PitchGesture.releaseVelocity(900.0, idleMs = 8), 1e-9)
+        assertEquals(-450.0, PitchGesture.releaseVelocity(-450.0, idleMs = 0), 1e-9)
+    }
+
+    @Test
     fun slowPointerIsFineFastPointerIsCoarse() {
         assertEquals(PitchGesture.FINE_CENTS_PER_PX, PitchGesture.centsPerPx(0.0), 1e-9)
         assertEquals(

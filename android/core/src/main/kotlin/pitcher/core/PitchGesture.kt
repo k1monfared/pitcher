@@ -85,6 +85,17 @@ object PitchGesture {
         return (cents / LIGHT_GRID).roundToInt() * LIGHT_GRID
     }
 
+    /** A finger held still this long before lifting releases without momentum. */
+    const val RELEASE_IDLE_MS = 50L
+
+    /**
+     * The pointer velocity to fling with on release. The smoothed speed only
+     * updates on move events, so after the finger rests it is stale; a rest
+     * longer than [RELEASE_IDLE_MS] means the user meant to stop.
+     */
+    fun releaseVelocity(smoothedPxPerSec: Double, idleMs: Long): Double =
+        if (idleMs > RELEASE_IDLE_MS) 0.0 else smoothedPxPerSec
+
     /** Low-pass the pointer speed so the rate does not flicker frame to frame. */
     fun smoothedSpeed(previous: Double, instantPxPerSec: Double, alpha: Double): Double =
         previous + alpha * (instantPxPerSec - previous)

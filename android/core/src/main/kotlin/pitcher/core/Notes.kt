@@ -40,6 +40,17 @@ object Notes {
         )
     }
 
+    /** A detected pitch as note text with its cents offset, e.g. `A4+37`. */
+    fun hzToNoteText(hz: Double): String {
+        val reading = hzToNote(hz)
+        val off = Math.round(reading.centsOff).toInt()
+        return when {
+            off > 0 -> "${reading.name}+$off"
+            off < 0 -> "${reading.name}$off"
+            else -> reading.name
+        }
+    }
+
     fun noteToHz(note: String): Double? {
         val s = note.trim()
         if (s.isEmpty()) return null

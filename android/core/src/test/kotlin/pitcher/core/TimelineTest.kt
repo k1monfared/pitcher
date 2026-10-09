@@ -69,6 +69,46 @@ class TimelineTest {
     }
 
     @Test
+    fun edgeAtFindsTheNearestEdgeWithinTolerance() {
+        val list = listOf(loop(1, 10_000, 20_000), loop(2, 30_000, 40_000))
+        assertEquals(Timeline.Edge(1, isStart = false), Timeline.edgeAt(list, 21_000, toleranceMs = 4_000))
+        assertEquals(Timeline.Edge(2, isStart = true), Timeline.edgeAt(list, 28_500, toleranceMs = 4_000))
+        assertEquals(null, Timeline.edgeAt(list, 25_000, toleranceMs = 4_000))
+    }
+
+    @Test
+    fun edgeAtWorksAtFullZoomOnALongTrack() {
+        // A 3 minute track on a 1080 px chart is about 167 ms per pixel, so a
+        // 24 px touch radius is about 4 s. A touch 1 s from the edge must hit.
+        val msPerPx = 180_000.0 / 1080.0
+        val tolerance = (24 * msPerPx).toLong()
+        val list = listOf(loop(1, 60_000, 90_000))
+        assertEquals(Timeline.Edge(1, isStart = true), Timeline.edgeAt(list, 61_000, tolerance))
+    }
+
+    @Test
+    fun edgeAtPrefersTheCloserEdgeOfATinyLoop() {
+        val list = listOf(loop(1, 10_000, 10_200))
+        assertEquals(Timeline.Edge(1, isStart = true), Timeline.edgeAt(list, 9_900, toleranceMs = 4_000))
+        assertEquals(Timeline.Edge(1, isStart = false), Timeline.edgeAt(list, 10_300, toleranceMs = 4_000))
+    }
+
+    @Test
+    fun loopAtReturnsTheContainingLoop() {
+        val list = listOf(loop(1, 0, 1000), loop(2, 2000, 3000))
+        assertEquals(2L, Timeline.loopAt(list, 2500)?.id)
+        assertEquals(null, Timeline.loopAt(list, 1500))
+    }
+
+    @Test
+    fun nearestIndexHonoursTolerance() {
+        val times = listOf(1_000L, 5_000L, 9_000L)
+        assertEquals(1, Timeline.nearestIndex(times, 5_600, toleranceMs = 1_000))
+        assertEquals(null, Timeline.nearestIndex(times, 7_000, toleranceMs = 1_000))
+        assertEquals(null, Timeline.nearestIndex(emptyList<Long>(), 7_000, toleranceMs = 1_000))
+    }
+
+    @Test
     fun movingFirstStartAllowsZeroAndLastEndAllowsDuration() {
         val list = listOf(loop(1, 500, 1000), loop(2, 2000, 2500))
         val first = Timeline.moveEdge(list, id = 1, isStart = true, valueMs = -100, durationMs = 10_000)
