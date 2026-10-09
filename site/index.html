@@ -3,17 +3,17 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>pitcher - transpose audio by any interval</title>
+    <title>pitcher: change the key of any song, keep the tempo</title>
     <meta
       name="description"
-      content="pitcher is a free and open source toolkit that transposes audio by any pitch interval while keeping tempo. Linux CLI, local web UI, and an offline Android app."
+      content="pitcher moves music up or down by any interval while the tempo stays the same. Find the key with the built-in tuner, loop and slow down the hard parts, and save the version you need. Free, open source, and fully offline."
     />
     <meta name="theme-color" content="#0b0b0f" />
     <meta property="og:type" content="website" />
-    <meta property="og:title" content="pitcher - transpose audio by any interval" />
+    <meta property="og:title" content="pitcher: change the key of any song, keep the tempo" />
     <meta
       property="og:description"
-      content="Shift pitch while keeping tempo, detect the note, and keep a shelf of variants. Free, offline, open source."
+      content="Transpose by any interval, find the key, loop and slow down, and save the result. Free, offline, open source."
     />
     <meta property="og:image" content="assets/android/modern-studio.png" />
     <link rel="icon" href="assets/favicon.svg" type="image/svg+xml" />
@@ -43,11 +43,11 @@
           </svg>
         </button>
         <nav class="site" id="site-nav">
+          <a href="#how">How it works</a>
+          <a href="#features">Features</a>
           <a href="#desktop">Desktop</a>
-          <a href="web/">Web UI</a>
-          <a href="#android">Android</a>
-          <a href="#install">Install</a>
-          <a class="nav-cta" href="https://github.com/k1monfared/pitcher/releases">Download</a>
+          <a href="#faq">FAQ</a>
+          <a class="nav-cta" href="https://github.com/k1monfared/pitcher/releases/latest">Download</a>
         </nav>
       </div>
     </header>
@@ -57,23 +57,23 @@
         <div class="wrap hero-grid">
           <div class="hero-copy">
             <p class="eyebrow">Free and open source</p>
-            <h1>Transpose audio by any interval, without changing the tempo.</h1>
+            <h1>Change the key of any song. Keep the tempo.</h1>
             <p class="lede">
-              Move a piece up or down by semitones, cents, or a fraction of a
-              semitone, keep the formants so voices still sound natural, detect the
-              exact note at a point in the track, and keep a shelf of pitch variants
-              per source.
+              pitcher moves music up or down by any interval, from a full octave to a
+              single cent, while the rhythm stays exactly where it was. Find the key
+              with the built-in tuner, loop and slow down the hard parts, and save the
+              version you need as a file you can share.
             </p>
             <div class="cta">
-              <a class="btn primary" href="https://github.com/k1monfared/pitcher/releases">
-                Get the Android app
+              <a class="btn primary" href="https://github.com/k1monfared/pitcher/releases/latest">
+                Download for Android
               </a>
-              <a class="btn" href="#desktop">Run it on your computer</a>
+              <a class="btn" href="#desktop">Desktop and web</a>
             </div>
             <ul class="hero-meta">
-              <li>Offline by design</li>
-              <li>No accounts</li>
-              <li>No tracking</li>
+              <li>Works offline</li>
+              <li>No account</li>
+              <li>No ads or tracking</li>
               <li>GPL-3.0</li>
             </ul>
           </div>
@@ -83,188 +83,259 @@
                 src="assets/android/modern-studio.png"
                 width="1233"
                 height="2673"
-                alt="The pitcher Android studio: a full-screen pitch pad with a live cents readout, waveform, loop lane, and pitch shelf"
+                alt="The pitcher studio on Android: the pitch in cents with the interval above it, a waveform with loops and bookmarks, playback controls, and a shelf of kept pitches"
               />
             </div>
           </div>
         </div>
       </section>
 
-      <section class="wrap" id="desktop">
+      <section class="wrap" id="who">
         <div class="section-head">
-          <h2>Three ways to use it</h2>
-          <p class="muted">Same engine, same note math, three front ends.</p>
+          <h2>Made for people who make music</h2>
+          <p class="muted">The same song, in the key that works for you.</p>
         </div>
         <div class="grid cols-3">
           <div class="card">
-            <div class="icon" aria-hidden="true">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <polyline points="4 17 10 11 4 5" />
-                <line x1="12" y1="19" x2="20" y2="19" />
-              </svg>
-            </div>
-            <h3>Desktop CLI</h3>
+            <h3>Singers</h3>
             <p>
-              A single Rust binary. Shift files, detect notes, keep a shelf of
-              variants, and export, all from the terminal. Works on local files and
-              on audio fetched with yt-dlp.
+              Bring a song into your range. Try a few keys by ear, keep the ones that
+              fit, and save a backing track in the key you will perform.
             </p>
-            <a class="link" href="#install">Build and run &rarr;</a>
           </div>
           <div class="card">
-            <div class="icon" aria-hidden="true">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <rect x="3" y="4" width="18" height="14" rx="2" />
-                <line x1="3" y1="9" x2="21" y2="9" />
-                <line x1="7" y1="20" x2="17" y2="20" />
-              </svg>
-            </div>
-            <h3>Local web UI</h3>
+            <h3>Players</h3>
             <p>
-              A browser interface with a waveform, a vertical pitch fader, a tuner,
-              and a variants shelf. It runs on your machine next to a small Rust
-              server, so your audio never leaves the computer.
+              Play along with a recording that was tuned differently or capoed, or move
+              a tune to a key that suits your instrument. Shifts can be as small as one
+              cent.
             </p>
-            <a class="link" href="web/">See the web UI &rarr;</a>
           </div>
           <div class="card">
-            <div class="icon" aria-hidden="true">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <rect x="7" y="2" width="10" height="20" rx="2.5" />
-                <line x1="11" y1="18" x2="13" y2="18" />
-              </svg>
-            </div>
-            <h3>Android app</h3>
+            <h3>Learners and teachers</h3>
             <p>
-              Touch-first and fully offline. Import audio or video (only the audio
-              is kept), or share a file in from another app. Pitch by gesture, live
-              preview, and export to WAV, MP3, M4A, or Opus.
+              Loop a passage, slow it down without changing the pitch, and mark the
+              places you want to come back to. Save a practice file at the slower speed.
             </p>
-            <a class="link" href="#android">See the app &rarr;</a>
           </div>
         </div>
       </section>
 
-      <section class="wrap" id="touch">
+      <section class="wrap" id="how">
         <div class="section-head">
-          <h2>Built for touch</h2>
-          <p class="muted">
-            The Android studio is a single gesture surface, with a short guided tour
-            to show you around.
-          </p>
+          <h2>How it works</h2>
+          <p class="muted">Three steps, all on your phone.</p>
         </div>
-        <div class="hero-grid" style="margin-top: 28px">
-          <div>
-            <ul class="features">
-              <li>Drag up or down on the pitch pad to shift; slide left for coarse steps, right for 1-cent fine control</li>
-              <li>Snap to the nearest semitone while you drag, or type an exact value</li>
-              <li>Pinch the waveform to zoom, drag to pan, tap to seek, and tap a bookmark to jump to it</li>
-              <li>Drag the lane above the waveform to set an A/B loop, or use the loop chip</li>
-              <li>Hold the play-speed chip and slide to pick a preset; tap it to return to 1x</li>
-              <li>Keep every pitch you like and long-press one to rename, export, share, or delete it</li>
-              <li>The guided tour runs on first launch and can be replayed from Settings</li>
-              <li>Renders can be cancelled, and the app keeps the screen on while you work</li>
-            </ul>
-          </div>
-          <div class="hero-art">
-            <div class="phone">
-              <img
-                src="assets/android/modern-guide.png"
-                width="1233"
-                height="2673"
-                loading="lazy"
-                decoding="async"
-                alt="The guided tour highlighting the pitch pad on first launch"
-              />
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section class="wrap" id="android">
-        <div class="section-head">
-          <h2>Android app</h2>
-          <p class="muted">
-            Native Kotlin and Jetpack Compose. It requests no network permission and
-            bundles no downloader, so it is offline by design. Download it from the
-            releases page and sideload the APK.
-          </p>
-        </div>
-        <div class="shots phones">
-          <figure>
-            <img src="assets/android/modern-studio.png" width="1233" height="2673" loading="lazy" decoding="async" alt="Modern studio with the full-screen pitch pad, loop lane, and pitch shelf" />
-            <figcaption>Studio: pitch by gesture, with loops and bookmarks</figcaption>
-          </figure>
-          <figure>
-            <img src="assets/android/modern-guide.png" width="1233" height="2673" loading="lazy" decoding="async" alt="The guided tour on first launch" />
-            <figcaption>Guided tour: the gestures and controls, one by one</figcaption>
-          </figure>
-          <figure>
-            <img src="assets/android/modern-library.png" width="1233" height="2673" loading="lazy" decoding="async" alt="Library with imported songs" />
-            <figcaption>Library: import, open, and manage your songs</figcaption>
-          </figure>
-        </div>
-        <div class="cta" style="margin-top: 28px">
-          <a class="btn primary" href="https://github.com/k1monfared/pitcher/releases">
-            Download the APK
-          </a>
-          <a class="btn" href="https://github.com/k1monfared/pitcher#readme">Read the docs</a>
-        </div>
+        <ol class="steps">
+          <li>
+            <h3>Open a song</h3>
+            <p class="muted">
+              Import an audio or video file, or share one into pitcher from any other
+              app. Only the audio is kept.
+            </p>
+          </li>
+          <li>
+            <h3>Find your pitch</h3>
+            <p class="muted">
+              Slide up or down on the screen and hear the change as the song plays. Or
+              let the tuner name the note you hear, choose the note you want, and apply
+              the interval in one tap.
+            </p>
+          </li>
+          <li>
+            <h3>Keep it and save it</h3>
+            <p class="muted">
+              Keep the pitches you like. Each one is prepared in the background, so
+              saving it as a file or sharing it is quick.
+            </p>
+          </li>
+        </ol>
       </section>
 
       <section class="wrap" id="features">
         <div class="section-head">
           <h2>Features</h2>
+          <p class="muted">Everything in the Android app, version 2.6.</p>
         </div>
-        <ul class="features">
-          <li>Shift by cents or semitones, including fractional amounts</li>
-          <li>Formant preservation so vocals stay natural</li>
-          <li>Monophonic tuner: find the exact note at a point</li>
-          <li>Manual note and frequency entry, with target note or Hz</li>
-          <li>Keep every pitch you like, sorted by how far it shifted</li>
-          <li>Live preview: pitch moves while tempo stays fixed</li>
-          <li>Section loop and playback speed from 0.5x to 2x</li>
-          <li>Bookmarks on the waveform</li>
-          <li>Export to WAV, FLAC, MP3, Ogg, or M4A</li>
-          <li>Runs offline, no accounts, no telemetry</li>
-        </ul>
+        <div class="split">
+          <ul class="features single">
+            <li>Shift by any amount from one octave down to one octave up, in cents or semitones</li>
+            <li>A full-screen pitch control: slow movements are fine, fast ones are coarse, and snap lands on semitones</li>
+            <li>The interval is spelled out as you go, for example "up a minor third"</li>
+            <li>A tuner that detects the note at the playhead or at a bookmark, keeping the exact cents</li>
+            <li>Loops for the passages you practice, repeated one at a time or in sequence</li>
+            <li>Bookmarks with names, shown right on the waveform</li>
+            <li>Play speed from half to double, without changing the pitch</li>
+            <li>A shelf of kept pitches, one tap to switch between them</li>
+            <li>Save or share as WAV, MP3, M4A, or Opus, the whole song or just your loops</li>
+            <li>Save at your practice speed when you want a slower file</li>
+            <li>Files sound exactly like the preview, because both use the same engine</li>
+            <li>Playback continues in the background and pauses for calls</li>
+          </ul>
+          <div class="hero-art">
+            <div class="phone">
+              <img
+                src="assets/android/new-pitch.png"
+                width="1233"
+                height="2673"
+                loading="lazy"
+                decoding="async"
+                alt="A new pitch waiting on the shelf with a dashed outline, ready to be kept with one tap"
+              />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="wrap" id="screens">
+        <div class="section-head">
+          <h2>A closer look</h2>
+          <p class="muted">
+            A short guided tour points out every control the first time you open a song.
+            You can replay it from Settings.
+          </p>
+        </div>
+        <div class="shots phones">
+          <figure>
+            <img src="assets/android/modern-studio.png" width="1233" height="2673" loading="lazy" decoding="async" alt="The studio with a song transposed down a tritone" />
+            <figcaption>The studio: pitch, waveform, loops, and kept pitches</figcaption>
+          </figure>
+          <figure>
+            <img src="assets/android/new-pitch.png" width="1233" height="2673" loading="lazy" decoding="async" alt="A dashed pill for a pitch that is not kept yet" />
+            <figcaption>Tap the dashed pill to keep the pitch you are on</figcaption>
+          </figure>
+          <figure>
+            <img src="assets/android/modern-guide.png" width="1233" height="2673" loading="lazy" decoding="async" alt="The guided tour highlighting the pitch control" />
+            <figcaption>The guided tour, one control at a time</figcaption>
+          </figure>
+          <figure>
+            <img src="assets/android/modern-library.png" width="1233" height="2673" loading="lazy" decoding="async" alt="The library of imported songs" />
+            <figcaption>Your library of songs</figcaption>
+          </figure>
+        </div>
+      </section>
+
+      <section class="wrap" id="privacy">
+        <div class="section-head">
+          <h2>Your music stays on your phone</h2>
+          <p class="muted">
+            The Android app has no network permission at all. Nothing is uploaded,
+            nothing is tracked, and there is no account to create. Files you save go to
+            your Music folder, or to any folder you choose.
+          </p>
+        </div>
+      </section>
+
+      <section class="wrap" id="desktop">
+        <div class="section-head">
+          <h2>On your computer</h2>
+          <p class="muted">
+            pitcher also runs on Linux as a command line tool and a local web app, using
+            the Rubber Band library for studio-quality shifting with formant preservation.
+          </p>
+        </div>
+        <div class="grid cols-2">
+          <div class="card">
+            <h3>Command line</h3>
+            <p>
+              Shift files, detect notes, and keep a shelf of versions from the terminal.
+              Good for batches and scripts.
+            </p>
+          </div>
+          <div class="card">
+            <h3>Web app</h3>
+            <p>
+              A browser interface with a waveform, a pitch fader, a tuner, and a shelf of
+              versions. It runs on your own machine, so your audio never leaves it.
+            </p>
+            <a class="link" href="web/">See the web app &rarr;</a>
+          </div>
+        </div>
+        <pre><code># Debian or Ubuntu
+sudo apt install rubberband-cli librubberband-dev aubio-tools libaubio-dev ffmpeg yt-dlp
+cargo build --release
+
+./target/release/pitcher pitch in.wav out.wav --cents -100 --formant
+./target/release/pitcher detect in.wav --at 12.3
+./scripts/pitcher-web.sh    # opens the web app on a free local port</code></pre>
       </section>
 
       <section class="wrap" id="install">
         <div class="section-head">
-          <h2>Install</h2>
+          <h2>Install on Android</h2>
         </div>
+        <ol class="steps">
+          <li>
+            <h3>Download</h3>
+            <p class="muted">
+              Get <code>pitcher-android-v2.6.0.apk</code> from the
+              <a href="https://github.com/k1monfared/pitcher/releases/latest">latest release</a>.
+            </p>
+          </li>
+          <li>
+            <h3>Install</h3>
+            <p class="muted">
+              Open the file on your phone. Android asks once to allow installs from your
+              browser or file manager.
+            </p>
+          </li>
+          <li>
+            <h3>Update</h3>
+            <p class="muted">
+              New versions install over the old one and keep your songs and pitches.
+              Requires Android 10 or newer.
+            </p>
+          </li>
+        </ol>
+      </section>
 
-        <h3>Android</h3>
-        <p class="muted">
-          Download <code>pitcher-android-*.apk</code> from the
-          <a href="https://github.com/k1monfared/pitcher/releases">releases page</a>
-          and open it on your device. Android will ask you to allow installing from
-          this source. Requires Android 10 or newer.
-        </p>
-
-        <h3>Desktop (CLI and web UI)</h3>
-        <p class="muted">Requires Rust, Node, and the audio tools below.</p>
-        <pre><code># system dependencies (Debian/Ubuntu)
-sudo apt install rubberband-cli librubberband-dev aubio-tools libaubio-dev ffmpeg yt-dlp
-
-# build the CLI and server
-cargo build --release
-
-# the pitcher binary
-./target/release/pitcher pitch in.wav out.wav --cents -100 --formant
-./target/release/pitcher detect in.wav --at 12.3
-./target/release/pitcher add in.wav --title "My Track"
-
-# the web UI (builds the frontend, picks a free port, opens the browser)
-./scripts/pitcher-web.sh</code></pre>
-
-        <h3>Web UI</h3>
-        <p class="muted">
-          The web UI is a local app: it needs the Rust server and ffmpeg, Rubber Band,
-          aubio, and yt-dlp on the same machine. See the
-          <a href="web/">web UI page</a> for details and screenshots.
-        </p>
+      <section class="wrap" id="faq">
+        <div class="section-head">
+          <h2>Questions</h2>
+        </div>
+        <div class="faq">
+          <details>
+            <summary>Does changing the pitch change the speed?</summary>
+            <p class="muted">
+              No. The tempo stays exactly the same. Speed is a separate control, and it
+              never changes the pitch either.
+            </p>
+          </details>
+          <details>
+            <summary>How small a change can I make?</summary>
+            <p class="muted">
+              One cent, a hundredth of a semitone. That is enough to match a recording
+              that is slightly out of standard tuning.
+            </p>
+          </details>
+          <details>
+            <summary>Will the saved file sound like what I heard?</summary>
+            <p class="muted">
+              Yes. Playback and saved files use the same shifting engine, so the file
+              matches the preview.
+            </p>
+          </details>
+          <details>
+            <summary>Which formats can I save?</summary>
+            <p class="muted">
+              WAV, MP3, M4A, and Opus. You can save the whole song or only your loops,
+              joined into one file, at normal speed or at your practice speed.
+            </p>
+          </details>
+          <details>
+            <summary>Does it need the internet?</summary>
+            <p class="muted">
+              No. The Android app works completely offline and cannot reach the network.
+            </p>
+          </details>
+          <details>
+            <summary>Is it really free?</summary>
+            <p class="muted">
+              Yes. pitcher is free and open source software under the GPL-3.0-or-later
+              license. There are no ads, purchases, or subscriptions.
+            </p>
+          </details>
+        </div>
       </section>
 
       <section class="wrap" id="about">
@@ -272,10 +343,9 @@ cargo build --release
           <h2>About</h2>
         </div>
         <p class="muted">
-          pitcher is free software under the GPL-3.0-or-later license. The shift engine
-          is the Rubber Band Library, the tuner is YIN, and the whole thing is built to
-          run offline. Downloading audio from streaming services is subject to those
-          services' terms; use it only for audio you have the right to process.
+          pitcher is free software under the GPL-3.0-or-later license. On Android it uses
+          the Sonic engine that ships with Android's media framework, and on the desktop
+          the Rubber Band library. Use it with audio you have the right to process.
         </p>
       </section>
     </main>
@@ -286,7 +356,8 @@ cargo build --release
         <span class="links">
           <a href="https://github.com/k1monfared/pitcher">Source</a>
           <a href="https://github.com/k1monfared/pitcher/releases">Releases</a>
-          <a href="web/">Web UI</a>
+          <a href="https://github.com/k1monfared/pitcher/blob/main/android/CHANGELOG.md">Changelog</a>
+          <a href="web/">Web app</a>
         </span>
       </div>
     </footer>

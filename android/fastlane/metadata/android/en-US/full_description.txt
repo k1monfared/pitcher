@@ -1,36 +1,38 @@
-pitcher transposes audio by any pitch interval while keeping the tempo, and lets
-you keep a shelf of pitch variants per track.
+pitcher changes the key of any song while the tempo stays exactly the same. Move
+music up or down by anything from a full octave to a single cent, find the key
+with the built-in tuner, practice with loops and slower speeds, and save the
+version you need as a file.
 
-It is fully offline. The app requests no network permission and bundles no
-downloader. Import audio (or video, from which only the audio is kept) from your
-device, or share a file into pitcher from any other app.
+Made for singers who want a song in their range, players who need to match a
+recording or an instrument, and anyone learning a piece by ear.
 
-The interface is built for touch. A short guided tour runs the first time you
-open a song and points out the gestures and controls; you can replay it from
-Settings at any time.
+Change the pitch
+- Slide up or down on the screen and hear the change as the song plays.
+- Step by 1, 10, or 100 cents, type an exact value, or snap to semitones.
+- The interval is spelled out as you go, for example "up a minor third".
 
-Features:
-- Transpose by any amount in cents or semitones, with live preview: pitch moves
-  while tempo stays fixed.
-- A full-screen pitch gesture: drag up or down to shift. The rate follows how
-  fast you move, so slow is fine and fast is coarse, and a flick keeps going and
-  slows down until you catch it. Snap to a 20-cent grid with a stronger pull to
-  semitones.
-- A timeline: make multiple loops by dragging the lane above the wave, and add
-  bookmarks. Long-press a loop edge or a bookmark pin to fine-tune it. Pinch to
-  zoom, drag to pan, long-press to scrub, tap to seek.
-- A repeat button cycles whole song, all loops, or one loop. Loops can be turned
-  off individually, and renders join the enabled loops into one file.
-- A tuner: keep a source and a target note, detected at the playhead or a
-  bookmark or typed, and apply the interval to the slider in one tap.
-- Detect the note at the playhead, or type a note or a frequency.
-- Keep every pitch you like; the shelf lists the original plus each variant.
-  Long-press a saved pitch to rename, share, or delete it.
-- One render sheet: choose the folder, edit the file name, pick a format, and
-  Save file or Share. Renders can be cancelled.
-- Export and share as WAV, MP3, M4A, or Opus, with stereo where the device
-  allows.
-- Screen stays on while you work, and playback continues in the background.
+Find the key
+- The tuner names the note at the playhead or at a bookmark, with its exact cents.
+- Choose the note you want and apply the interval in one tap.
 
-pitcher is free and open source software (GPL-3.0-or-later). No ads, no
-tracking, no accounts.
+Practice
+- Loops for the passages you work on, repeated one at a time or in sequence.
+- Named bookmarks shown on the waveform.
+- Play speed from half to double, without changing the pitch.
+- Zoom the waveform, and let it follow the playhead.
+
+Keep and save
+- Keep the pitches you like on a shelf and switch between them with a tap.
+- Kept pitches are prepared in the background, so saving is quick.
+- Save or share as WAV, MP3, M4A, or Opus, the whole song or only your loops, at
+  normal speed or at your practice speed.
+- Files sound exactly like the preview, because both use the same engine.
+
+Private by design
+- No network permission. Nothing leaves your phone.
+- No account, no ads, no tracking.
+- Import audio or video files, or share one in from another app.
+
+A short guided tour shows every control the first time you open a song.
+
+pitcher is free and open source software (GPL-3.0-or-later).

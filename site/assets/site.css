@@ -412,6 +412,103 @@ ul.features li::after {
   transform: rotate(45deg);
 }
 
+/* ---------- Split: text beside a phone ---------- */
+
+.split {
+  display: grid;
+  grid-template-columns: 1.15fr 0.85fr;
+  align-items: center;
+  gap: clamp(28px, 5vw, 64px);
+  margin-top: 28px;
+}
+
+ul.features.single {
+  grid-template-columns: 1fr;
+  margin-top: 0;
+}
+
+ul.features,
+ol.steps {
+  text-align: left;
+}
+
+/* ---------- Steps ---------- */
+
+ol.steps {
+  list-style: none;
+  counter-reset: step;
+  padding: 0;
+  margin: 26px 0 0;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 18px;
+}
+
+ol.steps li {
+  counter-increment: step;
+  position: relative;
+  padding: 22px 22px 18px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: linear-gradient(180deg, var(--surface), var(--surface-2));
+}
+
+ol.steps li::before {
+  content: counter(step);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  margin-bottom: 12px;
+  border-radius: 50%;
+  background: rgba(106, 169, 255, 0.14);
+  color: var(--accent);
+  font-weight: 700;
+}
+
+ol.steps li p {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+/* ---------- FAQ ---------- */
+
+.faq {
+  margin-top: 22px;
+  max-width: 760px;
+}
+
+.faq details {
+  border-bottom: 1px solid var(--border);
+  padding: 14px 0;
+}
+
+.faq summary {
+  cursor: pointer;
+  font-weight: 600;
+  list-style: none;
+}
+
+.faq summary::-webkit-details-marker {
+  display: none;
+}
+
+.faq summary::after {
+  content: "+";
+  float: right;
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.faq details[open] summary::after {
+  content: "\2212";
+}
+
+.faq details p {
+  margin: 10px 0 0;
+}
+
 /* ---------- Screenshots ---------- */
 
 .shots {
@@ -549,7 +646,9 @@ footer.site .links {
   }
 
   .grid.cols-3,
-  .grid.cols-2 {
+  .grid.cols-2,
+  ol.steps,
+  .split {
     grid-template-columns: 1fr;
   }
 

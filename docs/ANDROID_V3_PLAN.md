@@ -1,8 +1,26 @@
 # pitcher for Android - Studio, timeline, and render rewrite (release 2.5)
 
-Status: shipped in 2.5.0. This pulls together the decisions from the planning
-discussion and supersedes the v2 plan wherever they differ. The v2 "classic"
-interface is removed in this release.
+Status: shipped in 2.5.0 and refined through 2.6.0. This pulls together the
+decisions from the planning discussion and supersedes the v2 plan wherever they
+differ. The v2 "classic" interface is removed in this release.
+
+Where the shipped app differs from this plan (see `android/CHANGELOG.md`):
+
+- Rendering uses Media3's Sonic, the playback engine, so files match the
+  preview. The WSOLA shifter was removed in 2.6.0.
+- The shelf has one pill per pitch. A dashed pill stands for the current pitch
+  until it is kept. Keeping renders the pitch in the background to a cached
+  WAV, and saves only cut loops, apply speed, and encode. Each pitch has its own
+  job, two at a time.
+- Saved files are recorded per pitch (`renders` table, schema v4) by name,
+  format, loop set, and speed, so a matching file is reused instead of rendered.
+- Export is the enabled loops only when the loop-only option is on, which is
+  off by default. Files can also be saved at the current play speed.
+- The format picker is a rolling knob. The tuner has a visible button in
+  addition to the long-press on the readout. Loop edges drag directly as well
+  as after a hold, and holding without moving opens rename and delete.
+- Open items resolved: momentum stops on touch and ignores a resting release.
+  Share reuses a saved file and renders only when none matches.
 
 ## Scope
 

@@ -26,6 +26,10 @@ decisions. Summary of the chosen stack:
 - The Android 2.5 rework (rebuilt gesture, loops and bookmarks timeline, unified
   render sheet, tuner modal) is in [docs/ANDROID_V3_PLAN.md](docs/ANDROID_V3_PLAN.md).
   The classic interface was removed; the modern Studio is the only one.
+- Android shifts with Media3's Sonic for both playback and saved files, so files
+  match the preview. Kept pitches pre-render to a cached WAV in the background.
+  Release notes live in `android/CHANGELOG.md` and the store listing in
+  `android/fastlane/`.
 
 ## Layout
 

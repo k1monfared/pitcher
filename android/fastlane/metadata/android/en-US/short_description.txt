@@ -1,1 +1,1 @@
-Transpose any track by any interval, keeping tempo. Offline and free.
+Change the key of any song, keep the tempo. Tuner, loops, speed. Offline.

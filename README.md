@@ -1,91 +1,118 @@
 # pitcher
 
-FOSS audio pitch-shifting toolkit. Transpose audio by any interval while preserving tempo,
-optionally preserve formants, detect the exact note at a point in a track, and keep a shelf
-of pitch variants per source. Linux CLI plus a local web UI, and a separate offline Android app.
+**Change the key of any song. Keep the tempo.**
 
-Project site: <https://k1monfared.com/pitcher/> (web UI guide: <https://k1monfared.com/pitcher/web/>)
+pitcher moves music up or down by any interval, from a full octave to a single
+cent, while the rhythm stays exactly where it was. Find the key with the built-in
+tuner, loop and slow down the hard parts, and save the version you need as a file.
 
-## What it does
+It is free and open source, works completely offline, and has no ads, accounts,
+or tracking.
 
-- Shift any audio (local files, or imported from YouTube/SoundCloud) by a pitch interval in
-  cents, tempo unchanged. All amounts are cents internally: C#4 to C4 is -100 cents.
-- Preserve formants (`--formant`) so vocals and acoustic instruments do not sound warbly.
-- Detect the note at a moment in the track (pure-Rust YIN), or type a note/frequency manually.
-- Move a detected note to a target note, including microtonal offsets (C#4 + 37 cents).
-- Keep an original plus every pitch variant you rendered, star the keepers, prune the rest.
+Website: <https://k1monfared.com/pitcher/>
 
-See [docs/PLAN.md](docs/PLAN.md) for the design and [docs/LEGALITY.md](docs/LEGALITY.md) for
-source and terms notes.
+<p align="center">
+  <img src="site/assets/android/modern-studio.png" width="260" alt="The pitcher studio on Android" />
+  &nbsp;
+  <img src="site/assets/android/new-pitch.png" width="260" alt="Keeping a new pitch on the shelf" />
+</p>
 
-## Requirements
+## Get it
+
+**Android (10 or newer).** Download `pitcher-android-v2.6.0.apk` from the
+[latest release](https://github.com/k1monfared/pitcher/releases/latest) and open it
+on your phone. New versions install over the old one and keep your library.
+
+**Linux desktop.** A command line tool and a local web app. See
+[Desktop](#desktop) below.
+
+## What you can do
+
+- **Transpose** by any amount from one octave down to one octave up. Slide on the
+  screen and hear the change as the song plays, use the step buttons, or type an
+  exact value. Snap lands on semitones when you want it to.
+- **Find the key.** The tuner names the note at the playhead or at a bookmark,
+  with its exact cents. Choose the note you want and apply the interval in one tap.
+- **Practice.** Make loops around the passages you work on, repeat one or play them
+  in sequence, add named bookmarks, and change the play speed from half to double
+  without changing the pitch.
+- **Keep the pitches you like.** Each kept pitch sits on a shelf and is prepared in
+  the background, so switching, saving, and sharing are quick.
+- **Save and share** as WAV, MP3, M4A, or Opus. Save the whole song or only your
+  loops, at normal speed or at your practice speed. Files sound exactly like the
+  preview.
+- **Stay private.** The Android app has no network permission. Nothing leaves your
+  phone.
+
+A short guided tour shows every control the first time you open a song.
+
+## Desktop
+
+The desktop version uses the Rubber Band library for high quality shifting with
+optional formant preservation, which keeps voices natural.
 
 ```
-rubberband-cli librubberband-dev aubio-tools libaubio-dev ffmpeg yt-dlp
-```
-
-Only `ffmpeg` (with the rubberband filter) is required at runtime for shifting, plus
-`ffmpeg`/`ffprobe` for decoding. `yt-dlp` is needed only for URL import. The Rust tuner is
-built in, so aubio is optional. All FOSS.
-
-## CLI
-
-```
+# Debian or Ubuntu
+sudo apt install rubberband-cli librubberband-dev aubio-tools libaubio-dev ffmpeg yt-dlp
 cargo build --release
+```
 
+Command line:
+
+```
 ./target/release/pitcher pitch in.wav out.wav --cents -100 --formant
 ./target/release/pitcher pitch in.wav out.wav --to-note C4 --from-note "C#4"
 ./target/release/pitcher detect in.wav --at 12.3
-./target/release/pitcher note --hz 277.18
 ./target/release/pitcher interval C#4 C4
-./target/release/pitcher interval --source-hz 277.18 --target-note G5
 ./target/release/pitcher add in.wav --title "My Track"
 ./target/release/pitcher explore 1 --offset -200 --span 400 --step 50
-./target/release/pitcher try 1
-./target/release/pitcher shelf star 3
 ./target/release/pitcher shelf export 1 ./kept
-./target/release/pitcher rename 1 --title "New Title" --artist "Me"
-./target/release/pitcher delete 1            # asks first; --yes to skip
 ```
 
-## Web UI
+Web app, served on the first free port from 7373 (the localhost and LAN addresses
+are printed when it starts):
 
 ```
 ./scripts/pitcher-web.sh
 ```
 
-Builds the frontend if needed, builds the server, and serves on the first free port from
-7373. Prints the localhost and LAN URLs. The UI has a vertical pitch fader (live audition,
-snap modes, keyboard nudges), a canvas waveform with click-to-seek and shift-drag looping,
-a note tuner with manual override, and a variant shelf.
+It has a waveform with looping, a pitch fader with live audition, a tuner, and a
+shelf of versions. It runs on your own machine. See the
+[web app page](https://k1monfared.com/pitcher/web/).
 
-## Android
+Fetching audio from streaming sites with `yt-dlp` is subject to those sites'
+terms. See [docs/LEGALITY.md](docs/LEGALITY.md).
 
-A separate native Kotlin + Jetpack Compose app, fully offline (no network
-permission, no bundled downloader). The touch-first Studio is the whole app. A
-short guided tour runs on first launch and can be replayed from Settings. See
-[android/README.md](android/README.md) and
-[docs/ANDROID_V3_PLAN.md](docs/ANDROID_V3_PLAN.md).
+## For developers
 
-## Tests
+| Part | Stack |
+| --- | --- |
+| Desktop core and CLI | Rust, Rubber Band, YIN tuner, SQLite |
+| Web app | axum server, Svelte 5 + Vite + TypeScript, soundtouchjs preview |
+| Android app | Kotlin, Jetpack Compose, Media3 (ExoPlayer and Sonic) |
 
 ```
-cargo test                    # Rust: notes, engine, tuner, shelf, CLI, server, ports
-cd web && npm install && npm test   # TypeScript: notes, fader, audio, api
-cd android && ./gradlew :core:test :app:testDebugUnitTest   # Kotlin core + app
+cargo test                                            # Rust
+cd web && npm install && npm test                     # web app
+cd android && ./gradlew :core:test :app:testDebugUnitTest   # Android
 ```
 
-## Layout
+Building the Android app, signing, screenshots, and releases are covered in
+[android/README.md](android/README.md). The design history is in [docs/](docs/),
+and the Android release notes are in [android/CHANGELOG.md](android/CHANGELOG.md).
 
 ```
 crates/pitcher-core/   engine, tuner, note math, sqlite shelf, import, model
-crates/pitcher-cli/    the `pitcher` binary
+crates/pitcher-cli/    the pitcher binary
 server/                axum REST server over pitcher-core (serves web/dist)
-web/                   Svelte 5 + Vite + TS frontend (live preview via soundtouchjs)
-site/                  static project site (GitHub Pages): landing + web UI guide
-docs/                  plan, Android plans, and legality notes
-data/                  sqlite db + rendered variants (gitignored)
-android/core/          pure-Kotlin note math, tested on the JVM
-android/app/           native Android app (Kotlin + Compose), offline only
-android/fastlane/      store listing metadata and screenshots
+web/                   Svelte 5 + Vite + TS frontend
+site/                  project website (GitHub Pages)
+docs/                  plans and legality notes
+android/core/          pure Kotlin logic, tested on the JVM
+android/app/           the Android app
+android/fastlane/      store listing text and screenshots
 ```
+
+## License
+
+GPL-3.0-or-later.

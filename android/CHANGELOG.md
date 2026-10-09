@@ -1,83 +1,62 @@
 # Changelog
 
-## Unreleased
+## 2.6.0
 
-Pitches and files, reworked:
+A release about sound, saving, and the timeline.
 
-- One pill per pitch. The original and every kept pitch always show. When the
-  pitch is somewhere nothing is kept, one dashed pill stands for it, in order;
-  it disappears when the pitch reaches a kept one, which lights up instead.
-- Tap the dashed pill to keep that pitch. Keeping renders it in the background,
-  so saving or sharing a file later only has to encode. Tap a kept pitch to
-  play it, and tap the playing one to save or share it as a file.
-- Every pitch works on its own: saving one never blocks another. Long-press a
-  busy pitch to cancel just that one.
-- Pitches remember every file saved from them (name, format, and loop set).
-  `Save file` reads `Saved` until one of those changes, and `Share` shares that
-  file instead of rendering a new one. A file deleted outside the app can be
-  saved again.
-- The file sheet's buttons keep their place: while saving they read
-  `Saving...` and `Cancel`. The format is a knob that rolls with the finger,
-  after the file name and a dot.
-- "Saved" is a short popup instead of text on the screen.
-- Removing a pitch keeps the files it saved.
+Sound
 
-Studio:
-
-- `follow` glides with playback instead of stepping.
-- Play and pause are an icon. Follow, snap, speed, and repeat have no
-  backgrounds, and the repeat icon is wider so its `1` reads clearly.
-- The interval (for example "up a minor third") sits right above the cents.
-- A song's waveform is saved the first time it is drawn, so opening the song
-  again shows it right away instead of decoding the whole file.
-- The format knob has no frame lines.
-- Files can be saved at the current play speed. The pitch's background render
-  stays at normal speed, so only the save applies the speed.
-- The settings gear is a plain coloured icon.
-
-Chart and transport:
-
-- Scrubbing the wave moves the playhead under the finger and seeks on release.
-- The playhead carries its time at the bottom of the wave, on its right, or on
-  its left near the right edge.
-- `follow` keeps the playhead three quarters across a zoomed view. Panning by
-  hand turns it off.
-- Loop names show inside their bars when at least one letter fits. Bookmark
-  names run up the wave beside their line. Loops have square ends with edge
-  posts.
-- The repeat button is an icon with clear arrows. `play speed` reads `speed`,
-  and the transport buttons have fixed widths.
-
-Usability fixes for the studio.
-
-- Loop edges and bookmark pins can be grabbed at any zoom. The touch radius was
-  compared in milliseconds instead of pixels, so at full zoom the target was
-  under a pixel wide.
-- Dragging a loop edge or a bookmark follows the finger for the whole drag and
-  saves once on release. Before, the first move restarted the gesture.
-- A loop edge can be dragged directly. Holding a loop or a pin without moving
-  opens rename and delete, and tapping a loop selects it.
-- Zoomed out, a plain drag on the waveform scrubs.
-- Pitch momentum stops as soon as you touch the pad, and lifting a resting
-  finger no longer flings. The +1 and +10 pills work with snap on.
-- Tapping `original` returns to the original pitch, and the highlighted pitch
-  always matches what is playing.
-- Rendering no longer renames a pitch to its file name or clears its name.
-  Loop-only renders are saved as files and no longer replace the pitch's full
-  render. Making a loop no longer switches export to loops only.
-- The render sheet shows the folder by name, can reset a song to the default
-  folder, and the loop-only row toggles when tapped.
-- A loop that ends at the end of the song keeps repeating, and loop seams are
-  tighter.
+- Saved files now sound exactly like the preview. Saving uses Sonic, the same
+  engine as playback, instead of a separate shifter.
+- Kept pitches render in the background with flat memory use, so long songs no
+  longer run out of memory.
 - Playback pauses for calls and other audio apps, and stops when headphones are
   unplugged.
-- Deleting a song asks first and no longer stops a different song that is
-  playing.
-- The bookmark button only adds. It no longer deletes a bookmark under the
-  playhead.
-- Back from the Library returns to the open song.
-- Loop names accept spaces. The tuner shows detection progress and failures,
-  and keeps the cents offset of a detected note (for example `A4+37`).
+
+Pitches and files
+
+- One pill per pitch. The original and every kept pitch always show. When you
+  are on a pitch you have not kept, a dashed pill stands for it in order. Tap it
+  to keep the pitch. It disappears when you reach a kept pitch, which lights up
+  instead.
+- Tap a kept pitch to play it, and tap the playing one to save it as a file.
+  Hold a pitch to rename, share, cancel, or remove it.
+- Every pitch works on its own: saving one never blocks another.
+- Save at the current play speed, or only the enabled loops.
+- Pitches remember the files saved from them. Save file reads Saved until the
+  name, format, loops, or speed change, and Share reuses the saved file instead
+  of rendering again. A file deleted outside the app can be saved again.
+- The file sheet keeps its buttons in place while saving. The format is a knob
+  that rolls with your finger, and the folder shows by name with a way back to
+  the default.
+- Saved files appear as a short popup. Removing a pitch keeps its files.
+
+Timeline
+
+- Loop edges and bookmark pins can be grabbed and dragged at any zoom, and the
+  drag follows the finger all the way.
+- Tap a loop to select it (outlined). Hold a loop or a pin to rename or delete
+  it. Loop names show inside their bars and bookmark names on the waveform.
+- Scrubbing moves the playhead under your finger and seeks when you lift it.
+  Zoomed out, a plain drag scrubs.
+- The playhead shows its time. Follow keeps it in view while zoomed and glides
+  with playback.
+- A loop that ends at the end of the song keeps repeating, and loop seams are
+  tighter.
+- Waveforms are saved per song, so a song opens right away the second time.
+
+Studio
+
+- A tuner button, a tour step for it, and the interval named in the tuner. A
+  detected note keeps its cents (for example A4+37).
+- The interval sits above the cents. Play and pause are an icon, and the repeat
+  button is a clearer icon with a readable 1.
+- Pitch momentum stops when you touch the pad, and lifting a resting finger no
+  longer flings. The step buttons work with snap on.
+- Tapping original returns to the original pitch.
+- The bookmark button only adds. Back from the Library returns to the song.
+- Deleting a song asks first and does not stop a different song.
+- Loop names accept spaces, and the tuner shows its progress.
 
 ## 2.5.2
 

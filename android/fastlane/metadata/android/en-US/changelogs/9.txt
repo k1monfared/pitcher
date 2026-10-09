@@ -1,0 +1,6 @@
+- Saved files now sound exactly like the preview.
+- One pill per pitch: tap the dashed one to keep a pitch. Kept pitches render in the background, so saving is quick, and pitches save independently.
+- Save at your current play speed.
+- Tuner button, with the interval named.
+- Grab loop edges and bookmarks at any zoom. Names show on the waveform.
+- Smooth follow mode, time label on the playhead, faster loading, and a cleaner look.
