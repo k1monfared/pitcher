@@ -47,7 +47,7 @@ object AacWriter {
         sampleRate: Int,
     ) {
         file.parentFile?.mkdirs()
-        val codec = MediaCodec.createEncoderByType(mime)
+        val codec = Codecs.encoder(mime)
         val muxer = MediaMuxer(file.absolutePath, muxerFormat)
         var trackIndex = -1
         var muxerStarted = false

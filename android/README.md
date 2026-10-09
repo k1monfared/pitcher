@@ -92,6 +92,9 @@ Create `android/local.properties` with `sdk.dir=/path/to/Android/Sdk`
   decoder through Sonic to the file, so memory stays flat for any song length.
 - Saving cuts the loops and applies the speed from that render, then encodes. MP3
   uses a pure Java LAME port. M4A and Opus use the platform encoders.
+- Decoding, playback, and M4A and Opus encoding use the phone's codecs, always
+  preferring Android's own open-source codecs over a phone maker's closed-source
+  ones (`media/Codecs.kt`). See [../docs/LEGALITY.md](../docs/LEGALITY.md).
 - Waveforms are computed once per song and kept with the app's files.
 - The library, pitches, saved files, loops, and bookmarks live in a small SQLite
   database (schema version 4).

@@ -22,18 +22,38 @@ actual audio from a different provider, usually YouTube. This is against Spotify
 and likely copyright law. Pitcher follows the same model if a Spotify URL is given: it
 resolves metadata only. The audio still has to come from a source you are allowed to use.
 
-## Bundled libraries
+## License and libraries
 
-The web UI uses `soundtouchjs` (LGPL-2.1, compatible with this repo's GPL-3.0-or-later)
-for live pitch and tempo preview in the browser. Files you keep are always rendered
-server-side with the Rubber Band Library (GPL).
+pitcher is licensed under the GPL-3.0 (see `LICENSE`).
 
-The Android app uses `jump3r` (LGPL, a Java port of LAME) for MP3 encoding, Android's
-own `MediaCodec`/`MediaMuxer` for AAC and Opus encoding, and its own Kotlin WSOLA
-implementation for pitch shifting. All are free and open source and compatible with
-this repo's GPL-3.0-or-later license.
+Desktop and web: the Rubber Band Library (GPL-2.0-or-later) shifts pitch, aubio
+(GPL-3.0) is the optional tuner, ffmpeg (LGPL or GPL, depending on the build)
+decodes and encodes, and yt-dlp (Unlicense) imports from URLs. The web UI previews
+in the browser with `soundtouchjs` (LGPL-2.1). All are free and open source and
+compatible with the GPL-3.0.
 
-No proprietary or closed-source audio code is used anywhere.
+Android: every library the app ships is free and open source. Jetpack Compose,
+AndroidX, and Media3 (ExoPlayer and its Sonic engine, used for both playback and
+saved files) are Apache-2.0. MP3 encoding is `jump3r` (LGPL-2.1, a Java port of
+LAME).
+
+Android also relies on the codecs built into the phone, for decoding imported songs,
+for playback, and for encoding M4A and Opus. These are not shipped with pitcher.
+Phones usually carry two kinds: Android's own open-source codecs (the AOSP
+`c2.android` family) and the phone maker's closed-source ones. pitcher always picks
+Android's own codecs and uses a maker's codec only if the phone has nothing else for
+that format. So on a typical phone the whole audio path is open source.
+
+## Formats
+
+- WAV is uncompressed and unencumbered.
+- MP3's patents have expired, and pitcher encodes it in-app with LAME (jump3r).
+- Opus is an open, royalty-free format. Android's Opus encoder is libopus (BSD).
+- M4A (AAC) is a standardized but patent-licensed format. Android's own AAC codec
+  is Fraunhofer's FDK AAC. Its license is free in the FSF's definition but is not
+  GPL-compatible, and Debian classes it as non-free. pitcher does not ship it, it
+  only calls the phone's codec. If you want a fully free chain, save as WAV, MP3,
+  or Opus.
 
 ## No warranty
 

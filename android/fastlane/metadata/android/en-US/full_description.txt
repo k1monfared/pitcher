@@ -35,4 +35,4 @@ Private by design
 
 A short guided tour shows every control the first time you open a song.
 
-pitcher is free and open source software (GPL-3.0-or-later).
+pitcher is free and open source software (GPL-3.0).

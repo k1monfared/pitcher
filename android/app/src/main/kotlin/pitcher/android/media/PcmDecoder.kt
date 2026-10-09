@@ -57,7 +57,7 @@ object PcmDecoder {
                 0
             }
 
-            codec = MediaCodec.createDecoderByType(mime)
+            codec = Codecs.decoder(mime)
             codec.configure(inputFormat, null, null, 0)
             codec.start()
 
@@ -184,7 +184,7 @@ object PcmDecoder {
             } else {
                 2
             }
-            codec = MediaCodec.createDecoderByType(mime)
+            codec = Codecs.decoder(mime)
             codec.configure(inputFormat, null, null, 0)
             codec.start()
 

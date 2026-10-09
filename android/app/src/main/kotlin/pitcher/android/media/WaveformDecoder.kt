@@ -35,7 +35,7 @@ object WaveformDecoder {
                 44100
             }
 
-            codec = MediaCodec.createDecoderByType(mime)
+            codec = Codecs.decoder(mime)
             codec.configure(inputFormat, null, null, 0)
             codec.start()
 

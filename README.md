@@ -115,4 +115,6 @@ android/fastlane/      store listing text and screenshots
 
 ## License
 
-GPL-3.0-or-later.
+GPL-3.0. See [LICENSE](LICENSE).
+
+<sub>Written with DeepSeek V4.1 Flash and Opus 5.5.</sub>

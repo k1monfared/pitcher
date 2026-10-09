@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Decoding, playback, and encoding prefer Android's own open-source codecs over a
+  phone maker's closed-source ones, which are used only when nothing else exists.
+- pitcher is licensed under the GPL-3.0, and the license text is now included.
+
 ## 2.6.0
 
 A release about sound, saving, and the timeline.

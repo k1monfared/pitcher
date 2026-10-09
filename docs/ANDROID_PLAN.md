@@ -3,8 +3,10 @@
 > Status: shipped, then superseded. The UI was redesigned in
 > [ANDROID_V2_PLAN.md](ANDROID_V2_PLAN.md), and the multi-screen interface was
 > removed entirely in 2.5 ([ANDROID_V3_PLAN.md](ANDROID_V3_PLAN.md)). Two
-> corrections inline: offline renders use the in-app WSOLA shifter (not
-> TarsosDSP), and screen-on uses the window keep-screen-on flag.
+> corrections inline: offline renders used the in-app WSOLA shifter (not
+> TarsosDSP), and screen-on uses the window keep-screen-on flag. Since 2.6.0,
+> renders use Media3's Sonic instead of WSOLA, and the app prefers Android's
+> own open-source codecs over vendor ones.
 
 Independent native Android app. No downloading, no streaming, no server: the user
 picks an audio or video file already on the device and gets the full pitcher

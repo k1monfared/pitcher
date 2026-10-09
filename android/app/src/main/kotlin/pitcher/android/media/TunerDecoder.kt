@@ -41,7 +41,7 @@ object TunerDecoder {
             val startUs = ((centerMs - maxWindowMs / 2).coerceAtLeast(0)) * 1000
             extractor.seekTo(startUs, MediaExtractor.SEEK_TO_PREVIOUS_SYNC)
 
-            codec = MediaCodec.createDecoderByType(mime)
+            codec = Codecs.decoder(mime)
             codec.configure(inputFormat, null, null, 0)
             codec.start()
 
