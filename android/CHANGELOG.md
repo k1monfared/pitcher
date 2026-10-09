@@ -28,6 +28,9 @@ Studio:
 - Play and pause are an icon. Follow, snap, speed, and repeat have no
   backgrounds, and the repeat icon is wider so its `1` reads clearly.
 - The interval (for example "up a minor third") sits right above the cents.
+- A song's waveform is saved the first time it is drawn, so opening the song
+  again shows it right away instead of decoding the whole file.
+- The format knob has no frame lines.
 
 Chart and transport:
 

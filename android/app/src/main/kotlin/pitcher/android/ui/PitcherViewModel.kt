@@ -45,6 +45,7 @@ import pitcher.core.LoopMode
 import pitcher.core.LoopPlayback
 import pitcher.core.Notes
 import pitcher.core.PcmConcat
+import pitcher.core.PeaksCache
 import pitcher.core.RenderPlan
 import pitcher.core.Timeline
 import pitcher.core.Tuner
@@ -239,10 +240,19 @@ class PitcherViewModel(app: Application) : AndroidViewModel(app) {
             setPlaybackParameters(PlaybackParameters(tempo, 1f))
         }
         viewModelScope.launch {
-            val p = withContext(Dispatchers.IO) { WaveformDecoder.decodePeaks(track.sourcePath) }
+            val p = withContext(Dispatchers.IO) {
+                val source = File(track.sourcePath)
+                val cache = peaksFile(track.id)
+                PeaksCache.read(cache, source)
+                    ?: WaveformDecoder.decodePeaks(track.sourcePath).also { PeaksCache.write(cache, source, it) }
+            }
             if (current?.id == track.id) peaks = p
         }
     }
+
+    /** The saved waveform of a song, kept with the app's files so it survives cache clears. */
+    private fun peaksFile(trackId: Long): File =
+        File(getApplication<Application>().filesDir, "peaks/track-$trackId.peaks")
 
     fun togglePlay() {
         if (current == null) return
@@ -267,6 +277,7 @@ class PitcherViewModel(app: Application) : AndroidViewModel(app) {
         val isCurrent = current?.id == track.id
         if (isCurrent) controller?.stop()
         repo.listVariants(track.id).forEach { forgetPitch(it.id) }
+        runCatching { peaksFile(track.id).delete() }
         repo.deleteTrackWithFiles(track.id, dataDir)
         if (isCurrent) {
             current = null

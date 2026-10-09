@@ -5,7 +5,6 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.spring
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -14,7 +13,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -48,7 +46,6 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
@@ -286,7 +283,6 @@ internal fun FormatDrum(
     var dragging by remember { mutableStateOf(false) }
     val density = LocalDensity.current
     val radiusPx = with(density) { DRUM_RADIUS.toPx() }
-    val itemPx = with(density) { DRUM_ITEM_HEIGHT.toPx() }
     val stepPx = radiusPx * Math.toRadians(DRUM_STEP_DEGREES.toDouble()).toFloat()
     val accent = MaterialTheme.colorScheme.primary
 
@@ -342,14 +338,6 @@ internal fun FormatDrum(
                 }
             },
     ) {
-        // A faint frame marks the middle, where the chosen extension sits.
-        Canvas(modifier = Modifier.fillMaxSize()) {
-            val y0 = size.height / 2f - itemPx / 2f - 2f
-            val y1 = size.height / 2f + itemPx / 2f + 2f
-            listOf(y0, y1).forEach { y ->
-                drawLine(accent.copy(alpha = 0.35f), Offset(0f, y), Offset(size.width, y), strokeWidth = 1.5f)
-            }
-        }
         val center = ShelfModel.drumNearest(scroll.value, entries.size)
         entries.forEachIndexed { i, f ->
             val slot = ShelfModel.drumSlot(i, scroll.value, DRUM_STEP_DEGREES, radiusPx)
