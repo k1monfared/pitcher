@@ -99,29 +99,33 @@ fun ExportSheet(vm: PitcherViewModel, onDismiss: () -> Unit, onOpenTimeline: () 
         ) {
             Text("Render", style = MaterialTheme.typography.headlineSmall)
 
-            val selectedVariant = vm.variants.firstOrNull { it.id == vm.selectedVariantId }
-            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                TextButton(onClick = { vm.renderAndKeep(null) }, enabled = !vm.exporting) {
-                    Text("+ render")
-                }
-                if (selectedVariant != null) {
+            val selectedVariant = vm.selectedVariant
+            if (selectedVariant != null) {
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                     TextButton(onClick = { renamingPitch = selectedVariant }) { Text("rename pitch") }
-                    TextButton(onClick = { vm.deleteVariant(selectedVariant) }) { Text("delete") }
+                    TextButton(onClick = { vm.deleteVariant(selectedVariant) }) { Text("delete pitch") }
                 }
             }
 
             val folder = vm.effectiveFolder()
+            val songFolder = track?.saveFolder
             Text(
-                "Save to ${folder ?: "${RenderedStore.FOLDER} (default)"}",
+                "Save to ${RenderedStore.folderLabel(folder)}" + if (folder == null) " (default)" else "",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.clickable { folderPicker.launch(null) },
             )
-            Text(
-                "Tap the address to change the folder for this song. Set a default in Settings.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    "Tap the address to change the folder for this song. Set a default in Settings.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.weight(1f),
+                )
+                if (songFolder != null) {
+                    TextButton(onClick = { vm.setSongFolder(null) }) { Text("use default") }
+                }
+            }
 
             Row(verticalAlignment = Alignment.CenterVertically) {
                 OutlinedTextField(
@@ -137,20 +141,27 @@ fun ExportSheet(vm: PitcherViewModel, onDismiss: () -> Unit, onOpenTimeline: () 
                 )
             }
 
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Checkbox(
-                    checked = vm.exportLoopOnly,
-                    onCheckedChange = { vm.changeExportLoopOnly(it) },
-                    enabled = vm.loops.any { it.enabled },
-                )
-                Text(
-                    "Render only the enabled loops",
-                    style = MaterialTheme.typography.bodyMedium,
-                    modifier = Modifier.clickable { onOpenTimeline() },
-                )
+            val hasEnabledLoops = vm.loops.any { it.enabled }
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .weight(1f)
+                        .clickable(enabled = hasEnabledLoops) {
+                            vm.changeExportLoopOnly(!vm.exportLoopOnly)
+                        },
+                ) {
+                    Checkbox(
+                        checked = vm.exportLoopOnly && hasEnabledLoops,
+                        onCheckedChange = null,
+                        enabled = hasEnabledLoops,
+                    )
+                    Text(
+                        if (hasEnabledLoops) "Render only the enabled loops" else "No loops to render",
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                }
+                TextButton(onClick = onOpenTimeline) { Text("edit loops") }
             }
 
             var confirmCancel by remember { mutableStateOf(false) }

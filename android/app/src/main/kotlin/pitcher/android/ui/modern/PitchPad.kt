@@ -51,7 +51,7 @@ import androidx.compose.ui.unit.sp
 import kotlin.math.abs
 import kotlin.math.min
 import kotlin.math.roundToInt
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import pitcher.core.PitchGesture
 
@@ -80,10 +80,11 @@ fun PitchPad(
     val lastApplied = remember { mutableIntStateOf(cents) }
     val dragging = remember { mutableStateOf(false) }
     val flinging = remember { mutableStateOf(false) }
+    val flingJob = remember { mutableStateOf<Job?>(null) }
     var showExact by remember { mutableStateOf(false) }
 
-    fun apply(rawValue: Double) {
-        val applied = if (snapNow) PitchGesture.snapCents(rawValue) else rawValue.roundToInt()
+    fun apply(rawValue: Double, allowSnap: Boolean = true) {
+        val applied = if (allowSnap && snapNow) PitchGesture.snapCents(rawValue) else rawValue.roundToInt()
         val prev = lastApplied.intValue
         if (applied != prev) {
             lastApplied.intValue = applied
@@ -97,20 +98,31 @@ fun PitchPad(
         }
     }
 
+    fun stopFling() {
+        flingJob.value?.cancel()
+        flingJob.value = null
+        flinging.value = false
+    }
+
     fun reset() {
+        stopFling()
         raw.value = 0.0
         apply(0.0)
     }
 
+    // The pills and exact entry are explicit values, so they bypass snap.
     fun adjust(delta: Int) {
-        raw.value = (raw.value + delta)
-            .coerceIn(PitchGesture.MIN_CENTS.toDouble(), PitchGesture.MAX_CENTS.toDouble())
-        apply(raw.value)
+        stopFling()
+        raw.value = (lastApplied.intValue + delta)
+            .coerceIn(PitchGesture.MIN_CENTS, PitchGesture.MAX_CENTS)
+            .toDouble()
+        apply(raw.value, allowSnap = false)
     }
 
     fun fling(velocity: Double) {
+        stopFling()
         if (abs(velocity) < PitchGesture.STOP_CENTS_PER_SEC) return
-        scope.launch {
+        flingJob.value = scope.launch {
             flinging.value = true
             var value = raw.value
             var v = velocity
@@ -153,22 +165,28 @@ fun PitchPad(
                     val rampPx = min(10f * density.density, 0.10f * size.height)
                     awaitEachGesture {
                         val down = awaitFirstDown(requireUnconsumed = false)
+                        // Any touch grabs the value and stops momentum.
+                        stopFling()
                         val startX = down.position.x
                         val startY = down.position.y
                         var lastY = down.position.y
                         var lastTime = down.uptimeMillis
+                        var lastMoveTime = down.uptimeMillis
                         var rawLocal = raw.value
                         var travel = 0.0
                         var velocity = 0.0
                         var moved = false
-                        dragging.value = true
                         while (true) {
                             val event = awaitPointerEvent()
                             val change = event.changes.firstOrNull { it.id == down.id } ?: break
                             val pos = change.position
                             val dt = (change.uptimeMillis - lastTime).coerceAtLeast(1) / 1000.0
                             val dy = lastY - pos.y
-                            if (abs(pos.x - startX) > slopPx || abs(pos.y - startY) > slopPx) moved = true
+                            if (!moved && (abs(pos.x - startX) > slopPx || abs(pos.y - startY) > slopPx)) {
+                                moved = true
+                                dragging.value = true
+                            }
+                            if (dy != 0f) lastMoveTime = change.uptimeMillis
                             if (moved) {
                                 travel += dy
                                 velocity = PitchGesture.smoothedSpeed(velocity, dy / dt, 0.25)
@@ -189,7 +207,10 @@ fun PitchPad(
                         }
                         dragging.value = false
                         if (moved) {
-                            fling(velocity * PitchGesture.centsPerPx(abs(velocity)))
+                            val idle = currentEvent.changes.firstOrNull()?.uptimeMillis
+                                ?.minus(lastMoveTime) ?: 0L
+                            val release = PitchGesture.releaseVelocity(velocity, idle)
+                            fling(release * PitchGesture.centsPerPx(abs(release)))
                         }
                     }
                 },
@@ -244,8 +265,9 @@ fun PitchPad(
         ExactEntryDialog(
             initial = cents,
             onConfirm = {
+                stopFling()
                 raw.value = it.toDouble()
-                apply(raw.value)
+                apply(raw.value, allowSnap = false)
                 showExact = false
             },
             onDismiss = { showExact = false },

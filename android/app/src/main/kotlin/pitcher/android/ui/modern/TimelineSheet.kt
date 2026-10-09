@@ -55,9 +55,14 @@ fun TimelineSheet(vm: PitcherViewModel, onDismiss: () -> Unit) {
                     modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
+                    // Local text so a trailing space survives the trimmed save.
+                    var name by remember(loop.id) { mutableStateOf(loop.name ?: "") }
                     OutlinedTextField(
-                        value = loop.name ?: "",
-                        onValueChange = { vm.renameLoop(loop.id, it) },
+                        value = name,
+                        onValueChange = {
+                            name = it
+                            vm.renameLoop(loop.id, it)
+                        },
                         placeholder = { Text("loop ${index + 1}") },
                         singleLine = true,
                         textStyle = MaterialTheme.typography.bodyLarge,

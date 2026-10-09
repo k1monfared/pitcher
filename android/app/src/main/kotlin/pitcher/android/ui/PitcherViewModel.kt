@@ -75,8 +75,11 @@ class PitcherViewModel(app: Application) : AndroidViewModel(app) {
         private set
     var tempo by mutableStateOf(1f)
         private set
-    var selectedVariantId by mutableStateOf<Long?>(null)
-        private set
+    /** The saved pitch matching the current pitch, so the shelf always shows what plays. */
+    val selectedVariant: Variant?
+        get() = variants.firstOrNull { it.cents == faderCents }
+    val selectedVariantId: Long?
+        get() = selectedVariant?.id
     var loops by mutableStateOf<List<LoopSection>>(emptyList())
         private set
     var selectedLoopId by mutableStateOf<Long?>(null)
@@ -128,7 +131,16 @@ class PitcherViewModel(app: Application) : AndroidViewModel(app) {
                 durationMs = (controller?.duration ?: 0L).coerceAtLeast(0)
             }
             if (state == Player.STATE_ENDED) {
-                isPlaying = false
+                // A loop that reaches the end of the track ends playback before
+                // the tick sees it pass the loop end, so restart it here.
+                val target = LoopPlayback.seekTarget(coreLoops(), loopMode, Long.MAX_VALUE, selectedLoopId)
+                if (target != null) {
+                    controller?.seekTo(target)
+                    controller?.play()
+                    positionMs = target
+                } else {
+                    isPlaying = false
+                }
             }
         }
     }
@@ -155,7 +167,7 @@ class PitcherViewModel(app: Application) : AndroidViewModel(app) {
                         positionMs = target
                     }
                 }
-                delay(50)
+                delay(if (loopMode == LoopMode.NONE) 50 else 15)
             }
         }
     }
@@ -211,14 +223,13 @@ class PitcherViewModel(app: Application) : AndroidViewModel(app) {
         loops = repo.listLoops(track.id)
         selectedLoopId = loops.firstOrNull()?.id
         loopMode = LoopMode.NONE
-        exportLoopOnly = loops.any { it.enabled }
+        exportLoopOnly = false
         tunerSource = track.tunerSource
         tunerTarget = track.tunerTarget
         peaks = FloatArray(0)
         detectedHz = null
         detectMessage = null
         faderCents = 0
-        selectedVariantId = null
         positionMs = 0
         durationMs = (track.durationS * 1000).toLong()
         controller?.apply {
@@ -253,12 +264,16 @@ class PitcherViewModel(app: Application) : AndroidViewModel(app) {
 
     fun deleteTrack(track: Track) {
         val dataDir = File(getApplication<Application>().filesDir, "imports").parentFile!!
-        controller?.stop()
+        val isCurrent = current?.id == track.id
+        if (isCurrent) controller?.stop()
         repo.deleteTrackWithFiles(track.id, dataDir)
-        if (current?.id == track.id) {
+        if (isCurrent) {
             current = null
             variants = emptyList()
             bookmarks = emptyList()
+            loops = emptyList()
+            selectedLoopId = null
+            loopMode = LoopMode.NONE
             peaks = FloatArray(0)
             positionMs = 0
             durationMs = 0
@@ -266,15 +281,13 @@ class PitcherViewModel(app: Application) : AndroidViewModel(app) {
         refreshTracks()
     }
 
+    /** Adds a bookmark at the playhead. One already within 750 ms is kept, not toggled off. */
     fun addBookmark(name: String?) {
         val track = current ?: return
         val atMs = controller?.currentPosition ?: positionMs
-        val existing = bookmarks.firstOrNull { kotlin.math.abs((it.t * 1000).toLong() - atMs) < 750L }
-        if (existing != null) {
-            repo.deleteBookmark(existing.id)
-        } else {
-            repo.addBookmark(track.id, atMs / 1000.0, name)
-        }
+        val times = bookmarks.map { (it.t * 1000).toLong() }
+        if (Timeline.nearestIndex(times, atMs, toleranceMs = 750L) != null) return
+        repo.addBookmark(track.id, atMs / 1000.0, name)
         bookmarks = repo.listBookmarks(track.id)
     }
 
@@ -288,13 +301,18 @@ class PitcherViewModel(app: Application) : AndroidViewModel(app) {
         bookmarks = bookmarks.filterNot { it.id == id }
     }
 
-    fun moveBookmark(id: Long, t: Double) {
-        repo.updateBookmarkTime(id, t)
+    /** Moves a bookmark in memory while it is dragged; [commitBookmark] saves it. */
+    fun previewBookmark(id: Long, t: Double) {
+        bookmarks = bookmarks.map { if (it.id == id) it.copy(t = t) else it }
+    }
+
+    fun commitBookmark(id: Long) {
+        val b = bookmarks.firstOrNull { it.id == id } ?: return
+        repo.updateBookmarkTime(id, b.t)
         current?.let { bookmarks = repo.listBookmarks(it.id) }
     }
 
     fun selectOriginal() {
-        selectedVariantId = null
         setPitchCents(0)
     }
 
@@ -314,17 +332,14 @@ class PitcherViewModel(app: Application) : AndroidViewModel(app) {
         val id = repo.addLoop(track.id, s, e, name)
         loops = repo.listLoops(track.id)
         selectedLoopId = id
-        exportLoopOnly = true
     }
 
     fun deleteLoop(id: Long) {
         repo.deleteLoop(id)
         current?.let { loops = repo.listLoops(it.id) }
         if (selectedLoopId == id) selectedLoopId = loops.firstOrNull()?.id
-        if (loops.isEmpty()) {
-            loopMode = LoopMode.NONE
-            exportLoopOnly = false
-        }
+        if (loops.isEmpty()) loopMode = LoopMode.NONE
+        if (loops.none { it.enabled }) exportLoopOnly = false
     }
 
     fun renameLoop(id: Long, name: String) {
@@ -337,12 +352,19 @@ class PitcherViewModel(app: Application) : AndroidViewModel(app) {
         current?.let { loops = repo.listLoops(it.id) }
     }
 
-    fun moveLoopEdge(id: Long, isStart: Boolean, valueMs: Long) {
-        val track = current ?: return
+    /**
+     * Moves a loop edge in memory while it is dragged, clamped by the timeline
+     * rules. [commitLoopEdge] saves it when the finger lifts.
+     */
+    fun previewLoopEdge(id: Long, isStart: Boolean, valueMs: Long) {
         val moved = Timeline.moveEdge(coreLoops(), id, isStart, valueMs, durationMs)
         val target = moved.firstOrNull { it.id == id } ?: return
-        repo.updateLoopEdges(id, target.startMs, target.endMs)
-        loops = repo.listLoops(track.id)
+        loops = loops.map { if (it.id == id) it.copy(startMs = target.startMs, endMs = target.endMs) else it }
+    }
+
+    fun commitLoopEdge(id: Long) {
+        val loop = loops.firstOrNull { it.id == id } ?: return
+        repo.updateLoopEdges(id, loop.startMs, loop.endMs)
     }
 
     fun selectLoop(id: Long?) {
@@ -375,11 +397,12 @@ class PitcherViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun clearLoops() {
-        val track = current ?: return
+        if (current == null) return
         loops.forEach { repo.deleteLoop(it.id) }
         loops = emptyList()
         selectedLoopId = null
         loopMode = LoopMode.NONE
+        exportLoopOnly = false
     }
 
     fun changeExportFormat(format: ExportFormat) {
@@ -407,43 +430,48 @@ class PitcherViewModel(app: Application) : AndroidViewModel(app) {
      */
     fun renderAndKeep(name: String?) {
         startRender {
-            renderToLibrary(faderCents, name)
+            renderToLibrary(faderCents, label = name)
             current?.let { variants = repo.listVariants(it.id) }
-            exportMessage = "saved to ${RenderedStore.FOLDER}"
+            exportMessage = savedMessage()
         }
     }
 
     /** Renders a specific saved pitch into the library. */
     fun renderAndKeepVariant(variant: Variant) {
         startRender {
-            renderToLibrary(variant.cents, variant.name)
+            renderToLibrary(variant.cents, label = variant.name)
             current?.let { variants = repo.listVariants(it.id) }
-            exportMessage = "saved to ${RenderedStore.FOLDER}"
+            exportMessage = savedMessage()
         }
     }
 
     /** Renders the current pitch using an explicit full file base name. */
     fun renderAs(baseName: String?) {
         startRender {
-            renderToLibrary(faderCents, baseName, fullName = true, notify = false)
+            renderToLibrary(faderCents, label = null, fileBase = baseName, notify = false)
             current?.let { variants = repo.listVariants(it.id) }
-            exportMessage = "saved"
+            exportMessage = savedMessage()
         }
     }
 
-    /** Renders (if needed) with an explicit full base name, then shares it. */
+    /** Renders with an explicit full base name, then shares it. */
     fun shareAs(baseName: String?) {
         startRender {
-            val variant = renderToLibrary(faderCents, baseName, fullName = true, notify = false)
+            val uri = renderToLibrary(faderCents, label = null, fileBase = baseName, notify = false)
             current?.let { variants = repo.listVariants(it.id) }
-            if (variant != null) {
-                shareUri = Uri.parse(variant.outputPath)
+            if (uri != null) {
+                shareUri = Uri.parse(uri)
                 exportMime = exportFormat.mime
                 exportMessage = "ready to share"
             } else {
                 exportMessage = "render failed"
             }
         }
+    }
+
+    private fun savedMessage(): String {
+        val what = if (renderSegments() != null) "loops saved" else "saved"
+        return "$what to ${RenderedStore.folderLabel(effectiveFolder())}"
     }
 
     /** Ensures the current pitch is rendered, then opens the share sheet. */
@@ -457,14 +485,14 @@ class PitcherViewModel(app: Application) : AndroidViewModel(app) {
             } else {
                 repo.findVariant(track.id, faderCents, true, null, format.id)
             }
-            val variant = if (existing != null && RenderedStore.exists(existing.outputPath)) {
-                existing
+            val uri = if (existing != null && RenderedStore.exists(existing.outputPath)) {
+                existing.outputPath
             } else {
-                renderToLibrary(faderCents, name, notify = false)
+                renderToLibrary(faderCents, label = name, notify = false)
             }
             current?.let { variants = repo.listVariants(it.id) }
-            if (variant != null) {
-                shareUri = Uri.parse(variant.outputPath)
+            if (uri != null) {
+                shareUri = Uri.parse(uri)
                 exportMime = format.mime
                 exportMessage = "ready to share"
             } else {
@@ -516,17 +544,22 @@ class PitcherViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /**
+     * Renders and saves a file, returning its URI. [label] is the pitch's name
+     * on the shelf and in the default file name; [fileBase], when given, is the
+     * full file name typed in the render sheet and never renames the pitch.
+     * Whole-track renders keep the shelf's pitch pointing at the new file. Loop
+     * renders are saved as files only, so they never replace a full render.
+     */
     private suspend fun renderToLibrary(
         cents: Int,
-        name: String?,
-        fullName: Boolean = false,
+        label: String?,
+        fileBase: String? = null,
         notify: Boolean = true,
-    ): Variant? {
+    ): String? {
         val track = current ?: return null
         val format = exportFormat
         val segments = renderSegments()
-        val section = segments?.takeIf { it.size == 1 }?.first()
-            ?.let { it.first / 1000.0 to it.second / 1000.0 }
         val app = getApplication<Application>()
         val folder = effectiveFolder()
         return withContext(Dispatchers.IO) {
@@ -542,14 +575,14 @@ class PitcherViewModel(app: Application) : AndroidViewModel(app) {
                     segments = segments,
                     cancelled = { renderCancelled },
                 )
-                val displayName = if (fullName && !name.isNullOrBlank()) {
-                    "${name.trim()}.$ext"
+                val displayName = if (!fileBase.isNullOrBlank()) {
+                    "${fileBase.trim()}.$ext"
                 } else {
                     Notes.downloadFilename(
                         track.title,
                         track.artist,
                         track.sourcePath,
-                        name,
+                        label,
                         cents,
                         ext,
                     )
@@ -563,26 +596,27 @@ class PitcherViewModel(app: Application) : AndroidViewModel(app) {
                         RenderedStore.openIntent(app, uri, folder),
                     )
                 }
-                val existing = repo.findVariantByCents(track.id, cents)
-                if (existing != null) {
-                    repo.updateVariantFile(existing.id, uri, format.id, name)
-                    repo.getVariant(existing.id)
-                } else {
-                    val id = repo.addVariantFull(
-                        track.id,
-                        VariantSpec(
-                            cents = cents,
-                            formant = true,
-                            engine = "sonic",
-                            pitchQuality = "quality",
-                            section = section,
-                            outputPath = uri,
-                            outputFormat = format.id,
-                            targetNote = name?.takeIf { it.isNotBlank() },
-                        ),
-                    )
-                    repo.getVariant(id)
+                if (segments == null) {
+                    val existing = repo.findVariantByCents(track.id, cents)
+                    if (existing != null) {
+                        repo.updateVariantFile(existing.id, uri, format.id)
+                    } else {
+                        repo.addVariantFull(
+                            track.id,
+                            VariantSpec(
+                                cents = cents,
+                                formant = false,
+                                engine = "wsola",
+                                pitchQuality = "quality",
+                                section = null,
+                                outputPath = uri,
+                                outputFormat = format.id,
+                                targetNote = label?.takeIf { it.isNotBlank() },
+                            ),
+                        )
+                    }
                 }
+                uri
             } finally {
                 tmp.delete()
             }
@@ -707,7 +741,7 @@ class PitcherViewModel(app: Application) : AndroidViewModel(app) {
             }
             detectMessage = null
             detectedHz = reading.hz
-            val note = Notes.hzToNote(reading.hz).name
+            val note = Notes.hzToNoteText(reading.hz)
             if (isSource) updateTunerSource(note) else updateTunerTarget(note)
         }
     }
@@ -747,7 +781,6 @@ class PitcherViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun selectVariant(variant: Variant) {
-        selectedVariantId = variant.id
         setPitchCents(variant.cents)
     }
 
@@ -762,7 +795,6 @@ class PitcherViewModel(app: Application) : AndroidViewModel(app) {
         }
         repo.deleteVariant(variant.id)
         variants = variants.filterNot { it.id == variant.id }
-        if (selectedVariantId == variant.id) selectOriginal()
     }
 
     override fun onCleared() {

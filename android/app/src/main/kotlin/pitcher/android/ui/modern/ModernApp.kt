@@ -2,6 +2,7 @@ package pitcher.android.ui.modern
 
 import android.content.Intent
 import android.net.Uri
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
@@ -53,6 +54,9 @@ fun ModernApp(
     var libraryIntroDone by remember { mutableStateOf(false) }
     var onboardingStep by remember { mutableStateOf<String?>(null) }
     val onboarding = rememberOnboardingTargets()
+
+    // Back from the Library returns to the open song instead of leaving the app.
+    BackHandler(enabled = showLibrary && vm.current != null) { showLibrary = false }
 
     Box(modifier = Modifier.fillMaxSize()) {
         if (showLibrary) {

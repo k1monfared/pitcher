@@ -1,5 +1,38 @@
 # Changelog
 
+## Unreleased
+
+Usability fixes for the studio.
+
+- Loop edges and bookmark pins can be grabbed at any zoom. The touch radius was
+  compared in milliseconds instead of pixels, so at full zoom the target was
+  under a pixel wide.
+- Dragging a loop edge or a bookmark follows the finger for the whole drag and
+  saves once on release. Before, the first move restarted the gesture.
+- A loop edge can be dragged directly. Holding a loop or a pin without moving
+  opens rename and delete, and tapping a loop selects it.
+- Zoomed out, a plain drag on the waveform scrubs.
+- Pitch momentum stops as soon as you touch the pad, and lifting a resting
+  finger no longer flings. The +1 and +10 pills work with snap on.
+- Tapping `original` returns to the original pitch, and the highlighted pitch
+  always matches what is playing.
+- Rendering no longer renames a pitch to its file name or clears its name.
+  Loop-only renders are saved as files and no longer replace the pitch's full
+  render. Making a loop no longer switches export to loops only.
+- The render sheet shows the folder by name, can reset a song to the default
+  folder, and the loop-only row toggles when tapped.
+- A loop that ends at the end of the song keeps repeating, and loop seams are
+  tighter.
+- Playback pauses for calls and other audio apps, and stops when headphones are
+  unplugged.
+- Deleting a song asks first and no longer stops a different song that is
+  playing.
+- The bookmark button only adds. It no longer deletes a bookmark under the
+  playhead.
+- Back from the Library returns to the open song.
+- Loop names accept spaces. The tuner shows detection progress and failures,
+  and keeps the cents offset of a detected note (for example `A4+37`).
+
 ## 2.5.2
 
 - Making a loop works at any zoom level. It used to need a 200 ms drag, so

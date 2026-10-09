@@ -97,6 +97,18 @@ object RenderedStore {
         }
     }
 
+    /**
+     * A readable name for a save folder: the path inside the storage volume for
+     * a SAF tree (`primary:Music/Covers` reads as `Music/Covers`), or the default.
+     */
+    fun folderLabel(folderTreeUri: String?): String {
+        if (folderTreeUri.isNullOrBlank()) return FOLDER
+        val docId = runCatching { DocumentsContract.getTreeDocumentId(Uri.parse(folderTreeUri)) }
+            .getOrNull() ?: return folderTreeUri
+        val path = docId.substringAfter(':', docId)
+        return path.ifBlank { docId.substringBefore(':') }
+    }
+
     fun exists(uriString: String): Boolean =
         uriString.startsWith("content://") || uriString.startsWith("file://")
 }

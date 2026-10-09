@@ -12,12 +12,17 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -133,6 +138,28 @@ fun LibraryContent(
 
 @Composable
 private fun SongRow(track: Track, onOpen: () -> Unit, onDelete: () -> Unit) {
+    var confirmDelete by remember { mutableStateOf(false) }
+    if (confirmDelete) {
+        AlertDialog(
+            onDismissRequest = { confirmDelete = false },
+            title = { Text("Delete this song?") },
+            text = {
+                Text(
+                    "\"${track.title.ifBlank { "(untitled)" }}\" and its saved pitches, loops, " +
+                        "and bookmarks will be removed from pitcher.",
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirmDelete = false
+                    onDelete()
+                }) { Text("Delete") }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmDelete = false }) { Text("Keep") }
+            },
+        )
+    }
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -163,6 +190,6 @@ private fun SongRow(track: Track, onOpen: () -> Unit, onDelete: () -> Unit) {
                 )
             }
         }
-        TextButton(onClick = onDelete) { Text("Delete") }
+        TextButton(onClick = { confirmDelete = true }) { Text("Delete") }
     }
 }

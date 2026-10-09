@@ -176,12 +176,10 @@ class ShelfRepository(
         id: Long,
         outputPath: String,
         outputFormat: String,
-        name: String?,
     ) {
         val values = ContentValues().apply {
             put("output_path", outputPath)
             put("output_format", outputFormat)
-            put("name", name?.trim()?.takeIf { it.isNotEmpty() })
         }
         db().update("variants", values, "id = ?", arrayOf(id.toString()))
     }

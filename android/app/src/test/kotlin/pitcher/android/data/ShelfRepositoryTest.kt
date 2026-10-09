@@ -81,6 +81,29 @@ class ShelfRepositoryTest {
     }
 
     @Test
+    fun updatingAVariantFileKeepsItsName() {
+        val id = repo.addVariantFull(
+            trackId,
+            VariantSpec(
+                cents = 300,
+                formant = false,
+                engine = "wsola",
+                pitchQuality = "quality",
+                section = null,
+                outputPath = "content://old",
+                outputFormat = "m4a",
+                targetNote = null,
+            ),
+        )
+        repo.renameVariant(id, "key of E")
+        repo.updateVariantFile(id, "content://new", "mp3")
+        val v = repo.getVariant(id)!!
+        assertEquals("key of E", v.name)
+        assertEquals("content://new", v.outputPath)
+        assertEquals("mp3", v.outputFormat)
+    }
+
+    @Test
     fun deletingTrackCascadesLoopsAndBookmarks() {
         repo.addLoop(trackId, 0, 1000)
         repo.addBookmark(trackId, 1.5, null)

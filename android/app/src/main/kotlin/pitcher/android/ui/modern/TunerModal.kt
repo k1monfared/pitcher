@@ -16,6 +16,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -36,7 +37,7 @@ fun TunerModal(vm: PitcherViewModel, onDismiss: () -> Unit) {
             Text("Tuner", style = MaterialTheme.typography.headlineSmall)
             Text(
                 "Pick a source and a target note. Detect at the playhead, choose a bookmark, " +
-                    "or type a note like c#4.",
+                    "or type a note like c#4 or a4+37.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -63,6 +64,14 @@ fun TunerModal(vm: PitcherViewModel, onDismiss: () -> Unit) {
                     vm.detectIntoTunerTarget()
                 },
             )
+
+            vm.detectMessage?.let {
+                Text(
+                    it,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.secondary,
+                )
+            }
 
             val cents = vm.tunerCents()
             if (cents != null) {
@@ -102,10 +111,19 @@ private fun NoteField(
     onBookmark: (Long) -> Unit,
 ) {
     var menu by remember { mutableStateOf(false) }
+    // Typed text stays local so the trimmed saved value does not fight the
+    // cursor; a detected note replaces it.
+    var text by remember { mutableStateOf(value ?: "") }
+    LaunchedEffect(value) {
+        if (value?.trim() != text.trim()) text = value ?: ""
+    }
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         OutlinedTextField(
-            value = value ?: "",
-            onValueChange = onChange,
+            value = text,
+            onValueChange = {
+                text = it
+                onChange(it)
+            },
             label = { Text(label) },
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),

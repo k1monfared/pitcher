@@ -50,6 +50,7 @@ fun PitchShelf(
     onDeleteVariant: (Variant) -> Unit,
     saving: Boolean = false,
     modifier: Modifier = Modifier,
+    onSelectOriginal: () -> Unit = {},
     onboarding: OnboardingTargets? = null,
 ) {
     var renaming by remember { mutableStateOf<Variant?>(null) }
@@ -63,10 +64,10 @@ fun PitchShelf(
             PitchCard(
                 label = "original",
                 sub = "+0c",
-                selected = selectedVariantId == null,
+                selected = faderCents == 0,
                 saved = true,
                 accent = accent,
-                onClick = { onOpenPitch(null) },
+                onClick = onSelectOriginal,
                 menuItems = emptyList(),
             )
         }
