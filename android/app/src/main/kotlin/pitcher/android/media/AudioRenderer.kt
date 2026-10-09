@@ -28,18 +28,19 @@ object AudioRenderer {
         startMs: Long = 0L,
         endMs: Long = -1L,
         segments: List<Pair<Long, Long>>? = null,
+        speed: Double = 1.0,
         cancelled: () -> Boolean = { false },
     ) {
         if (segments == null || segments.size <= 1) {
             val s = segments?.firstOrNull()?.first ?: startMs
             val e = segments?.firstOrNull()?.second ?: endMs
-            renderRange(sourcePath, target, format, cents, s, e, cancelled)
+            renderRange(sourcePath, target, format, cents, speed, s, e, cancelled)
             return
         }
         try {
-            renderConcat(sourcePath, target, format, cents, segments, maxChannels = 2, cancelled = cancelled)
+            renderConcat(sourcePath, target, format, cents, speed, segments, maxChannels = 2, cancelled = cancelled)
         } catch (e: OutOfMemoryError) {
-            renderConcat(sourcePath, target, format, cents, segments, maxChannels = 1, cancelled = cancelled)
+            renderConcat(sourcePath, target, format, cents, speed, segments, maxChannels = 1, cancelled = cancelled)
         }
     }
 
@@ -48,19 +49,20 @@ object AudioRenderer {
         target: File,
         format: ExportFormat,
         cents: Int,
+        speed: Double,
         startMs: Long,
         endMs: Long,
         cancelled: () -> Boolean,
     ) {
         val isWholeTrack = startMs <= 0L && endMs <= 0L
-        if (cents == 0 && isWholeTrack && sameFormat(sourcePath, format)) {
+        if (cents == 0 && speed == 1.0 && isWholeTrack && sameFormat(sourcePath, format)) {
             File(sourcePath).copyTo(target, overwrite = true)
             return
         }
         try {
-            renderPcm(sourcePath, target, format, cents, startMs, endMs, maxChannels = 2, cancelled = cancelled)
+            renderPcm(sourcePath, target, format, cents, speed, startMs, endMs, maxChannels = 2, cancelled = cancelled)
         } catch (e: OutOfMemoryError) {
-            renderPcm(sourcePath, target, format, cents, startMs, endMs, maxChannels = 1, cancelled = cancelled)
+            renderPcm(sourcePath, target, format, cents, speed, startMs, endMs, maxChannels = 1, cancelled = cancelled)
         }
     }
 
@@ -69,6 +71,7 @@ object AudioRenderer {
         target: File,
         format: ExportFormat,
         cents: Int,
+        speed: Double,
         startMs: Long,
         endMs: Long,
         maxChannels: Int,
@@ -77,7 +80,7 @@ object AudioRenderer {
         if (cancelled()) throw CancellationException("cancelled")
         val decoded = PcmDecoder.decodeChannels(sourcePath, startMs, endMs, maxChannels, cancelled)
             ?: error("cannot decode audio")
-        val shifted = shiftChannels(decoded, cents, cancelled)
+        val shifted = shiftChannels(decoded, cents, speed, cancelled)
         if (cancelled()) throw CancellationException("cancelled")
         writeFormat(target, format, shifted, decoded.sampleRate)
     }
@@ -87,6 +90,7 @@ object AudioRenderer {
         target: File,
         format: ExportFormat,
         cents: Int,
+        speed: Double,
         segments: List<Pair<Long, Long>>,
         maxChannels: Int,
         cancelled: () -> Boolean,
@@ -98,7 +102,7 @@ object AudioRenderer {
             val decoded = PcmDecoder.decodeChannels(sourcePath, startMs, endMs, maxChannels, cancelled)
                 ?: error("cannot decode audio")
             sampleRate = decoded.sampleRate
-            parts.add(shiftChannels(decoded, cents, cancelled))
+            parts.add(shiftChannels(decoded, cents, speed, cancelled))
         }
         if (cancelled()) throw CancellationException("cancelled")
         writeFormat(target, format, PcmConcat.concat(parts), sampleRate)
@@ -107,11 +111,12 @@ object AudioRenderer {
     private fun shiftChannels(
         decoded: WindowedAudioChannels,
         cents: Int,
+        speed: Double,
         cancelled: () -> Boolean,
     ): Array<FloatArray> {
         val channels = decoded.channels
         return Array(channels.size) { c ->
-            val out = PitchShifter.shift(channels[c], decoded.sampleRate, cents, cancelled)
+            val out = PitchShifter.shift(channels[c], decoded.sampleRate, cents, speed, cancelled)
             channels[c] = FloatArray(0)
             out
         }

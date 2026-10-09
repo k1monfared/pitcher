@@ -425,6 +425,17 @@ class PitcherViewModel(app: Application) : AndroidViewModel(app) {
         exportLoopOnly = value
     }
 
+    /** Whether saved files play at the current play speed instead of 1x. */
+    var exportAtSpeed by mutableStateOf(false)
+        private set
+
+    fun changeExportAtSpeed(value: Boolean) {
+        exportAtSpeed = value
+    }
+
+    /** The speed the next file is saved at. */
+    fun exportSpeed(): Double = if (exportAtSpeed && tempo != 1f) tempo.toDouble() else 1.0
+
     /**
      * The ranges to render: the enabled loops when loop-only is on, or null for
      * the whole track.
@@ -540,10 +551,16 @@ class PitcherViewModel(app: Application) : AndroidViewModel(app) {
     fun defaultFileBase(cents: Int = faderCents, name: String? = selectedVariant?.name): String {
         val track = current ?: return ""
         val ext = exportFormat.extension
-        val base = Notes.downloadFilename(track.title, track.artist, track.sourcePath, name, cents, ext)
+        var base = Notes.downloadFilename(track.title, track.artist, track.sourcePath, name, cents, ext)
             .removeSuffix(".$ext")
-        return if (renderSegments() != null) "$base - loops" else base
+        val speed = exportSpeed()
+        if (speed != 1.0) base += " - ${formatSpeedLabel(speed)}"
+        if (renderSegments() != null) base += " - loops"
+        return base
     }
+
+    private fun formatSpeedLabel(speed: Double): String =
+        if (speed == speed.toInt().toDouble()) "${speed.toInt()}x" else "${"%.2f".format(speed).trimEnd('0')}x"
 
     /**
      * The saved file of [variantId] that already matches [fileBase], [format],
@@ -555,8 +572,9 @@ class PitcherViewModel(app: Application) : AndroidViewModel(app) {
         fileBase: String,
         format: ExportFormat = exportFormat,
         segments: String = currentSegmentsKey(),
+        speed: Double = exportSpeed(),
     ): RenderPlan.Record? {
-        val match = RenderPlan.reusable(repo.listRenders(variantId), format.id, fileBase, segments)
+        val match = RenderPlan.reusable(repo.listRenders(variantId), format.id, fileBase, segments, speed)
             ?: return null
         val present = withContext(Dispatchers.IO) { RenderedStore.isPresent(getApplication(), match.uri) }
         if (!present) {
@@ -584,6 +602,7 @@ class PitcherViewModel(app: Application) : AndroidViewModel(app) {
         val format = exportFormat
         val segments = renderSegments()
         val segmentsKey = RenderPlan.segmentsKey(segments)
+        val speed = exportSpeed()
         val folder = effectiveFolder()
         val name = fileBase.trim().ifEmpty { defaultFileBase(variant.cents, variant.name) }
         val flag = flagFor(id)
@@ -592,7 +611,7 @@ class PitcherViewModel(app: Application) : AndroidViewModel(app) {
             pitchWork[id] = if (share) PitchWork.SHARING else PitchWork.SAVING
             pitchStatus.remove(id)
             try {
-                val existing = matchingRender(id, name, format, segmentsKey)
+                val existing = matchingRender(id, name, format, segmentsKey, speed)
                 val uri = existing?.uri ?: run {
                     val prepared = prepare(id, variant.cents).await()
                     val saved = withContext(renderDispatcher) {
@@ -600,13 +619,14 @@ class PitcherViewModel(app: Application) : AndroidViewModel(app) {
                         val tmp = File(tmpDir, "render-${System.nanoTime()}.${format.extension}")
                         try {
                             // The prepared file is already shifted, so this only
-                            // cuts the loops and encodes.
+                            // cuts the loops, applies the speed, and encodes.
                             AudioRenderer.render(
                                 sourcePath = prepared.path,
                                 target = tmp,
                                 format = format,
                                 cents = 0,
                                 segments = segments,
+                                speed = speed,
                                 cancelled = { flag.get() },
                             )
                             RenderedStore.save(app, folder, "$name.${format.extension}", format.mime, tmp)
@@ -614,7 +634,7 @@ class PitcherViewModel(app: Application) : AndroidViewModel(app) {
                             tmp.delete()
                         }
                     }
-                    repo.addRender(id, saved, format.id, name, segmentsKey)
+                    repo.addRender(id, saved, format.id, name, segmentsKey, speed)
                     if (current?.id == track.id) refreshVariants()
                     rendersVersion++
                     saved

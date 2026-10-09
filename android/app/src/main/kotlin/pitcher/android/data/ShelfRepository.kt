@@ -169,19 +169,27 @@ class ShelfRepository(
         return id
     }
 
-    fun addRender(variantId: Long, uri: String, format: String, fileName: String, segments: String): Long {
+    fun addRender(
+        variantId: Long,
+        uri: String,
+        format: String,
+        fileName: String,
+        segments: String,
+        speed: Double = 1.0,
+    ): Long {
         val values = ContentValues().apply {
             put("variant_id", variantId)
             put("uri", uri)
             put("format", format)
             put("file_name", fileName.trim())
             put("segments", segments)
+            put("speed", speed)
         }
         return db().insert("renders", null, values)
     }
 
     fun listRenders(variantId: Long): List<RenderPlan.Record> {
-        val sql = "SELECT id, uri, format, file_name, segments FROM renders WHERE variant_id = ? ORDER BY id"
+        val sql = "SELECT id, uri, format, file_name, segments, speed FROM renders WHERE variant_id = ? ORDER BY id"
         return db().rawQuery(sql, arrayOf(variantId.toString())).use { c ->
             c.mapAll {
                 RenderPlan.Record(
@@ -190,6 +198,7 @@ class ShelfRepository(
                     format = it.getString(2),
                     fileName = it.getString(3),
                     segments = it.getString(4),
+                    speed = it.getDouble(5),
                 )
             }
         }

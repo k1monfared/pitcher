@@ -19,17 +19,24 @@ object PitchShifter {
     private const val SYNTH_HOP = FRAME / 2
     private const val SEARCH = FRAME / 4
 
+    /**
+     * Shifts by [cents] and plays back at [speed] (2.0 is twice as fast, same
+     * pitch). Speed folds into the stretch: the resampled audio is stretched by
+     * ratio / speed instead of ratio, so both cost one pass.
+     */
     fun shift(
         samples: FloatArray,
         sampleRate: Int,
         cents: Int,
+        speed: Double = 1.0,
         cancelled: () -> Boolean = { false },
     ): FloatArray {
         if (samples.isEmpty()) return FloatArray(0)
-        if (cents == 0) return samples.copyOf()
+        val s = if (speed > 0.0) speed else 1.0
+        if (cents == 0 && s == 1.0) return samples.copyOf()
         val ratio = Math.pow(2.0, cents / 1200.0)
-        val resampled = resample(samples, ratio, cancelled)
-        return timeStretch(resampled, ratio, cancelled)
+        val resampled = if (cents == 0) samples else resample(samples, ratio, cancelled)
+        return timeStretch(resampled, ratio / s, cancelled)
     }
 
     private fun resample(input: FloatArray, ratio: Double, cancelled: () -> Boolean): FloatArray {

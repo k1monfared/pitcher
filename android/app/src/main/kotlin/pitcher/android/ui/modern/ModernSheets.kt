@@ -92,7 +92,9 @@ fun ExportSheet(vm: PitcherViewModel, onDismiss: () -> Unit, onOpenTimeline: () 
     LaunchedEffect(Unit) {
         if (variant == null) vm.keepPitch()
     }
-    LaunchedEffect(variant?.id, fileBase, format, vm.exportLoopOnly, vm.loops, vm.rendersVersion) {
+    LaunchedEffect(
+        variant?.id, fileBase, format, vm.exportLoopOnly, vm.loops, vm.exportAtSpeed, vm.tempo, vm.rendersVersion,
+    ) {
         match = variant?.let { vm.matchingRender(it.id, fileBase) }
     }
 
@@ -187,6 +189,28 @@ fun ExportSheet(vm: PitcherViewModel, onDismiss: () -> Unit, onOpenTimeline: () 
                     )
                 }
                 TextButton(onClick = onOpenTimeline) { Text("edit loops") }
+            }
+
+            val speedChanged = vm.tempo != 1f
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(enabled = speedChanged) { vm.changeExportAtSpeed(!vm.exportAtSpeed) },
+            ) {
+                Checkbox(
+                    checked = vm.exportAtSpeed && speedChanged,
+                    onCheckedChange = null,
+                    enabled = speedChanged,
+                )
+                Text(
+                    if (speedChanged) {
+                        "At the current speed (${formatSpeed(vm.tempo)})"
+                    } else {
+                        "At the current speed (playing at 1x)"
+                    },
+                    style = MaterialTheme.typography.bodyMedium,
+                )
             }
 
             val work = variant?.let { vm.pitchWork[it.id] }

@@ -362,28 +362,28 @@ private fun StudioTopBar(
 
 @Composable
 private fun GearButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
-    Surface(
-        modifier = modifier.clickable(onClick = onClick),
-        shape = CircleShape,
-        color = Color.White.copy(alpha = 0.06f),
+    // No background, tinted like the Library link opposite it.
+    val tint = MaterialTheme.colorScheme.primary
+    androidx.compose.foundation.Canvas(
+        modifier = modifier
+            .clickable(onClick = onClick)
+            .padding(10.dp)
+            .size(22.dp),
     ) {
-        androidx.compose.foundation.Canvas(modifier = Modifier.padding(9.dp).size(20.dp)) {
-            val w = size.width
-            val cx = w / 2f
-            val cy = w / 2f
-            val teeth = 8
-            val outer = w * 0.46f
-            val inner = w * 0.30f
-            val tint = Color(0xFFEDEDF2)
-            for (i in 0 until teeth) {
-                val a = Math.toRadians(i * 360.0 / teeth)
-                val x = cx + (outer * 0.62f * kotlin.math.cos(a)).toFloat()
-                val y = cy + (outer * 0.62f * kotlin.math.sin(a)).toFloat()
-                drawCircle(color = tint, radius = w * 0.11f, center = Offset(x, y))
-            }
-            drawCircle(color = tint, radius = inner, center = Offset(cx, cy))
-            drawCircle(color = Color(0xFF08080B), radius = inner * 0.42f, center = Offset(cx, cy))
+        val w = size.width
+        val cx = w / 2f
+        val cy = w / 2f
+        val teeth = 8
+        val outer = w * 0.46f
+        val inner = w * 0.30f
+        for (i in 0 until teeth) {
+            val a = Math.toRadians(i * 360.0 / teeth)
+            val x = cx + (outer * 0.62f * kotlin.math.cos(a)).toFloat()
+            val y = cy + (outer * 0.62f * kotlin.math.sin(a)).toFloat()
+            drawCircle(color = tint, radius = w * 0.11f, center = Offset(x, y))
         }
+        drawCircle(color = tint, radius = inner, center = Offset(cx, cy))
+        drawCircle(color = Color(0xFF08080B), radius = inner * 0.42f, center = Offset(cx, cy))
     }
 }
 

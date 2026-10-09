@@ -48,6 +48,35 @@ class PitchShifterTest {
     }
 
     @Test
+    fun fasterSpeedShortensTheAudioAndKeepsThePitch() {
+        val input = sine(440.0, secs = 2.0)
+        val out = PitchShifter.shift(input, 44100, 0, speed = 2.0)
+        val ratio = out.size.toDouble() / (input.size / 2.0)
+        assertTrue("ratio=$ratio", ratio in 0.97..1.03)
+        val r = Tuner.detect(out, 44100)!!
+        assertTrue("hz=${r.hz}", abs(r.hz - 440.0) < 5.0)
+    }
+
+    @Test
+    fun slowerSpeedLengthensTheAudio() {
+        val input = sine(440.0, secs = 1.0)
+        val out = PitchShifter.shift(input, 44100, 0, speed = 0.5)
+        val ratio = out.size.toDouble() / (input.size * 2.0)
+        assertTrue("ratio=$ratio", ratio in 0.97..1.03)
+    }
+
+    @Test
+    fun pitchAndSpeedApplyTogether() {
+        val input = sine(440.0, secs = 2.0)
+        val out = PitchShifter.shift(input, 44100, -300, speed = 1.25)
+        val ratio = out.size.toDouble() / (input.size / 1.25)
+        assertTrue("ratio=$ratio", ratio in 0.97..1.03)
+        val expected = 440.0 * Math.pow(2.0, -300.0 / 1200.0)
+        val r = Tuner.detect(out, 44100)!!
+        assertTrue("hz=${r.hz} expected~$expected", abs(r.hz - expected) < 6.0)
+    }
+
+    @Test
     fun handlesSilence() {
         val out = PitchShifter.shift(FloatArray(44100), 44100, -100)
         assertEquals(44100.0, out.size.toDouble(), 1000.0)

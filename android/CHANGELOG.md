@@ -31,6 +31,9 @@ Studio:
 - A song's waveform is saved the first time it is drawn, so opening the song
   again shows it right away instead of decoding the whole file.
 - The format knob has no frame lines.
+- Files can be saved at the current play speed. The pitch's background render
+  stays at normal speed, so only the save applies the speed.
+- The settings gear is a plain coloured icon.
 
 Chart and transport:
 

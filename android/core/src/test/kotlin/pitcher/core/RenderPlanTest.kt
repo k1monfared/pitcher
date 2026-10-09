@@ -36,6 +36,14 @@ class RenderPlanTest {
     }
 
     @Test
+    fun aDifferentSpeedNeedsANewRender() {
+        val records = listOf(record(1, "m4a", "Song - +300"))
+        assertNull(RenderPlan.reusable(records, "m4a", "Song - +300", "", speed = 0.8))
+        val slow = listOf(record(2, "m4a", "Song - +300").copy(speed = 0.8))
+        assertEquals(2L, RenderPlan.reusable(slow, "m4a", "Song - +300", "", speed = 0.8)?.id)
+    }
+
+    @Test
     fun nameMatchingIgnoresSurroundingSpaces() {
         val records = listOf(record(1, "m4a", "Song - +300"))
         assertEquals(1L, RenderPlan.reusable(records, "m4a", "  Song - +300 ", "")?.id)

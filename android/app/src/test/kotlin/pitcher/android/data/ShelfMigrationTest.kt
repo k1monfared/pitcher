@@ -80,6 +80,33 @@ class ShelfMigrationTest {
     }
 
     @Test
+    fun version3RendersGainASpeedOfOne() {
+        SQLiteDatabase.openDatabase(context.getDatabasePath(dbName).path, null, SQLiteDatabase.OPEN_READWRITE)
+            .use { db ->
+                db.execSQL(
+                    "CREATE TABLE renders (id INTEGER PRIMARY KEY AUTOINCREMENT, variant_id INTEGER NOT NULL, " +
+                        "uri TEXT NOT NULL, format TEXT NOT NULL, file_name TEXT NOT NULL, " +
+                        "segments TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL DEFAULT (datetime('now')))",
+                )
+                db.execSQL(
+                    "INSERT INTO renders (variant_id, uri, format, file_name) " +
+                        "VALUES (1, 'content://media/9', 'mp3', 'Song - up')",
+                )
+                db.version = 3
+            }
+        val repo = ShelfRepository(context, dbName)
+        try {
+            val render = repo.listRenders(1).single()
+            assertEquals("Song - up", render.fileName)
+            assertEquals(1.0, render.speed, 0.0)
+            repo.addRender(1, "content://media/10", "m4a", "Song - up", "", speed = 0.8)
+            assertEquals(0.8, repo.listRenders(1).last().speed, 1e-9)
+        } finally {
+            repo.close()
+        }
+    }
+
+    @Test
     fun existingFilesBecomeRendersAndPitchesSurvive() {
         val repo = ShelfRepository(context, dbName)
         try {
@@ -90,6 +117,7 @@ class ShelfMigrationTest {
             assertEquals("content://media/1", render.uri)
             assertEquals("m4a", render.format)
             assertEquals("", render.segments)
+            assertEquals(1.0, render.speed, 0.0)
             assertEquals("up", repo.getVariant(1)!!.name)
         } finally {
             repo.close()

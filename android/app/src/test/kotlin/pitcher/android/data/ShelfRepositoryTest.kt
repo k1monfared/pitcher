@@ -116,11 +116,12 @@ class ShelfRepositoryTest {
     fun rendersAttachToAPitchAndCascadeWithIt() {
         val id = repo.addPitch(trackId, -200)
         repo.addRender(id, "content://a", "m4a", "Song - -200", "")
-        repo.addRender(id, "content://b", "mp3", "Song - -200", "1000-2000")
+        repo.addRender(id, "content://b", "mp3", "Song - -200", "1000-2000", speed = 0.75)
         assertEquals(2, repo.getVariant(id)!!.renderCount)
         val records = repo.listRenders(id)
         assertEquals(listOf("m4a", "mp3"), records.map { it.format })
         assertEquals("1000-2000", records.last().segments)
+        assertEquals(listOf(1.0, 0.75), records.map { it.speed })
         repo.deleteVariant(id)
         assertTrue(repo.listRenders(id).isEmpty())
     }

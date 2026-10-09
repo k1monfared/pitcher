@@ -96,12 +96,19 @@ internal class ShelfDb(
                 format TEXT NOT NULL,
                 file_name TEXT NOT NULL,
                 segments TEXT NOT NULL DEFAULT '',
+                speed REAL NOT NULL DEFAULT 1.0,
                 created_at TEXT NOT NULL DEFAULT (datetime('now'))
             )
             """.trimIndent(),
         )
         db.execSQL("CREATE INDEX IF NOT EXISTS idx_renders_variant ON renders(variant_id)")
     }
+
+    private fun hasColumn(db: SQLiteDatabase, table: String, column: String): Boolean =
+        db.rawQuery("PRAGMA table_info($table)", null).use { c ->
+            val nameIdx = c.getColumnIndexOrThrow("name")
+            generateSequence { if (c.moveToNext()) c.getString(nameIdx) else null }.any { it == column }
+        }
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
         if (oldVersion < 2) {
@@ -139,9 +146,13 @@ internal class ShelfDb(
                 """.trimIndent(),
             )
         }
+        // Version 3 renders had no speed; they all played at 1x.
+        if (oldVersion < 4 && !hasColumn(db, "renders", "speed")) {
+            db.execSQL("ALTER TABLE renders ADD COLUMN speed REAL NOT NULL DEFAULT 1.0")
+        }
     }
 
     companion object {
-        const val VERSION = 3
+        const val VERSION = 4
     }
 }
