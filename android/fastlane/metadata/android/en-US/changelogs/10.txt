@@ -1,0 +1,3 @@
+- A new icon: a glowing knob, turned up. It follows your wallpaper colours on Android 13 and newer.
+- Audio is decoded, played, and encoded with Android's own open-source codecs, never a phone maker's closed-source ones unless nothing else exists.
+- Licensed under the GPL-3.0.

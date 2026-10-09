@@ -1,7 +1,9 @@
 # Changelog
 
-## Unreleased
+## 2.6.1
 
+- A new icon: a glowing knob, turned up. It also follows your wallpaper colours
+  on Android 13 and newer.
 - Decoding, playback, and encoding prefer Android's own open-source codecs over a
   phone maker's closed-source ones, which are used only when nothing else exists.
 - pitcher is licensed under the GPL-3.0, and the license text is now included.
