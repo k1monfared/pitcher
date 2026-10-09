@@ -1,0 +1,31 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- The knob in one colour, for themed icons. The system tints it. -->
+    <group
+        android:pivotX="54"
+        android:pivotY="54"
+        android:scaleX="0.7"
+        android:scaleY="0.7">
+        <path
+            android:pathData="M31.37,76.63 A32,32 0 1,1 76.63,76.63"
+            android:strokeColor="#FFFFFF"
+            android:strokeAlpha="0.35"
+            android:strokeWidth="7"
+            android:strokeLineCap="round" />
+        <path
+            android:pathData="M31.37,76.63 A32,32 0 0,1 70,26.29"
+            android:strokeColor="#FFFFFF"
+            android:strokeWidth="9"
+            android:strokeLineCap="round" />
+        <path
+            android:pathData="M54,36 A18,18 0 1,1 53.99,36 Z"
+            android:strokeColor="#FFFFFF"
+            android:strokeWidth="5" />
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M60.5,37.24 A5.5,5.5 0 1,1 60.49,37.24 Z" />
+    </group>
+</vector>

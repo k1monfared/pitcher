@@ -16,6 +16,9 @@ import pitcher.android.data.Bookmark
 import pitcher.android.data.LoopSection
 import pitcher.android.data.Track
 import pitcher.android.data.Variant
+import android.widget.ImageView
+import androidx.compose.foundation.layout.size
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.padding
 import androidx.compose.ui.Modifier
@@ -175,6 +178,24 @@ class ScreenshotTest {
         }
         settle()
         compose.onRoot().captureRoboImage("build/screenshots/14-modern-studio-new-pitch.png")
+    }
+
+    @Test
+    @Config(qualifiers = "w411dp-h891dp-xxhdpi")
+    fun launcherIcon() {
+        compose.setContent {
+            AndroidView(
+                factory = { context ->
+                    ImageView(context).apply {
+                        setImageResource(pitcher.android.R.mipmap.ic_launcher)
+                        setBackgroundColor(android.graphics.Color.rgb(40, 40, 48))
+                    }
+                },
+                modifier = Modifier.size(192.dp),
+            )
+        }
+        settle()
+        compose.onRoot().captureRoboImage("build/screenshots/16-launcher-icon.png")
     }
 
     @Test

@@ -90,7 +90,8 @@ header.site .header-inner {
   text-decoration: none;
 }
 
-.brand svg {
+.brand svg,
+.brand img {
   display: block;
   flex: none;
 }
