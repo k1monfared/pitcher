@@ -19,7 +19,7 @@ Website: <https://k1monfared.com/pitcher/>
 
 ## Get it
 
-**Android (10 or newer).** Download `pitcher-android-v2.6.1.apk` from the
+**Android (10 or newer).** Download `pitcher-android-v2.6.2.apk` from the
 [latest release](https://github.com/k1monfared/pitcher/releases/latest) and open it
 on your phone. New versions install over the old one and keep your library.
 
@@ -94,7 +94,7 @@ terms. See [docs/LEGALITY.md](docs/LEGALITY.md).
 ```
 cargo test                                            # Rust
 cd web && npm install && npm test                     # web app
-cd android && ./gradlew :core:test :app:testDebugUnitTest   # Android
+cd android && ./gradlew :core:test :app:testFdroidDebugUnitTest   # Android
 ```
 
 Building the Android app, signing, screenshots, and releases are covered in
@@ -110,7 +110,7 @@ site/                  project website (GitHub Pages)
 docs/                  plans and legality notes
 android/core/          pure Kotlin logic, tested on the JVM
 android/app/           the Android app
-android/fastlane/      store listing text and screenshots
+fastlane/              store listing text and screenshots
 ```
 
 ## License

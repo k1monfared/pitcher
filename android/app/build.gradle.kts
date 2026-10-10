@@ -13,8 +13,8 @@ android {
         applicationId = "com.k1.pitcher"
         minSdk = 29
         targetSdk = 36
-        versionCode = 10
-        versionName = "2.6.1"
+        versionCode = 11
+        versionName = "2.6.2"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -38,8 +38,27 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
             )
-            signingConfig = signingConfigs.findByName("release")
-                ?: signingConfigs.getByName("debug")
+            // -Punsigned leaves the APK unsigned, as F-Droid builds it before
+            // checking it against the published, signed APK.
+            signingConfig = if (project.hasProperty("unsigned")) {
+                null
+            } else {
+                signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
+            }
+        }
+    }
+
+    // fdroid is also the GitHub release. play leaves out the support links,
+    // since Play does not allow pointing to outside payments.
+    flavorDimensions += "store"
+    productFlavors {
+        create("fdroid") {
+            dimension = "store"
+            buildConfigField("boolean", "SUPPORT_LINKS", "true")
+        }
+        create("play") {
+            dimension = "store"
+            buildConfigField("boolean", "SUPPORT_LINKS", "false")
         }
     }
 
@@ -50,6 +69,7 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 
     testOptions {

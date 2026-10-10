@@ -42,12 +42,14 @@ jobs:
           PITCHER_KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           PITCHER_KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           PITCHER_KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        # The fdroid flavour is the GitHub release, so F-Droid can verify its
+        # reproducible build against this APK and ship it with this signature.
         run: |
           cd android
-          ./gradlew :core:test :app:assembleRelease
+          ./gradlew :core:test :app:assembleFdroidRelease
 
       - name: Rename APK
-        run: mv android/app/build/outputs/apk/release/app-release.apk "pitcher-android-${{ github.ref_name }}.apk"
+        run: mv android/app/build/outputs/apk/fdroid/release/app-fdroid-release.apk "pitcher-android-${{ github.ref_name }}.apk"
 
       - name: Publish release
         if: startsWith(github.ref, 'refs/tags/')

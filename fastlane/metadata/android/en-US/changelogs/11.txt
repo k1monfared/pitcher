@@ -1,0 +1,3 @@
+- Support pitcher from Settings, with Ko-fi, GitHub Sponsors, and Patreon.
+- Settings shows the real app version and describes the current engines.
+- Reproducible build: the F-Droid and GitHub APKs are the same, so you can update from either.

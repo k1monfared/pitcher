@@ -73,9 +73,9 @@ Settings.
 ```
 cd android
 ./gradlew :core:test                 # note math, tuner, timeline, shelf, files
-./gradlew :app:testDebugUnitTest     # storage, rendering, screenshots
-./gradlew :app:assembleDebug         # debug APK
-./gradlew :app:assembleRelease       # minified release APK
+./gradlew :app:testFdroidDebugUnitTest     # storage, rendering, screenshots
+./gradlew :app:assembleFdroidDebug   # debug APK
+./gradlew :app:assembleFdroidRelease # minified release APK (GitHub and F-Droid)
 ```
 
 Requires Java 17 or newer and the Android SDK (platform 36 and build-tools).
@@ -98,6 +98,31 @@ Create `android/local.properties` with `sdk.dir=/path/to/Android/Sdk`
 - Waveforms are computed once per song and kept with the app's files.
 - The library, pitches, saved files, loops, and bookmarks live in a small SQLite
   database (schema version 4).
+
+## Flavours
+
+- `fdroid` is the GitHub release and the F-Droid build. It shows the support links
+  in Settings.
+- `play` is the Google Play build. It leaves the support links out, since Play
+  does not allow pointing to outside payments.
+
+Both share the application id `com.k1.pitcher`, so one signing key covers every
+channel.
+
+## Reproducible builds
+
+The `fdroid` release build is reproducible. F-Droid rebuilds it from the tagged
+source, unsigned, and checks that the signature from the GitHub release fits its
+build byte for byte, then ships the GitHub-signed APK. To check it yourself:
+
+```
+./gradlew :app:assembleFdroidRelease -Punsigned
+apksigcopier compare pitcher-android-vX.Y.Z.apk --unsigned \
+  app/build/outputs/apk/fdroid/release/app-fdroid-release-unsigned.apk
+```
+
+`-Punsigned` leaves the release unsigned instead of falling back to the debug key.
+The F-Droid recipe lives in `fdroid/com.k1.pitcher.yml` for reference.
 
 ## Signing and releases
 
@@ -123,14 +148,14 @@ Screenshots are rendered from the real Compose UI with Roborazzi, no device
 needed:
 
 ```
-./gradlew :app:testDebugUnitTest -Proborazzi.test.record=true --tests "*ScreenshotTest"
+./gradlew :app:testFdroidDebugUnitTest -Proborazzi.test.record=true --tests "*ScreenshotTest"
 ```
 
 They land in `app/build/screenshots/`. The published copies live in
-`fastlane/metadata/android/en-US/images/phoneScreenshots/` and
+`../fastlane/metadata/android/en-US/images/phoneScreenshots/` and
 `../site/assets/android/`. Copy them over after regenerating.
 
 ## Store listing
 
 The listing text (title, short and full description, per-version changelogs) is
-in `fastlane/metadata/android/en-US/`.
+in `../fastlane/metadata/android/en-US/` at the repo root, where F-Droid reads it.

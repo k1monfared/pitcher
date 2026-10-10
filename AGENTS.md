@@ -29,7 +29,7 @@ decisions. Summary of the chosen stack:
 - Android shifts with Media3's Sonic for both playback and saved files, so files
   match the preview. Kept pitches pre-render to a cached WAV in the background.
   Release notes live in `android/CHANGELOG.md` and the store listing in
-  `android/fastlane/`.
+  `fastlane/` at the repo root, where F-Droid looks for it.
 
 ## Layout
 
@@ -47,7 +47,7 @@ docs/LEGALITY.md       source/ToS notes
 data/                  sqlite db + rendered variants (gitignored)
 android/core/          pure-Kotlin note math (ported from notes.rs), tested on JVM
 android/app/           native Android app (Kotlin + Compose), offline only
-android/fastlane/      store listing metadata and screenshots
+fastlane/              store listing text and screenshots (F-Droid and Play)
 ```
 
 ## Conventions
@@ -83,10 +83,10 @@ cargo fmt                        # format
 cd web && npm install && npm run build   # frontend
 cd web && npm test               # frontend tests
 cd android && ./gradlew :core:test        # Android core note-math tests
-cd android && ./gradlew :app:testDebugUnitTest  # Android app unit + screenshot tests
-cd android && ./gradlew :app:assembleDebug  # build debug APK
-cd android && ./gradlew :app:assembleRelease # minified release APK
-cd android && ./gradlew :app:testDebugUnitTest -Proborazzi.test.record=true --tests "*ScreenshotTest"  # render screenshots
+cd android && ./gradlew :app:testFdroidDebugUnitTest  # Android app unit + screenshot tests
+cd android && ./gradlew :app:assembleFdroidDebug  # build debug APK
+cd android && ./gradlew :app:assembleFdroidRelease # minified release APK (GitHub and F-Droid)
+cd android && ./gradlew :app:testFdroidDebugUnitTest -Proborazzi.test.record=true --tests "*ScreenshotTest"  # render screenshots
 ```
 
 Android release signing reads `PITCHER_KEYSTORE`, `PITCHER_KEYSTORE_PASSWORD`,

@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.6.2
+
+- Settings has a Support pitcher section with Ko-fi, GitHub Sponsors, and
+  Patreon. Each opens in your browser.
+- Settings shows the real app version and describes the current engines.
+- Ready for F-Droid: the build is reproducible, so F-Droid can ship the same
+  signed APK as GitHub, and updates move freely between the two.
+
 ## 2.6.1
 
 - A new icon: a glowing knob, turned up. It also follows your wallpaper colours

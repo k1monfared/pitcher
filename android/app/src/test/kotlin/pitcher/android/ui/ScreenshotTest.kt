@@ -200,6 +200,20 @@ class ScreenshotTest {
 
     @Test
     @Config(qualifiers = "w411dp-h891dp-xxhdpi")
+    fun supportLinks() {
+        compose.setContent {
+            ModernTheme {
+                Box(modifier = Modifier.background(Color(0xFF14141A)).padding(20.dp)) {
+                    SupportLinksSection(onOpen = {})
+                }
+            }
+        }
+        settle()
+        compose.onRoot().captureRoboImage("build/screenshots/17-support-links.png")
+    }
+
+    @Test
+    @Config(qualifiers = "w411dp-h891dp-xxhdpi")
     fun formatKnob() {
         compose.setContent {
             ModernTheme {

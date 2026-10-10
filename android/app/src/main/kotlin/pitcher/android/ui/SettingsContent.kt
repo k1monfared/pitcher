@@ -1,6 +1,8 @@
 package pitcher.android.ui
 
 import android.content.Intent
+import android.net.Uri
+import pitcher.android.BuildConfig
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
@@ -40,6 +42,15 @@ fun SettingsContent(vm: PitcherViewModel, modifier: Modifier = Modifier) {
         modifier = modifier.fillMaxWidth().padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
+        if (BuildConfig.SUPPORT_LINKS) {
+            SupportLinksSection(onOpen = { url ->
+                runCatching {
+                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+                }
+            })
+            HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+        }
+
         Text("Playback", style = MaterialTheme.typography.titleMedium)
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -66,16 +77,17 @@ fun SettingsContent(vm: PitcherViewModel, modifier: Modifier = Modifier) {
             style = MaterialTheme.typography.bodyMedium,
         )
         Text(
-            "Exported renders (cache): ${fmtSize(vm.storageExportsBytes)}",
+            "Kept pitches, rendered in the background: ${fmtSize(vm.storageExportsBytes)}",
             style = MaterialTheme.typography.bodyMedium,
         )
         Text(
-            "Rendered pitches live in ${pitcher.android.media.RenderedStore.FOLDER}.",
+            "Clearing these is safe. They are rendered again when needed. Files you saved " +
+                "stay in their folder.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Button(onClick = { vm.clearExports() }, enabled = vm.storageExportsBytes > 0) {
-            Text("Clear exported renders")
+            Text("Clear background renders")
         }
 
         HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
@@ -98,8 +110,8 @@ fun SettingsContent(vm: PitcherViewModel, modifier: Modifier = Modifier) {
 
         Text("Engines", style = MaterialTheme.typography.titleMedium)
         Text(
-            "Live preview: Media3 Sonic (pitch at fixed tempo)\n" +
-                "Renders: in-app WSOLA (stereo, mono fallback)\n" +
+            "Playback and saved files: Media3 Sonic, so files match the preview\n" +
+                "Codecs: Android's own open-source codecs first\n" +
                 "Tuner: built-in YIN",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -115,9 +127,10 @@ fun SettingsContent(vm: PitcherViewModel, modifier: Modifier = Modifier) {
         )
         Button(onClick = { vm.startOnboarding() }) { Text("Replay the tour") }
 
-        Text("pitcher 2.5.2 for Android", style = MaterialTheme.typography.bodySmall)
+        Text("pitcher ${BuildConfig.VERSION_NAME} for Android", style = MaterialTheme.typography.bodySmall)
         Text(
-            "Offline only. This app requests no network permission.",
+            "Offline only. This app requests no network permission. Free software under " +
+                "the GPL-3.0.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
