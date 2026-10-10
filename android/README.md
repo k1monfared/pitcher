@@ -78,7 +78,7 @@ cd android
 ./gradlew :app:assembleFdroidRelease # minified release APK (GitHub and F-Droid)
 ```
 
-Requires Java 17 or newer and the Android SDK (platform 36 and build-tools).
+Requires a full JDK 17 or newer (with javac, so set `JAVA_HOME` if the system Java is only a runtime) and the Android SDK (platform 36 and build-tools).
 Create `android/local.properties` with `sdk.dir=/path/to/Android/Sdk`
 (gitignored).
 

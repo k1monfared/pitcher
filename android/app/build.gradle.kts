@@ -13,8 +13,8 @@ android {
         applicationId = "com.k1.pitcher"
         minSdk = 29
         targetSdk = 36
-        versionCode = 11
-        versionName = "2.6.2"
+        versionCode = 12
+        versionName = "2.6.3"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 

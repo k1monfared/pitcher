@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.6.3
+
+- Builds on a stock JDK with no toolchain download, as F-Droid requires. No
+  changes to the app itself.
+
 ## 2.6.2
 
 - Settings has a Support pitcher section with Ko-fi, GitHub Sponsors, and

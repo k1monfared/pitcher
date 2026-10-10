@@ -95,7 +95,7 @@ debug key. `.github/workflows/android-release.yml` builds and attaches the APK
 to a GitHub Release on `v*` tags.
 
 Android builds need `android/local.properties` with `sdk.dir=/path/to/Android/Sdk`
-(gitignored). Java 17+ and the Android SDK (platform 36, build-tools) are required.
+(gitignored). A full JDK 17+ (with javac, so set JAVA_HOME if the system Java is only a runtime) and the Android SDK (platform 36, build-tools) are required.
 
 ## System dependencies
 
