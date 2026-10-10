@@ -13,12 +13,13 @@ AutoName: pitcher
 
 RepoType: git
 Repo: https://github.com/k1monfared/pitcher.git
-Binaries: https://github.com/k1monfared/pitcher/releases/download/v%v/pitcher-android-v%v.apk
+Binaries: 
+  https://github.com/k1monfared/pitcher/releases/download/v%v/pitcher-android-v%v.apk
 
 Builds:
-  - versionName: 2.6.3
-    versionCode: 12
-    commit: 47bae68ec6a00102ff1358287f5f8194d2a7098e
+  - versionName: 2.6.4
+    versionCode: 13
+    commit: a8e784e6b0420319702917b27d0ad2da75c5a912
     subdir: android/app
     gradle:
       - fdroid
@@ -29,5 +30,5 @@ AllowedAPKSigningKeys: 64a8bf36ccfde60227eada08be2c1e40010525772d2b5b67bcdb7f60d
 
 AutoUpdateMode: Version
 UpdateCheckMode: Tags ^v[0-9.]+$
-CurrentVersion: 2.6.3
-CurrentVersionCode: 12
+CurrentVersion: 2.6.4
+CurrentVersionCode: 13
