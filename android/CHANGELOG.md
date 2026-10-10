@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.6.4
+
+- The APK no longer carries a Google-encrypted dependency block, which F-Droid
+  does not allow. No changes to the app itself.
+
 ## 2.6.3
 
 - Builds on a stock JDK with no toolchain download, as F-Droid requires. No

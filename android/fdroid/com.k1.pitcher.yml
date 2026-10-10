@@ -1,6 +1,6 @@
 Categories:
-  - Music Practice Tool
   - Local Media Player
+  - Music Practice Tool
 License: GPL-3.0-only
 AuthorName: k1monfared
 WebSite: https://k1monfared.com/pitcher/
@@ -18,7 +18,7 @@ Binaries: https://github.com/k1monfared/pitcher/releases/download/v%v/pitcher-an
 Builds:
   - versionName: 2.6.3
     versionCode: 12
-    commit: v2.6.3
+    commit: 47bae68ec6a00102ff1358287f5f8194d2a7098e
     subdir: android/app
     gradle:
       - fdroid

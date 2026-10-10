@@ -13,8 +13,8 @@ android {
         applicationId = "com.k1.pitcher"
         minSdk = 29
         targetSdk = 36
-        versionCode = 12
-        versionName = "2.6.3"
+        versionCode = 13
+        versionName = "2.6.4"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -60,6 +60,12 @@ android {
             dimension = "store"
             buildConfigField("boolean", "SUPPORT_LINKS", "false")
         }
+    }
+
+    // The dependency block is encrypted with a Google key, which F-Droid's
+    // scanner rejects. Play still gets it through the bundle.
+    dependenciesInfo {
+        includeInApk = false
     }
 
     compileOptions {
