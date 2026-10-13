@@ -9,21 +9,29 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.viewModels
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.core.content.ContextCompat
 import androidx.core.content.IntentCompat
 import pitcher.android.ui.AppRoot
+import pitcher.android.ui.PitcherViewModel
 
 class MainActivity : ComponentActivity() {
     private val incoming = mutableStateOf<Uri?>(null)
+    private val viewModel: PitcherViewModel by viewModels()
+    private var askedNotifications = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        requestNotificationPermissionIfNeeded()
         incoming.value = extractUri(intent)
         setContent {
+            LaunchedEffect(viewModel.isPlaying) {
+                if (viewModel.isPlaying) requestNotificationPermissionIfNeeded()
+            }
             AppRoot(
+                vm = viewModel,
                 incomingUri = incoming.value,
                 onIncomingConsumed = { incoming.value = null },
             )
@@ -49,7 +57,9 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun requestNotificationPermissionIfNeeded() {
+        if (askedNotifications) return
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
+        askedNotifications = true
         val granted = ContextCompat.checkSelfPermission(
             this,
             Manifest.permission.POST_NOTIFICATIONS,

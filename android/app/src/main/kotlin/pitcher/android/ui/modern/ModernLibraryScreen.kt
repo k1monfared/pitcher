@@ -81,7 +81,7 @@ fun LibraryContent(
                     fontWeight = FontWeight.SemiBold,
                 )
                 Text(
-                    "${tracks.size} songs",
+                    songCountLabel(tracks.size),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
