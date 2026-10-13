@@ -1,6 +1,8 @@
 package pitcher.android.ui
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onRoot
@@ -55,6 +57,17 @@ class ScreenshotTest {
         compose.mainClock.advanceTimeBy(1_000)
     }
 
+    // The app window is dark, but the Roborazzi host is white, so screens that
+    // rely on the window background need it drawn here to match the device.
+    @Composable
+    private fun AppScreen(content: @Composable () -> Unit) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background),
+        ) { content() }
+    }
+
     private val track = Track(
         id = 1,
         sourcePath = "/data/imports/nava.m4a",
@@ -99,15 +112,17 @@ class ScreenshotTest {
         )
         compose.setContent {
             ModernTheme {
-                LibraryContent(
-                    tracks = listOf(track, farsi),
-                    message = null,
-                    canClose = true,
-                    onImport = {},
-                    onClose = {},
-                    onOpen = {},
-                    onDelete = {},
-                )
+                AppScreen {
+                    LibraryContent(
+                        tracks = listOf(track, farsi),
+                        message = null,
+                        canClose = true,
+                        onImport = {},
+                        onClose = {},
+                        onOpen = {},
+                        onDelete = {},
+                    )
+                }
             }
         }
         settle()
@@ -146,23 +161,25 @@ class ScreenshotTest {
         val targets = OnboardingTargets()
         compose.setContent {
             ModernTheme {
-                Box {
-                    LibraryContent(
-                        tracks = listOf(track),
-                        message = null,
-                        canClose = false,
-                        onImport = {},
-                        onClose = {},
-                        onOpen = {},
-                        onDelete = {},
-                        onboarding = targets,
-                    )
-                    OnboardingOverlay(
-                        targets = targets,
-                        steps = LIBRARY_TOUR,
-                        finalLabel = "Next",
-                        onFinish = {},
-                    )
+                AppScreen {
+                    Box {
+                        LibraryContent(
+                            tracks = listOf(track),
+                            message = null,
+                            canClose = false,
+                            onImport = {},
+                            onClose = {},
+                            onOpen = {},
+                            onDelete = {},
+                            onboarding = targets,
+                        )
+                        OnboardingOverlay(
+                            targets = targets,
+                            steps = LIBRARY_TOUR,
+                            finalLabel = "Next",
+                            onFinish = {},
+                        )
+                    }
                 }
             }
         }
