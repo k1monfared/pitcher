@@ -1,5 +1,14 @@
 # Changelog
 
+## 2.6.5
+
+- Saving at a practice speed now applies the pitch and the speed together, so
+  the saved file matches the preview. A fast save no longer smears a pure tone.
+- The tuner's note fields no longer let the keyboard rewrite a note, and the
+  library counts "1 song" instead of "1 songs".
+- Two unused media permissions are gone, and the notification permission is
+  asked for when playback starts rather than at launch.
+
 ## 2.6.4
 
 - The APK no longer carries a Google-encrypted dependency block, which F-Droid

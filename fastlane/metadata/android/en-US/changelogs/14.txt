@@ -1,0 +1,4 @@
+- Saved files at practice speed now match the preview.
+- The tuner's note fields no longer let the keyboard rewrite a note, and the
+  library counts "1 song" instead of "1 songs".
+- Removed two unused permissions and ask for notifications on first playback.
