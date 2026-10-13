@@ -607,18 +607,20 @@ class PitcherViewModel(app: Application) : AndroidViewModel(app) {
             try {
                 val existing = matchingRender(id, name, format, segmentsKey, speed)
                 val uri = existing?.uri ?: run {
-                    val prepared = prepare(id, variant.cents).await()
+                    val plan = RenderPlan.exportSource(variant.cents, speed)
+                    val prepared = if (plan.fromOriginal) null else prepare(id, variant.cents).await()
                     val saved = withContext(renderDispatcher) {
                         val tmpDir = File(app.cacheDir, "renders").apply { mkdirs() }
                         val tmp = File(tmpDir, "render-${System.nanoTime()}.${format.extension}")
                         try {
-                            // The prepared file is already shifted, so this only
-                            // cuts the loops, applies the speed, and encodes.
+                            // At speed 1 the prepared file is already shifted.
+                            // A speed change shares Sonic with the pitch, so it
+                            // is rendered from the original in one pass.
                             AudioRenderer.render(
-                                sourcePath = prepared.path,
+                                sourcePath = prepared?.path ?: track.sourcePath,
                                 target = tmp,
                                 format = format,
-                                cents = 0,
+                                cents = plan.cents,
                                 segments = segments,
                                 speed = speed,
                                 cancelled = { flag.get() },

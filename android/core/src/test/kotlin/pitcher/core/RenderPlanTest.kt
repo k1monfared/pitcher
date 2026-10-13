@@ -54,4 +54,21 @@ class RenderPlanTest {
         val records = listOf(record(1, "m4a", "A"), record(5, "m4a", "A"))
         assertEquals(5L, RenderPlan.reusable(records, "m4a", "A", "")?.id)
     }
+
+    @Test
+    fun atSpeedOneTheCachedPitchIsReused() {
+        val source = RenderPlan.exportSource(cents = 300, speed = 1.0)
+        assertEquals(false, source.fromOriginal)
+        assertEquals(0, source.cents)
+    }
+
+    @Test
+    fun aSpeedChangePitchesAndStretchesInOnePassFromTheOriginal() {
+        val faster = RenderPlan.exportSource(cents = 300, speed = 2.0)
+        assertEquals(true, faster.fromOriginal)
+        assertEquals(300, faster.cents)
+        val slower = RenderPlan.exportSource(cents = -200, speed = 0.5)
+        assertEquals(true, slower.fromOriginal)
+        assertEquals(-200, slower.cents)
+    }
 }

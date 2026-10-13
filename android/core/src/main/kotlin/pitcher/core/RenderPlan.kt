@@ -35,4 +35,17 @@ object RenderPlan {
                     it.segments == segments && abs(it.speed - speed) < 1e-3
             }
             .maxByOrNull { it.id }
+
+    /** How an export gets its audio: the original file, or the cached pitched one. */
+    data class ExportSource(val fromOriginal: Boolean, val cents: Int)
+
+    /**
+     * A pitch change and a speed change must share one Sonic pass: its speed-only
+     * pass degrades some tones, and live playback applies both together, so
+     * splitting them makes a saved file differ from the preview. At speed 1 the
+     * cached pitched file is reused as is.
+     */
+    fun exportSource(cents: Int, speed: Double): ExportSource =
+        if (speed == 1.0) ExportSource(fromOriginal = false, cents = 0)
+        else ExportSource(fromOriginal = true, cents = cents)
 }

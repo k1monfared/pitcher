@@ -43,6 +43,14 @@ class SonicShifterTest {
     }
 
     @Test
+    fun pitchAndSpeedTogetherStayInTune() {
+        val out = SonicShifter.process(stereo(440.0, 4.0), sr, cents = 200, speed = 2.0)
+        val expected = 440.0 * Math.pow(2.0, 200 / 1200.0)
+        val hz = Tuner.detect(out[0].copyOfRange(sr / 2, sr / 2 + 8192), sr)!!.hz
+        assertTrue("hz=$hz expected~$expected", abs(hz - expected) < 6.0)
+    }
+
+    @Test
     fun noChangeIsACopy() {
         val input = stereo(440.0, 0.5)
         val out = SonicShifter.process(input, sr, cents = 0, speed = 1.0)
