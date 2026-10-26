@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 2.6.6
 
 - Share or save a whole song as one `.pitcher` file from the song's More menu
   in Library. It holds the original audio and every pitch, loop, and bookmark

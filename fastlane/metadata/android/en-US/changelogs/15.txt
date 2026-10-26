@@ -1,0 +1,5 @@
+- Share or save a whole song as one .pitcher file from Library: the original
+  audio plus every pitch, loop, and bookmark with its name. Opening it in
+  pitcher adds the song to the library.
+- Removed the network state permission the media library pulled in.
+- The support links moved to the bottom of Settings.
