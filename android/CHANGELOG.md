@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- The network state permission that the media library pulled in is gone, so
+  the store listing no longer shows "view network connections".
+
 ## 2.6.5
 
 - Saving at a practice speed now applies the pitch and the speed together, so

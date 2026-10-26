@@ -103,9 +103,16 @@ same pitch + settings returns the existing row. Filenames follow the same rule:
 
 ## Permissions
 
-- `READ_MEDIA_AUDIO`, `READ_MEDIA_VIDEO` (scoped, no broad storage).
-- `POST_NOTIFICATIONS` + `FOREGROUND_SERVICE_MEDIA_PLAYBACK` only if background
-  play is enabled.
+- No storage permission: files come in through the system picker and the share
+  sheet, which grant per-file access. (`READ_MEDIA_AUDIO` and `READ_MEDIA_VIDEO`
+  were dropped in 2.6.5.)
+- `FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_MEDIA_PLAYBACK` and
+  `POST_NOTIFICATIONS` for background playback. Notifications are requested when
+  playback first starts.
+- `WAKE_LOCK` is merged in by libraries and kept for background playback and
+  rendering.
+- `ACCESS_NETWORK_STATE`, merged in by Media3, is removed with
+  `tools:node="remove"`.
 - No `INTERNET` permission: proves offline-only, helps F-Droid review.
 
 ## Testing

@@ -5,9 +5,15 @@ practice with loops and slower speeds, and save or share the result. Native
 Kotlin and Jetpack Compose, fully offline: no network permission and no bundled
 downloader.
 
-Install the APK from the
+Install it from [F-Droid](https://f-droid.org/packages/com.k1.pitcher/), or get
+the APK from the
 [latest release](https://github.com/k1monfared/pitcher/releases/latest). Android
 10 or newer. Release notes are in [CHANGELOG.md](CHANGELOG.md).
+
+The app asks for foreground service and notification permissions to keep
+playback going in the background, and a wake lock that Media3 and the background
+renderer use while the screen is off. Media3's network state permission is
+removed from the merged manifest, since the app only plays local files.
 
 ## Using the app
 
