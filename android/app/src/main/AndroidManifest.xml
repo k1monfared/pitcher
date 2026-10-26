@@ -33,6 +33,8 @@
                 <category android:name="android.intent.category.DEFAULT" />
                 <data android:mimeType="audio/*" />
                 <data android:mimeType="video/*" />
+                <data android:mimeType="application/zip" />
+                <data android:mimeType="application/octet-stream" />
             </intent-filter>
 
             <intent-filter>
@@ -41,6 +43,8 @@
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:mimeType="audio/*" />
                 <data android:mimeType="video/*" />
+                <data android:mimeType="application/zip" />
+                <data android:mimeType="application/octet-stream" />
             </intent-filter>
         </activity>
 

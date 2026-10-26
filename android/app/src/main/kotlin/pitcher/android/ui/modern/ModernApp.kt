@@ -16,6 +16,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
+import pitcher.android.data.SongPackage
 import pitcher.android.ui.PitcherViewModel
 
 /**
@@ -49,7 +50,8 @@ fun ModernApp(
             putExtra(Intent.EXTRA_STREAM, uri)
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
-        context.startActivity(Intent.createChooser(send, "Share pitched audio"))
+        val title = if (vm.exportMime == SongPackage.MIME) "Share song package" else "Share pitched audio"
+        context.startActivity(Intent.createChooser(send, title))
         vm.consumeShareUri()
     }
 

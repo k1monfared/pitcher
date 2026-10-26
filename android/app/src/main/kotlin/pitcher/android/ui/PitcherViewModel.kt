@@ -6,6 +6,7 @@ import android.net.Uri
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.core.content.FileProvider
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.media3.common.MediaItem
@@ -32,6 +33,7 @@ import kotlin.math.roundToInt
 import pitcher.android.data.Bookmark
 import pitcher.android.data.LoopSection
 import pitcher.android.data.ShelfRepository
+import pitcher.android.data.SongPackage
 import pitcher.android.data.Track
 import pitcher.android.data.Variant
 import pitcher.android.media.AudioRenderer
@@ -196,7 +198,31 @@ class PitcherViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             message = "importing..."
             try {
-                val imported = withContext(Dispatchers.IO) { MediaImporter.copyIn(getApplication(), uri) }
+                val app = getApplication<Application>()
+                val isPackage = withContext(Dispatchers.IO) {
+                    app.contentResolver.openInputStream(uri)?.use { input ->
+                        val head = ByteArray(4)
+                        var n = 0
+                        while (n < head.size) {
+                            val r = input.read(head, n, head.size - n)
+                            if (r < 0) break
+                            n += r
+                        }
+                        SongPackage.looksLikePackage(head.copyOf(n))
+                    } ?: false
+                }
+                if (isPackage) {
+                    val id = withContext(Dispatchers.IO) {
+                        app.contentResolver.openInputStream(uri)!!.use {
+                            SongPackage.import(repo, it, MediaImporter.importsDir(app))
+                        }
+                    }
+                    refreshTracks()
+                    repo.getTrack(id)?.let { openTrack(it) }
+                    message = null
+                    return@launch
+                }
+                val imported = withContext(Dispatchers.IO) { MediaImporter.copyIn(app, uri) }
                 val id = repo.addTrack(
                     sourcePath = imported.file.absolutePath,
                     sourceKind = "file",
@@ -671,6 +697,43 @@ class PitcherViewModel(app: Application) : AndroidViewModel(app) {
 
     fun consumeShareUri() {
         shareUri = null
+    }
+
+    /** Shares [track] with its pitches, loops and bookmarks as one package file. */
+    fun sharePackage(track: Track) {
+        val app = getApplication<Application>()
+        viewModelScope.launch {
+            try {
+                val file = withContext(Dispatchers.IO) {
+                    val dir = File(app.cacheDir, "packages").apply { mkdirs() }
+                    dir.listFiles()?.forEach { it.delete() }
+                    File(dir, SongPackage.fileName(track)).also { f ->
+                        f.outputStream().use { SongPackage.export(repo, track.id, it) }
+                    }
+                }
+                shareUri = FileProvider.getUriForFile(app, "${app.packageName}.fileprovider", file)
+                exportMime = SongPackage.MIME
+            } catch (e: Throwable) {
+                popup = "Could not share: ${reasonOf(e)}"
+            }
+        }
+    }
+
+    /** Writes [track]'s package to [target], a document the user picked. */
+    fun savePackage(track: Track, target: Uri) {
+        val app = getApplication<Application>()
+        viewModelScope.launch {
+            popup = try {
+                withContext(Dispatchers.IO) {
+                    app.contentResolver.openOutputStream(target)?.use {
+                        SongPackage.export(repo, track.id, it)
+                    } ?: error("cannot write there")
+                }
+                "Saved ${SongPackage.fileName(track)}"
+            } catch (e: Throwable) {
+                "Could not save: ${reasonOf(e)}"
+            }
+        }
     }
 
     fun changeKeepScreenOn(value: Boolean) {

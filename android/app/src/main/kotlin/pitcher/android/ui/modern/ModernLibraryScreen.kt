@@ -4,6 +4,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -14,6 +15,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -28,6 +31,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import pitcher.android.data.SongPackage
 import pitcher.android.data.Track
 import pitcher.android.ui.PitcherViewModel
 
@@ -41,21 +45,36 @@ fun ModernLibraryScreen(
     val launcher = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocument(),
     ) { uri -> uri?.let { vm.import(it) { onOpen() } } }
+    var saving by remember { mutableStateOf<Track?>(null) }
+    val saver = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument(SongPackage.MIME),
+    ) { uri ->
+        val track = saving
+        saving = null
+        if (uri != null && track != null) vm.savePackage(track, uri)
+    }
 
     LibraryContent(
         tracks = vm.tracks,
         message = vm.message,
         canClose = vm.current != null,
-        onImport = { launcher.launch(arrayOf("audio/*", "video/*")) },
+        onImport = { launcher.launch(IMPORT_TYPES) },
         onClose = onClose,
         onOpen = { track ->
             vm.openTrack(track)
             onOpen()
         },
         onDelete = { vm.deleteTrack(it) },
+        onSharePackage = { vm.sharePackage(it) },
+        onSavePackage = { track ->
+            saving = track
+            saver.launch(SongPackage.fileName(track))
+        },
         onboarding = onboarding,
     )
 }
+
+private val IMPORT_TYPES = arrayOf("audio/*", "video/*", SongPackage.MIME, "application/octet-stream")
 
 @Composable
 fun LibraryContent(
@@ -66,6 +85,8 @@ fun LibraryContent(
     onClose: () -> Unit,
     onOpen: (Track) -> Unit,
     onDelete: (Track) -> Unit,
+    onSharePackage: (Track) -> Unit = {},
+    onSavePackage: (Track) -> Unit = {},
     onboarding: OnboardingTargets? = null,
 ) {
     Column(modifier = Modifier.fillMaxSize().safeDrawingPadding()) {
@@ -116,7 +137,7 @@ fun LibraryContent(
             ) {
                 Text("No songs yet", style = MaterialTheme.typography.titleMedium)
                 Text(
-                    "Import an audio or video file, or share one into pitcher.",
+                    "Import an audio or video file, or a song package someone sent you.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -128,6 +149,8 @@ fun LibraryContent(
                         track = track,
                         onOpen = { onOpen(track) },
                         onDelete = { onDelete(track) },
+                        onSharePackage = { onSharePackage(track) },
+                        onSavePackage = { onSavePackage(track) },
                     )
                     HorizontalDivider()
                 }
@@ -137,8 +160,15 @@ fun LibraryContent(
 }
 
 @Composable
-private fun SongRow(track: Track, onOpen: () -> Unit, onDelete: () -> Unit) {
+private fun SongRow(
+    track: Track,
+    onOpen: () -> Unit,
+    onDelete: () -> Unit,
+    onSharePackage: () -> Unit,
+    onSavePackage: () -> Unit,
+) {
     var confirmDelete by remember { mutableStateOf(false) }
+    var menuOpen by remember { mutableStateOf(false) }
     if (confirmDelete) {
         AlertDialog(
             onDismissRequest = { confirmDelete = false },
@@ -190,6 +220,31 @@ private fun SongRow(track: Track, onOpen: () -> Unit, onDelete: () -> Unit) {
                 )
             }
         }
-        TextButton(onClick = { confirmDelete = true }) { Text("Delete") }
+        Box {
+            TextButton(onClick = { menuOpen = true }) { Text("More") }
+            DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                DropdownMenuItem(
+                    text = { Text("Share song package") },
+                    onClick = {
+                        menuOpen = false
+                        onSharePackage()
+                    },
+                )
+                DropdownMenuItem(
+                    text = { Text("Save song package") },
+                    onClick = {
+                        menuOpen = false
+                        onSavePackage()
+                    },
+                )
+                DropdownMenuItem(
+                    text = { Text("Delete") },
+                    onClick = {
+                        menuOpen = false
+                        confirmDelete = true
+                    },
+                )
+            }
+        }
     }
 }

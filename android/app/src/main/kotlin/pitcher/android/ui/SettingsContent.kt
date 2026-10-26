@@ -42,15 +42,6 @@ fun SettingsContent(vm: PitcherViewModel, modifier: Modifier = Modifier) {
         modifier = modifier.fillMaxWidth().padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        if (BuildConfig.SUPPORT_LINKS) {
-            SupportLinksSection(onOpen = { url ->
-                runCatching {
-                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
-                }
-            })
-            HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
-        }
-
         Text("Playback", style = MaterialTheme.typography.titleMedium)
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -126,6 +117,17 @@ fun SettingsContent(vm: PitcherViewModel, modifier: Modifier = Modifier) {
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Button(onClick = { vm.startOnboarding() }) { Text("Replay the tour") }
+
+        if (BuildConfig.SUPPORT_LINKS) {
+            HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+            SupportLinksSection(onOpen = { url ->
+                runCatching {
+                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+                }
+            })
+        }
+
+        HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
 
         Text("pitcher ${BuildConfig.VERSION_NAME} for Android", style = MaterialTheme.typography.bodySmall)
         Text(

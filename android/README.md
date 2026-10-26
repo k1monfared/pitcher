@@ -71,6 +71,14 @@ The pitch does not change.
 - Each pitch saves on its own, so one long save never blocks another.
 - Saved files use the same Sonic engine as playback, so they sound like the preview.
 
+**Share a whole song.** In Library, tap More on a song and choose Share song
+package or Save song package. You get one `.pitcher` file holding the original
+audio and every pitch, loop, and bookmark with its name. Opening it in pitcher,
+by tapping it, sharing it in, or using Import, adds it as a new song and leaves
+the rest of the library alone. Rendered files and your save folder are not
+included, so the package is about the size of the song. It also works as a
+backup of one song.
+
 A guided tour runs the first time you open a song and can be replayed from
 Settings.
 

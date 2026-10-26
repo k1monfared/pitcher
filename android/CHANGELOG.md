@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Share or save a whole song as one `.pitcher` file from the song's More menu
+  in Library. It holds the original audio and every pitch, loop, and bookmark
+  with its name, and opening it in pitcher adds the song to the library.
+- The support links moved to the bottom of Settings, so Keep screen on and the
+  other options come first.
 - The network state permission that the media library pulled in is gone, so
   the store listing no longer shows "view network connections".
 
